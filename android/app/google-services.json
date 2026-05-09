@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "424085530648",
+    "project_id": "anipulse-e8f26",
+    "storage_bucket": "anipulse-e8f26.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:424085530648:android:bc7adc53999474ca89bb6d",
+        "android_client_info": {
+          "package_name": "com.nexora.anipulse"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAq-moEh7mQn0h25UhFmWCO5EpSZJJQkdk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
