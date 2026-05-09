@@ -23,7 +23,7 @@
         "backgroundColor": "#0F0F0F"
       },
       "package": "com.nexora.anipulse",
-      "googleServicesFile": "./android/app/google-services.json"
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
