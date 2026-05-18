@@ -1,156 +1,215 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TextInput, 
-  TouchableOpacity, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
   Platform,
   ScrollView
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, borderRadius, typography } from '../../src/theme';
-import { Button } from '../../src/components/ui';
+import { useThemeColors } from '../../src/hooks/useThemeColors';
+import { Button, AuthFeedback } from '../../src/components/ui';
+import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { firebaseAuthService } from '../../src/services/firebase/auth';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import { GOOGLE_AUTH_CONFIG } from '../../src/services/firebase/authConfig';
+import { useAppStore } from '../../src/store/useAppStore';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const router = useRouter();
-  
+  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const setIsGuest = useAppStore(state => state.setIsGuest);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+    androidClientId: GOOGLE_AUTH_CONFIG.androidClientId,
+    iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+  });
+
+  React.useEffect(() => {
+    if (response?.type === 'success') {
+      const { id_token } = response.params;
+      handleGoogleSignInWithToken(id_token);
+    }
+  }, [response]);
+
+  const handleGoogleSignInWithToken = async (idToken: string) => {
+    setIsLoading(true);
+    try {
+      const user = await firebaseAuthService.signInWithGoogle(idToken);
+      if (user) {
+        setFeedback({ message: 'Signed in with Google!', type: 'success' });
+        setTimeout(() => router.replace('/(tabs)/home'), 1000);
+      }
+    } catch (error: any) {
+      console.error(error);
+      setFeedback({ message: 'Google Sign-In failed', type: 'error' });
+      setIsLoading(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) return;
-    
+
     setIsLoading(true);
     try {
       const user = await firebaseAuthService.loginWithEmail(email, password);
       if (user) {
-        router.replace('/(tabs)/home');
+        setFeedback({ message: 'Welcome back!', type: 'success' });
+        setTimeout(() => router.replace('/(tabs)/home'), 1000);
       }
     } catch (error: any) {
       console.error(error);
-      alert(error.message || 'Login failed');
+      setFeedback({
+        message: error.code === 'auth/user-not-found' ? 'User not found' :
+          error.code === 'auth/wrong-password' ? 'Incorrect password' :
+            'Login failed. Please check your credentials.',
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
-    setIsLoading(true);
-    try {
-      const user = await firebaseAuthService.signInWithGoogle();
-      if (user) {
-        router.replace('/(tabs)/home');
+    if (Platform.OS === 'web') {
+      setIsLoading(true);
+      try {
+        const user = await firebaseAuthService.signInWithGoogle();
+        if (user) {
+          router.replace('/(tabs)/home');
+        }
+      } catch (error: any) {
+        console.error(error);
+        alert(error.message || 'Google Sign-In failed');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error: any) {
-      console.error(error);
-      alert(error.message || 'Google Sign-In failed');
-    } finally {
-      setIsLoading(false);
+    } else {
+      promptAsync();
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      alert('Please enter your email address first.');
-      return;
-    }
-    try {
-      await firebaseAuthService.sendPasswordResetEmail(email);
-      alert('Password reset email sent! Please check your inbox.');
-    } catch (error: any) {
-      console.error(error);
-      alert(error.message || 'Failed to send reset email');
-    }
+  const handleForgotPassword = () => {
+    // Implement forgot password
+    alert('Forgot password functionality coming soon!');
   };
 
   const handleGuestMode = () => {
+    setIsGuest(true);
     router.replace('/(tabs)/home');
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to continue your journey</Text>
-        </View>
+    <AnimatedScreen style={[styles.container, { backgroundColor: colors.background }]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <AuthFeedback
+          visible={!!feedback}
+          message={feedback?.message || ''}
+          type={feedback?.type}
+          onHide={() => setFeedback(null)}
+        />
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your email"
-              placeholderTextColor={colors.textDim}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }
+          ]}
+        >
+          <View style={styles.header}>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Sign in to continue your journey</Text>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your password"
-              placeholderTextColor={colors.textDim}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
-          </View>
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor={colors.textDim}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
 
-          <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor={colors.textDim}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+              />
+            </View>
 
-          <Button 
-            title="Login" 
-            onPress={handleLogin} 
-            isLoading={isLoading}
-            style={styles.loginButton}
-          />
-
-          <View style={styles.dividerContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.divider} />
-          </View>
-
-          <Button 
-            title="Sign in with Google" 
-            onPress={handleGoogleSignIn} 
-            variant="secondary"
-            isLoading={isLoading}
-            style={styles.guestButton}
-          />
-
-          <Button 
-            title="Continue as Guest" 
-            onPress={handleGuestMode} 
-            variant="outline"
-            style={styles.guestButton}
-          />
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <Link href="/(auth)/register" asChild>
-            <TouchableOpacity>
-              <Text style={styles.footerLink}>Register</Text>
+            <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
-          </Link>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+            <Button
+              title="Login"
+              onPress={handleLogin}
+              isLoading={isLoading}
+              style={styles.loginButton}
+            />
+
+            <View style={styles.dividerContainer}>
+              <View style={styles.divider} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.divider} />
+            </View>
+
+            <Button
+              title="Sign in with Google"
+              onPress={handleGoogleSignIn}
+              variant="secondary"
+              isLoading={isLoading}
+              style={styles.guestButton}
+            />
+
+            <Button
+              title="Continue as Guest"
+              onPress={handleGuestMode}
+              variant="outline"
+              style={styles.guestButton}
+            />
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Don't have an account? </Text>
+            <Link href="/(auth)/register" asChild>
+              <TouchableOpacity>
+                <Text style={styles.footerLink}>Register</Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </AnimatedScreen>
   );
 }
 

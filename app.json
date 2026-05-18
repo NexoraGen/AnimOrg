@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "AniVerse",
-    "slug": "aniverse",
+    "name": "AnimOrg",
+    "slug": "animorg",
+    "scheme": "animorg",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#0F0F0F"
     },
     "assetBundlePatterns": [
@@ -22,7 +23,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F0F0F"
       },
-      "package": "com.nexora.anipulse",
+      "package": "com.nexora.animorg",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -30,8 +31,6 @@
     },
     "plugins": [
       "expo-router",
-      "@react-native-firebase/app",
-      "@react-native-google-signin/google-signin",
       [
         "expo-build-properties",
         {
@@ -39,15 +38,24 @@
             "useFrameworks": "static"
           }
         }
+      ],
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow AnimOrg to access your photos to select custom anime avatars.",
+          "cameraPermission": "Allow camera access to personalize your anime identity."
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
     },
+    "owner": "itisnexora",
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "8e0f2898-88bd-45d5-9031-511e4b85ee91"
+        "projectId": "a2a3be68-4799-4025-ab7c-f3f8070eff20"
       }
     }
   }

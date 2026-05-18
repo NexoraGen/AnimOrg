@@ -1,28 +1,38 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
+import {
+  View,
+  Text,
+  StyleSheet,
   Dimensions,
   TouchableOpacity,
-  ScrollView
+  ScrollView,
+  useWindowDimensions
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/theme';
-import { GlassHeader, PosterCard } from '../../src/components/ui';
+import { GlassHeader, PosterCard, HEADER_HEIGHT, Button } from '../../src/components/ui';
+import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useRouter } from 'expo-router';
+import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useState } from 'react';
 import { WatchlistItem, Media } from '../../src/types';
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - spacing.md * 3) / 2;
+
 
 export default function WatchlistScreen() {
   const router = useRouter();
-  const watchlist = useAppStore((state) => state.watchlist);
+  const insets = useSafeAreaInsets();
+  const { watchlist, animeProgress } = useAppStore();
   const [activeTab, setActiveTab] = useState<string>('all');
-  
+  const themeColors = useThemeColors();
+  const { width } = useWindowDimensions();
+
+  const numColumns = width > 1024 ? 5 : width > 768 ? 4 : 2;
+  const cardWidth = (width - spacing.md * 2 - spacing.md * (numColumns - 1)) / numColumns;
+
   const TABS = [
     { id: 'all', label: 'All' },
     { id: 'favorites', label: 'Favorites' },
@@ -42,7 +52,7 @@ export default function WatchlistScreen() {
     id: item.mediaId,
     title: item.title || 'Unknown Title',
     posterPath: item.posterPath || '',
-    rating: item.rating || 0,
+    rating: item.rating,
     description: '',
     backdropPath: '',
     releaseYear: 0,
@@ -51,13 +61,13 @@ export default function WatchlistScreen() {
   });
 
   return (
-    <View style={styles.container}>
-      <GlassHeader title="My Watchlist" />
-      
-      <View style={styles.tabsContainer}>
+    <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
+      <GlassHeader title="My Watchlist" showLogo={true} />
+
+      <View style={[styles.tabsContainer, { paddingTop: insets.top + HEADER_HEIGHT + 20 }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
           {TABS.map(tab => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={tab.id}
               style={[styles.tab, activeTab === tab.id && styles.activeTab]}
               onPress={() => setActiveTab(tab.id)}
@@ -72,35 +82,53 @@ export default function WatchlistScreen() {
 
       {filteredWatchlist.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>Nothing here yet</Text>
-          <Text style={styles.emptySubtitle}>
-            {activeTab === 'favorites' 
-              ? "You haven't added any favorites." 
-              : "Start adding anime you want to watch!"}
+          <View style={[styles.emptyIconCircle, { backgroundColor: themeColors.surfaceVariant }]}>
+            <Feather name="bookmark" size={48} color={themeColors.textDim} />
+            <View style={[styles.emptyIconBadge, { backgroundColor: themeColors.primary }]}>
+              <Feather name="plus" size={16} color="#FFF" />
+            </View>
+          </View>
+          <Text style={[styles.emptyTitle, { color: themeColors.text }]}>Your Library is Empty</Text>
+          <Text style={[styles.emptySubtitle, { color: themeColors.textMuted }]}>
+            {activeTab === 'favorites'
+              ? "You haven't added any favorites to your collection yet."
+              : "Discover masterpieces and track your progress in real-time."}
           </Text>
+          <Button
+            title="Start Discovering"
+            onPress={() => router.push('/(tabs)/home')}
+            style={styles.emptyButton}
+            variant="primary"
+          />
         </View>
       ) : (
-        <FlatList
+        <FlashList
           data={filteredWatchlist}
           keyExtractor={(item) => item.mediaId}
-          numColumns={2}
+          numColumns={numColumns}
           contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <View style={styles.cardContainer}>
-              <PosterCard 
-                media={mapWatchlistItemToMedia(item)} 
-                onPress={() => router.push(`/details/${item.mediaId}`)} 
-              />
-            </View>
-          )}
+          renderItem={({ item }) => {
+            const progressRec = animeProgress[item.mediaId];
+            const watchedCount = progressRec ? Object.values(progressRec.watchedEpisodes).filter(v => v).length : 0;
+            const total = item.episodes || 0;
+            const percentage = total > 0 ? watchedCount / total : 0;
+
+            return (
+              <View style={[styles.cardContainer, { width: cardWidth }]}>
+                <PosterCard
+                  media={mapWatchlistItemToMedia(item)}
+                  onPress={() => router.push(`/details/${item.mediaId}`)}
+                  width={cardWidth}
+                  showProgress={item.status === 'watching' && percentage > 0}
+                  progress={percentage}
+                />
+              </View>
+            );
+          }}
         />
       )}
 
-      <View style={styles.premiumBanner}>
-        <Text style={styles.premiumTitle}>Upgrade to Premium</Text>
-        <Text style={styles.premiumText}>Unlock unlimited watchlists and offline viewing.</Text>
-      </View>
-    </View>
+    </AnimatedScreen>
   );
 }
 
@@ -110,7 +138,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   tabsContainer: {
-    paddingTop: 100,
     paddingBottom: spacing.sm,
   },
   tabsScroll: {
@@ -126,7 +153,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   activeTab: {
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: 'rgba(183, 28, 28, 0.2)',
     borderColor: colors.primary,
   },
   tabText: {
@@ -143,9 +170,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   cardContainer: {
-    width: '48%',
     marginBottom: spacing.md,
-    marginRight: spacing.sm,
   },
   emptyContainer: {
     flex: 1,
@@ -153,24 +178,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.xl,
   },
+  emptyIconCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xl,
+    position: 'relative',
+  },
+  emptyIconBadge: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#0F0F0F',
+  },
   emptyTitle: {
-    color: colors.text,
-    fontSize: typography.sizes.xl,
-    fontWeight: typography.weights.bold as any,
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: spacing.sm,
   },
   emptySubtitle: {
-    color: colors.textMuted,
-    fontSize: typography.sizes.md,
+    fontSize: 16,
     textAlign: 'center',
+    paddingHorizontal: spacing.xl,
+    lineHeight: 24,
+    marginBottom: spacing.xl,
+  },
+  emptyButton: {
+    minWidth: 200,
   },
   premiumBanner: {
     margin: spacing.md,
     padding: spacing.md,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: 'rgba(183, 28, 28, 0.1)',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: 'rgba(183, 28, 28, 0.3)',
     alignItems: 'center',
   },
   premiumTitle: {

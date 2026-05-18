@@ -1,41 +1,216 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TextInput, 
-  FlatList, 
-  Pressable 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  ScrollView,
+  Platform,
+  useWindowDimensions,
+  ActivityIndicator,
+  Animated,
+  TouchableOpacity
 } from 'react-native';
-import { Search as SearchIcon, X } from 'lucide-react-native';
+import { FlashList } from '@shopify/flash-list';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { useAppStore } from '../../src/store/useAppStore';
+import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { colors, spacing, borderRadius, typography } from '../../src/theme';
-import { PosterCard, GlassHeader, SkeletonLoader } from '../../src/components/ui';
+import {
+  PosterCard,
+  GlassHeader,
+  SkeletonLoader,
+  HEADER_HEIGHT,
+  GenreChip,
+  SectionHeader,
+  CharacterSearchCard
+} from '../../src/components/ui';
+import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useRouter } from 'expo-router';
 import { animeApi } from '../../src/services/animeApi';
 import { useDebounce } from '../../src/hooks/useDebounce';
 import { Media } from '../../src/types';
+import { RecommendationService, RecommendationResult } from '../../src/services/RecommendationService';
+import { RecommendationModal } from '../../src/components/features/RecommendationModal';
+
+const THEME_MAP: Record<string, number> = {
+  'Action': 1, 'Adventure': 2, 'Comedy': 4, 'Romance': 22,
+  'Psychological': 40, 'Fantasy': 10, 'Thriller': 41,
+  'Shonen': 27, 'Seinen': 42, 'Sports': 30, 'Sci-Fi': 24,
+  'Mystery': 7, 'Slice of Life': 36, 'Samurai': 21,
+  'Magic': 16, 'Mecha': 18, 'Survival': 73, 'Horror': 14,
+  'School Life': 23, 'Isekai': 62, 'Supernatural': 37,
+  'Military': 38
+};
 
 export default function SearchScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const themeColors = useThemeColors();
+  const { width } = useWindowDimensions();
+
+  const { searchHistory, addToSearchHistory, clearSearchHistory, setModalActive } = useAppStore();
+
   const [query, setQuery] = useState('');
+  const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
+  const [minScore, setMinScore] = useState<number | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+
   const debouncedQuery = useDebounce(query, 500);
+
   const [results, setResults] = useState<Media[]>([]);
+  const [characterResults, setCharacterResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  
-  const GENRES = ['Action', 'Adventure', 'Fantasy', 'Sci-Fi', 'Horror', 'Comedy', 'Drama'];
+  const [isMoreLoading, setIsMoreLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(true);
+  const [isDiscoverMode, setIsDiscoverMode] = useState(false);
+  const [recommendationResult, setRecommendationResult] = useState<RecommendationResult | null>(null);
+  const [nextRecommendationMode, setNextRecommendationMode] = useState<'personalized' | 'community'>('personalized');
+  const [showRecModal, setShowRecModal] = useState(false);
 
-  React.useEffect(() => {
-    if (debouncedQuery.trim() === '') {
-      setResults([]);
-      setIsLoading(false);
-      return;
+  useEffect(() => {
+    setModalActive(showRecModal);
+  }, [showRecModal]);
+  const [isRecLoading, setIsRecLoading] = useState(false);
+
+  const {
+    watchlist,
+    userRatings,
+    getFavoriteGenres,
+    notInterested,
+    addToNotInterested,
+    recommendationHistory,
+    addToRecommendationHistory,
+    addToWatchlist
+  } = useAppStore();
+
+  const numColumns = width > 1024 ? 5 : width > 768 ? 4 : 2;
+  const cardWidth = (width - spacing.md * 2 - spacing.md * (numColumns - 1)) / numColumns;
+
+  const triggerHaptic = () => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const toggleGenre = (id: number) => {
+    setSelectedGenres(prev =>
+      prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]
+    );
+  };
+
+  const handleDiscover = async () => {
+    triggerHaptic();
+    setIsRecLoading(true);
+    setShowRecModal(true);
+    try {
+      const favoriteGenres = getFavoriteGenres();
+      const result = await RecommendationService.getSmartRecommendation(
+        watchlist,
+        userRatings,
+        favoriteGenres,
+        notInterested,
+        recommendationHistory,
+        nextRecommendationMode
+      );
+
+      if (result) {
+        setRecommendationResult(result);
+        addToRecommendationHistory(result.anime.id);
+
+        // Alternate between personalized and community modes for subsequent clicks
+        setNextRecommendationMode(prev => prev === 'personalized' ? 'community' : 'personalized');
+      } else {
+        setRecommendationResult(null);
+      }
+    } catch (error) {
+      console.error(error);
+      setRecommendationResult(null);
+    } finally {
+      setIsRecLoading(false);
     }
+  };
 
+  const handleNotInterested = async (id: string) => {
+    await addToNotInterested(id);
+    setShowRecModal(false);
+  };
+
+  const handleRecommendAgain = () => {
+    handleDiscover();
+  };
+
+  const [isAddingToWatchlist, setIsAddingToWatchlist] = useState(false);
+  const [isAddedToWatchlist, setIsAddedToWatchlist] = useState(false);
+
+  useEffect(() => {
+    if (showRecModal) {
+      setIsAddedToWatchlist(false);
+      setIsAddingToWatchlist(false);
+    }
+  }, [showRecModal]);
+
+  const handleAddToWatchlist = async (media: Media) => {
+    if (isAddedToWatchlist) return;
+
+    setIsAddingToWatchlist(true);
+    triggerHaptic();
+    try {
+      await addToWatchlist(media, 'plan-to-watch');
+      setIsAddedToWatchlist(true);
+      triggerHaptic(); // Double haptic for success
+
+      // Wait a bit to show the "Added" state before closing
+      setTimeout(() => {
+        setShowRecModal(false);
+        router.push('/(tabs)/watchlist');
+      }, 1000);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsAddingToWatchlist(false);
+    }
+  };
+
+  useEffect(() => {
     const fetchResults = async () => {
+      const hasFilters = selectedGenres.length > 0 || minScore || status;
+      if (debouncedQuery.trim() === '' && !hasFilters) {
+        if (!isDiscoverMode) {
+          setResults([]);
+          setCharacterResults([]);
+        }
+        setIsLoading(false);
+        setPage(1);
+        return;
+      }
+
       setIsLoading(true);
+      setIsDiscoverMode(false);
+      setPage(1);
       try {
-        const data = await animeApi.searchAnime(debouncedQuery);
-        setResults(data);
+        // Parallel fetch for anime and characters utilizing strict thematic sorting boundaries
+        const [animeResponse, charResponse] = await Promise.all([
+          animeApi.searchAnime(debouncedQuery, 1, selectedGenres, undefined, 'score', 'desc'),
+          debouncedQuery.trim() !== ''
+            ? animeApi.searchCharacters(debouncedQuery, 1)
+            : Promise.resolve({ data: [], hasNextPage: false })
+        ]);
+
+        setResults(animeResponse.data);
+        setHasNextPage(animeResponse.hasNextPage);
+
+        // Enhance character results with parent anime hints if they exist in anime results
+        const enhancedChars = charResponse.data.map(char => {
+          // Smart matching: see if any anime result matches the character's typical context
+          // Since Jikan list doesn't have it, we just provide what we have.
+          return char;
+        });
+        setCharacterResults(enhancedChars);
+
       } catch (error) {
         console.error('Search error:', error);
       } finally {
@@ -44,143 +219,369 @@ export default function SearchScreen() {
     };
 
     fetchResults();
-  }, [debouncedQuery]);
+  }, [debouncedQuery, selectedGenres, minScore, status]);
+
+  const loadMore = async () => {
+    if (isMoreLoading || !hasNextPage || isLoading || isDiscoverMode) return;
+
+    setIsMoreLoading(true);
+    const nextPage = page + 1;
+    try {
+      const response = await animeApi.searchAnime(debouncedQuery, nextPage, selectedGenres, undefined, 'score', 'desc');
+      setResults(prev => [...prev, ...response.data]);
+      setPage(nextPage);
+      setHasNextPage(response.hasNextPage);
+    } catch (error) {
+      console.error('Load more error:', error);
+    } finally {
+      setIsMoreLoading(false);
+    }
+  };
 
   const handleMediaPress = (id: string) => {
+    if (query.trim()) addToSearchHistory(query.trim());
     router.push(`/details/${id}`);
   };
 
+  const handleCharacterPress = (charId: string) => {
+    // For now, since we don't have separate character pages, 
+    // we can either show a modal or navigate to a specialized search for that character's anime
+    // Or just search for the character name as anime
+    setQuery(results[0]?.title || query); // Fallback to first result or current query
+  };
+
+  const renderSectionHeader = (title: string) => (
+    <View style={styles.listSectionHeader}>
+      <SectionHeader title={title} />
+    </View>
+  );
+
   return (
-    <View style={styles.container}>
-      <GlassHeader title="Search" />
-      
-      <View style={styles.content}>
-        <View style={styles.searchBar}>
-          <SearchIcon color={colors.textDim} size={20} />
+    <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
+      <GlassHeader title="Discovery" showLogo={true} />
+
+      <View style={[styles.content, { paddingTop: insets.top + HEADER_HEIGHT + spacing.md }]}>
+        <View style={[styles.searchContainer, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+          <Feather name="search" color={themeColors.primary} size={20} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: themeColors.text }]}
             placeholder="Search anime, characters..."
-            placeholderTextColor={colors.textDim}
+            placeholderTextColor={themeColors.textDim}
             value={query}
             onChangeText={setQuery}
+            returnKeyType="search"
           />
-          {query.length > 0 && (
-            <Pressable onPress={() => setQuery('')}>
-              <X color={colors.textDim} size={20} />
-            </Pressable>
+          {(query.length > 0 || selectedGenres.length > 0) && (
+            <TouchableOpacity onPress={() => { setQuery(''); setSelectedGenres([]); setResults([]); setCharacterResults([]); }} activeOpacity={0.7}>
+              <View style={[styles.clearButton, { backgroundColor: themeColors.surfaceVariant }]}>
+                <Feather name="x" color={themeColors.text} size={14} />
+              </View>
+            </TouchableOpacity>
           )}
         </View>
 
-        {query.length > 0 ? (
-          isLoading ? (
-            <View style={styles.resultsGrid}>
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <SkeletonLoader 
-                  key={i}
-                  width="47%" 
-                  height={220} 
-                  style={{ marginBottom: spacing.md, borderRadius: 12 }} 
+        {/* ALWAYS SHOW SELECTED THEMES OR ALL THEMES WHEN FILTERING */}
+        {(selectedGenres.length > 0 || query.length > 0) && (
+          <View style={{ marginBottom: spacing.sm }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.sm }}>
+              {Object.entries(THEME_MAP).map(([name, id]) => (
+                <GenreChip
+                  key={id}
+                  label={name}
+                  selected={selectedGenres.includes(id)}
+                  onPress={() => toggleGenre(id)}
                 />
               ))}
-            </View>
-          ) : results.length > 0 ? (
-            <FlatList
-              data={results}
-              numColumns={2}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.gridItem}>
-                  <PosterCard media={item} onPress={handleMediaPress} />
-                </View>
-              )}
-              columnWrapperStyle={styles.row}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No results found for "{query}"</Text>
-            </View>
-          )
-        ) : (
-          <View>
-            <Text style={styles.sectionTitle}>Popular Genres</Text>
-            <View style={styles.genresGrid}>
-              {GENRES.map((genre) => (
-                <Pressable key={genre} style={styles.genreChip}>
-                  <Text style={styles.genreText}>{genre}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.sectionTitle}>Recent Searches</Text>
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No recent searches yet</Text>
-            </View>
+            </ScrollView>
           </View>
         )}
+
+        {isLoading ? (
+          <View style={styles.resultsGrid}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <SkeletonLoader
+                key={i}
+                width={cardWidth}
+                height={cardWidth * 1.5}
+                style={{ marginBottom: spacing.md, borderRadius: 12 }}
+              />
+            ))}
+          </View>
+        ) : (results.length > 0 || characterResults.length > 0 || selectedGenres.length > 0 || debouncedQuery.trim() !== '') ? (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            onScroll={({ nativeEvent }) => {
+              const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+              if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 200) {
+                loadMore();
+              }
+            }}
+            scrollEventThrottle={400}
+          >
+            {results.length > 0 && (
+              <View style={styles.section}>
+                <SectionHeader title="Anime Series" icon="monitor" />
+                <View style={styles.resultsGrid}>
+                  {results.map((item, index) => (
+                    <View key={`${item.id}-${index}`} style={[styles.gridItem, { width: cardWidth }]}>
+                      <PosterCard
+                        media={item}
+                        onPress={handleMediaPress}
+                        width={cardWidth}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {characterResults.length > 0 && (
+              <View style={styles.section}>
+                <SectionHeader title="Characters" icon="users" />
+                {characterResults.map(char => (
+                  <CharacterSearchCard
+                    key={char.id}
+                    character={char}
+                    onPress={handleCharacterPress}
+                  />
+                ))}
+              </View>
+            )}
+
+            {results.length === 0 && characterResults.length === 0 && !isLoading && (
+              <View style={{ alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.xl }}>
+                <Feather name="alert-circle" size={48} color={themeColors.textDim} style={{ marginBottom: spacing.md }} />
+                <Text style={{ color: themeColors.textDim, fontSize: 16, textAlign: 'center', fontWeight: 'bold' }}>No results found.</Text>
+                <Text style={{ color: themeColors.textMuted, fontSize: 14, textAlign: 'center', marginTop: spacing.xs }}>
+                  (Jikan API may be overloaded. Please try again later or clear filters.)
+                </Text>
+              </View>
+            )}
+
+            {isMoreLoading && (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator color={themeColors.primary} size="small" />
+              </View>
+            )}
+            <View style={{ height: 100 }} />
+          </ScrollView>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 }}>
+            {/* ONLY SHOW THE BIG GRID OF THEMES IF THERE'S NO QUERY AND NO GENRE SELECTED */}
+            {selectedGenres.length === 0 && debouncedQuery.trim() === '' && (
+              <>
+                <View style={{ marginBottom: spacing.sm, paddingHorizontal: spacing.md }}>
+                  <Text style={{ color: themeColors.text, fontSize: 18, fontWeight: '800' }}>Anime Themes</Text>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.themeScroll}
+                  contentContainerStyle={styles.themeContent}
+                >
+                  <View style={styles.themeGrid}>
+                    {Object.entries(THEME_MAP).map(([name, id]) => (
+                      <GenreChip
+                        key={id}
+                        label={name}
+                        selected={selectedGenres.includes(id)}
+                        onPress={() => toggleGenre(id)}
+                      />
+                    ))}
+                  </View>
+                </ScrollView>
+              </>
+            )}
+
+            <TouchableOpacity
+              style={[styles.discoverHero]}
+              onPress={handleDiscover}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[themeColors.primary, '#800000']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <LinearGradient
+                colors={['rgba(0,0,0,0.4)', 'transparent']}
+                start={{ x: 0.5, y: 1 }}
+                end={{ x: 0.5, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.discoverIconWrapper}>
+                <Feather name="zap" color="#FFF" size={20} />
+              </View>
+              <View style={styles.discoverTextContainer}>
+                <Text style={styles.discoverTitle}>Surprise Me!</Text>
+                <Text style={styles.discoverSubtitle}>Find something you'll love</Text>
+              </View>
+              <View style={[styles.goButton, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                <Feather name="arrow-right" color="#FFF" size={16} />
+              </View>
+            </TouchableOpacity>
+
+            {searchHistory.length > 0 && (
+              <View style={styles.section}>
+                <SectionHeader
+                  title="Recent Searches"
+                  onViewAll={clearSearchHistory}
+                  viewAllLabel="Clear"
+                />
+                <View style={styles.historyList}>
+                  {searchHistory.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.historyItem}
+                      onPress={() => setQuery(item)}
+                    >
+                      <Feather name="clock" color={themeColors.textDim} size={18} />
+                      <Text style={[styles.historyText, { color: themeColors.textMuted }]}>{item}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            <View style={styles.section}>
+              <SectionHeader title="Trending Topics" icon="trending-up" />
+              <View style={[styles.trendingGrid, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+                {['Solo Leveling', 'One Piece', 'Jujutsu Kaisen', 'Oshi no Ko'].map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.trendingItem,
+                      { borderBottomColor: index === 3 ? 'transparent' : themeColors.border }
+                    ]}
+                    onPress={() => setQuery(item)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.trendingRankWrapper, { backgroundColor: `${themeColors.primary}15` }]}>
+                      <Text style={[styles.trendingRank, { color: themeColors.primary }]}>{index + 1}</Text>
+                    </View>
+                    <Text style={[styles.trendingText, { color: themeColors.text }]}>{item}</Text>
+                    <Feather name="arrow-up-right" color={themeColors.primary} size={16} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+        )}
       </View>
-    </View>
+
+      <RecommendationModal
+        visible={showRecModal}
+        isLoading={isRecLoading}
+        isAdded={isAddedToWatchlist}
+        isAdding={isAddingToWatchlist}
+        recommendation={recommendationResult}
+        onClose={() => setShowRecModal(false)}
+        onRecommendAgain={handleDiscover}
+        onNotInterested={handleNotInterested}
+        onAddToWatchlist={handleAddToWatchlist}
+        onViewDetails={(id) => {
+          setShowRecModal(false);
+          router.push(`/details/${id}`);
+        }}
+      />
+    </AnimatedScreen>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   content: {
-    paddingTop: 100,
+    flex: 1,
     paddingHorizontal: spacing.md,
   },
-  searchBar: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
-    height: 50,
-    borderWidth: 1,
-    borderColor: colors.border,
+    height: 52,
+    borderWidth: 1.5,
     marginBottom: spacing.xl,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   input: {
     flex: 1,
-    color: colors.text,
-    marginLeft: spacing.sm,
-    fontSize: typography.sizes.md,
+    marginLeft: spacing.md,
+    fontSize: 16,
+    fontWeight: '600',
   },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold as any,
-    marginBottom: spacing.md,
+  clearButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  genresGrid: {
-    flexDirection: 'row',
+  themeScroll: {
+    marginBottom: spacing.lg,
+  },
+  themeContent: {
+    paddingRight: spacing.xl,
+    paddingLeft: spacing.md,
+  },
+  themeGrid: {
+    flexDirection: 'column',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    height: 100, // Forces wrapping into 2 rows correctly across horizontal axis
+    alignContent: 'flex-start',
+    rowGap: spacing.sm,
+    columnGap: spacing.sm,
+  },
+  section: {
     marginBottom: spacing.xl,
   },
-  genreChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceVariant,
-    borderWidth: 1,
-    borderColor: colors.border,
+  historyList: {
+    gap: spacing.sm,
   },
-  genreText: {
-    color: colors.text,
-    fontSize: typography.sizes.sm,
-  },
-  emptyState: {
+  historyItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.sm,
   },
-  emptyText: {
-    color: colors.textDim,
+  historyText: {
     fontSize: typography.sizes.md,
+    marginLeft: spacing.md,
+  },
+  trendingGrid: {
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  trendingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 1,
+  },
+  trendingRankWrapper: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  trendingRank: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  trendingText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
   },
   resultsGrid: {
     flexDirection: 'row',
@@ -188,13 +589,63 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   gridItem: {
-    width: '48%',
     marginBottom: spacing.md,
   },
-  row: {
-    justifyContent: 'space-between',
+  footerLoader: {
+    paddingVertical: spacing.xl,
+    alignItems: 'center',
   },
-  listContent: {
-    paddingBottom: 150,
+  discoverHero: {
+    height: 72,
+    borderRadius: borderRadius.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
+  discoverIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  discoverTextContainer: {
+    flex: 1,
+    marginLeft: spacing.md,
+  },
+  discoverTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: '800' as any,
+    letterSpacing: -0.5,
+    marginBottom: 2,
+  },
+  discoverSubtitle: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  goButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listSectionHeader: {
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+  }
 });

@@ -1,14 +1,16 @@
 import React from 'react';
-import { 
-  TouchableOpacity, 
-  Text, 
-  StyleSheet, 
-  ActivityIndicator, 
-  ViewStyle, 
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  ViewStyle,
   TextStyle,
-  View
+  View,
+  StyleProp
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../../theme';
+import { useThemeColors } from '../../hooks/useThemeColors';
 
 interface ButtonProps {
   title: string;
@@ -17,8 +19,8 @@ interface ButtonProps {
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
   disabled?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
   icon?: React.ReactNode;
 }
 
@@ -33,10 +35,18 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   icon
 }) => {
+  const colors = useThemeColors();
   const getVariantStyle = () => {
     switch (variant) {
       case 'primary':
-        return { backgroundColor: colors.primary };
+        return {
+          backgroundColor: colors.primary,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.4,
+          shadowRadius: 10,
+          elevation: 8,
+        };
       case 'secondary':
         return { backgroundColor: colors.surfaceVariant };
       case 'outline':
@@ -65,6 +75,7 @@ export const Button: React.FC<ButtonProps> = ({
     <TouchableOpacity
       onPress={onPress}
       disabled={disabled || isLoading}
+      activeOpacity={0.8}
       style={[
         styles.base,
         getVariantStyle(),
@@ -74,11 +85,11 @@ export const Button: React.FC<ButtonProps> = ({
       ]}
     >
       {isLoading ? (
-        <ActivityIndicator color={colors.text} size="small" />
+        <ActivityIndicator color={variant === 'outline' || variant === 'ghost' ? colors.primary : colors.text} size="small" />
       ) : (
         <>
           {icon && <View style={styles.iconContainer}>{icon}</View>}
-          <Text style={[styles.text, textStyle]}>{title}</Text>
+          <Text style={[styles.text, { color: variant === 'outline' || variant === 'ghost' ? colors.primary : colors.text }, textStyle]}>{title}</Text>
         </>
       )}
     </TouchableOpacity>

@@ -1,26 +1,36 @@
 {
   "project_info": {
-    "project_number": "424085530648",
-    "project_id": "anipulse-e8f26",
-    "storage_bucket": "anipulse-e8f26.firebasestorage.app"
+    "project_number": "177485044340",
+    "project_id": "animorg-nexora",
+    "storage_bucket": "animorg-nexora.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:424085530648:android:bc7adc53999474ca89bb6d",
+        "mobilesdk_app_id": "1:177485044340:android:5e0ec2630cb585b7860f21",
         "android_client_info": {
-          "package_name": "com.nexora.anipulse"
+          "package_name": "com.nexora.animorg"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "177485044340-bpsn9l211k8kffp49mhp34402brsq4uv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAq-moEh7mQn0h25UhFmWCO5EpSZJJQkdk"
+          "current_key": "AIzaSyCTgVGBV60FJpkk8CebCA5CppPFKvrV5YY"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "177485044340-bpsn9l211k8kffp49mhp34402brsq4uv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

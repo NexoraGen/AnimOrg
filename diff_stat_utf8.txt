@@ -1,0 +1,35 @@
+﻿ README.md                                 |   49 +-
+ app.json                                  |   24 +-
+ app/(auth)/_layout.tsx                    |    1 +
+ app/(auth)/login.tsx                      |  265 ++++--
+ app/(auth)/register.tsx                   |  252 +++--
+ app/(tabs)/_layout.tsx                    |   37 +-
+ app/(tabs)/home.tsx                       |  392 +++++---
+ app/(tabs)/profile.tsx                    |  835 +++++++++++++----
+ app/(tabs)/search.tsx                     |  673 +++++++++++---
+ app/(tabs)/watchlist.tsx                  |  146 ++-
+ app/_layout.tsx                           |  214 ++++-
+ app/details/[id].tsx                      |  937 +++++++++++++------
+ app/index.tsx                             |  112 +--
+ assets/adaptive-icon.png                  |  Bin 1312599 -> 337409 bytes
+ assets/icon.png                           |  Bin 1312599 -> 337409 bytes
+ assets/splash.png                         |  Bin 2112002 -> 1657856 bytes
+ babel.config.js                           |    2 +-
+ google-services.json                      |   26 +-
+ package-lock.json                         | 1448 ++++++++++++++++++++---------
+ package.json                              |   28 +-
+ src/components/features/CharacterCard.tsx |   21 +-
+ src/components/ui/Button.tsx              |   35 +-
+ src/components/ui/GlassHeader.tsx         |  109 ++-
+ src/components/ui/HorizontalCarousel.tsx  |  133 ++-
+ src/components/ui/PosterCard.tsx          |  256 ++++-
+ src/components/ui/SkeletonLoader.tsx      |   61 +-
+ src/components/ui/index.ts                |   19 +
+ src/services/animeApi.ts                  |  206 +++-
+ src/services/api/jikan.ts                 |  506 +++++++++-
+ src/services/firebase/auth.ts             |  209 +++--
+ src/services/firebase/firestore.ts        |  904 +++++++++++++++++-
+ src/store/useAppStore.ts                  |  978 ++++++++++++++++---
+ src/theme/colors.ts                       |   53 +-
+ src/types/index.ts                        |  198 +++-
+ 34 files changed, 7202 insertions(+), 1927 deletions(-)

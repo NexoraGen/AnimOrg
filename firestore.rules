@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper to check if the user is accessing their own data
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+      
+      // User Social Subcollections
+      match /social/followers/{followerId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId) || isOwner(followerId);
+      }
+      match /social/following/{followingId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+      }
+      
+      // Watchlist Subcollection
+      match /watchlist/{animeId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Tracked Anime Subcollection (for Release Hub)
+      match /trackedAnime/{animeId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Activity Subcollection
+      match /activity/{activityId} {
+        allow read: if isAuthenticated();
+        allow write: if isOwner(userId);
+      }
+      
+      // Ratings Subcollection
+      match /ratings/{animeId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // --- Usernames Collection (Uniqueness Map) ---
+    match /usernames/{username} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+    }
+
+    // --- Global Activity Feed ---
+    match /global_activity/{activityId} {
+      allow read: if isAuthenticated();
+      // Allow writing if the activity correctly references the authenticated user
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Prevent editing or deleting other users' activity
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+  }
+}
