@@ -3,7 +3,7 @@
     "name": "AnimOrg",
     "slug": "animorg",
     "scheme": "animorg",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -24,6 +24,7 @@
         "backgroundColor": "#0F0F0F"
       },
       "package": "com.nexora.animorg",
+      "versionCode": 4,
       "googleServicesFile": "./google-services.json"
     },
     "web": {
@@ -46,7 +47,9 @@
           "photosPermission": "Allow AnimOrg to access your photos to select custom anime avatars.",
           "cameraPermission": "Allow camera access to personalize your anime identity."
         }
-      ]
+      ],
+      "expo-font",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true
