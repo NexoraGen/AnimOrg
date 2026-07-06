@@ -23,7 +23,17 @@ import { useAppStore } from '../../../store/useAppStore';
 
 const { width } = Dimensions.get('window');
 
-const CATEGORIES = ['Discussion', 'Theory', 'Recommendation', 'News', 'Hot Take', 'Question'];
+const CATEGORIES = ['Discussion', 'Question', 'Fun', 'Recommendation', 'News', 'Review'] as const;
+type PostCategory = typeof CATEGORIES[number];
+
+const CATEGORY_DESCRIPTIONS: Record<PostCategory, string> = {
+    Discussion: 'General anime discussions & opinions',
+    Question: 'Ask for help, suggestions, or info',
+    Fun: 'Jokes, hot takes & relatable anime humor',
+    Recommendation: 'Anime suggestions & requests',
+    News: 'Announcements, releases & industry news',
+    Review: 'Reviews, impressions & ratings',
+};
 
 interface PostComposerProps {
     onClose: () => void;
@@ -35,12 +45,17 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
     const user = useAppStore(state => state.user);
 
     const [content, setContent] = useState('');
-    const [category, setCategory] = useState(CATEGORIES[0]);
+    const [category, setCategory] = useState<PostCategory | null>(null);
     const [isPosting, setIsPosting] = useState(false);
 
     const handlePost = async () => {
         if (!content.trim()) {
             Alert.alert('Empty Post', 'Please express your thoughts.');
+            return;
+        }
+
+        if (!category) {
+            Alert.alert('No Category Selected', 'Please select a category for your post.');
             return;
         }
 
@@ -56,9 +71,9 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
                 username: user.username || 'Anonymous',
                 userAvatar: user.avatarUrl,
                 type: 'discussion',
-                category: category as any,
+                category: category.toLowerCase(),
                 content: content.trim(),
-                isSpoiler: false, // In text-only mode, we can simplify this or keep it for text
+                hasSpoilers: false,
             });
 
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -71,6 +86,8 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
             setIsPosting(false);
         }
     };
+
+    const canPost = content.trim().length > 0 && category !== null;
 
     return (
         <BlurView intensity={80} tint="dark" style={styles.container}>
@@ -85,16 +102,16 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
                     <Text style={[styles.headerTitle, { color: theme.text }]}>Create Post</Text>
                     <TouchableOpacity
                         onPress={handlePost}
-                        disabled={isPosting}
+                        disabled={isPosting || !canPost}
                         style={[
                             styles.postBtn,
-                            { backgroundColor: isPosting ? theme.surfaceVariant : theme.primary }
+                            { backgroundColor: (isPosting || !canPost) ? theme.surfaceVariant : theme.primary }
                         ]}
                     >
                         {isPosting ? (
                             <ActivityIndicator size="small" color="#fff" />
                         ) : (
-                            <Text style={styles.postBtnText}>Post</Text>
+                            <Text style={[styles.postBtnText, { opacity: canPost ? 1 : 0.5 }]}>Post</Text>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -107,10 +124,15 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
                         />
                         <View>
                             <Text style={[styles.username, { color: theme.text }]}>{user?.username ? `@${user.username}` : '@guest'}</Text>
-                            <TouchableOpacity style={[styles.categorySelector, { backgroundColor: theme.surfaceVariant }]}>
-                                <Text style={[styles.categoryText, { color: theme.textDim }]}>{category}</Text>
-                                <Feather name="chevron-down" size={14} color={theme.textDim} />
-                            </TouchableOpacity>
+                            {category ? (
+                                <View style={[styles.categoryIndicator, { backgroundColor: `${theme.primary}22` }]}>
+                                    <Text style={[styles.categoryIndicatorText, { color: theme.primary }]}>{category}</Text>
+                                </View>
+                            ) : (
+                                <View style={[styles.categoryIndicator, { backgroundColor: theme.surfaceVariant }]}>
+                                    <Text style={[styles.categoryIndicatorText, { color: theme.textDim }]}>Select a category ↓</Text>
+                                </View>
+                            )}
                         </View>
                     </View>
 
@@ -125,12 +147,17 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
                     />
 
                     <View style={styles.categories}>
-                        <Text style={[styles.sectionTitle, { color: theme.textDim }]}>Category</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.textDim }]}>
+                            Category <Text style={{ color: theme.primary }}>*</Text>
+                        </Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
                             {CATEGORIES.map((cat) => (
                                 <TouchableOpacity
                                     key={cat}
-                                    onPress={() => setCategory(cat)}
+                                    onPress={() => {
+                                        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setCategory(cat);
+                                    }}
                                     style={[
                                         styles.categoryChip,
                                         {
@@ -146,6 +173,11 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
+                        {category && (
+                            <Text style={[styles.categoryHint, { color: theme.textDim }]}>
+                                {CATEGORY_DESCRIPTIONS[category]}
+                            </Text>
+                        )}
                     </View>
                 </ScrollView>
 
@@ -216,57 +248,22 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
     },
-    categorySelector: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    categoryIndicator: {
+        alignSelf: 'flex-start',
         paddingHorizontal: 8,
-        paddingVertical: 4,
+        paddingVertical: 3,
         borderRadius: 6,
         marginTop: 4,
     },
-    categoryText: {
+    categoryIndicatorText: {
         fontSize: 12,
-        marginRight: 4,
+        fontWeight: '600',
     },
     input: {
         fontSize: 18,
         lineHeight: 24,
         textAlignVertical: 'top',
         minHeight: 120,
-    },
-    mediaPreview: {
-        marginVertical: spacing.lg,
-    },
-    imageWrapper: {
-        width: 100,
-        height: 100,
-        borderRadius: 12,
-        marginRight: 10,
-        overflow: 'hidden',
-    },
-    previewImage: {
-        width: '100%',
-        height: '100%',
-    },
-    removeImageBtn: {
-        position: 'absolute',
-        top: 5,
-        right: 5,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    addImageBtn: {
-        width: 100,
-        height: 100,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderStyle: 'dashed',
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     sectionTitle: {
         fontSize: 14,
@@ -278,48 +275,23 @@ const styles = StyleSheet.create({
     },
     categoryList: {
         paddingVertical: spacing.xs,
+        gap: 10,
     },
     categoryChip: {
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
-        marginRight: 10,
         borderWidth: 1,
     },
     categoryChipText: {
         fontSize: 13,
         fontWeight: '600',
     },
-    options: {
-        marginTop: spacing.xl,
-        marginBottom: spacing.xxl,
-    },
-    optionRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingVertical: spacing.md,
-    },
-    optionInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    optionLabel: {
-        fontSize: 16,
-        marginLeft: 12,
-    },
-    toggle: {
-        width: 40,
-        height: 22,
-        borderRadius: 11,
-        padding: 2,
-        justifyContent: 'center',
-    },
-    toggleDot: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#fff',
+    categoryHint: {
+        marginTop: spacing.sm,
+        fontSize: 12,
+        fontStyle: 'italic',
+        opacity: 0.7,
     },
     footer: {
         flexDirection: 'row',

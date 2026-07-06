@@ -24,7 +24,7 @@ export const firebaseAuthService = {
   },
 
   // Register with email and password
-  registerWithEmail: async (email: string, password: string, username: string) => {
+  registerWithEmail: async (email: string, password: string) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -35,9 +35,9 @@ export const firebaseAuthService = {
       await firestoreService.createUserProfile(user.uid, {
         id: user.uid,
         email: user.email || '',
-        username,
         avatarUrl,
         favoriteGenres: [],
+        hasCompletedOnboarding: false,
         watchStats: {
           animeCount: 0,
           totalHours: 0,
@@ -113,8 +113,13 @@ export const firebaseAuthService = {
   deleteAccount: async () => {
     const user = auth.currentUser;
     if (!user) throw new Error('No user logged in');
-    // In a real production app, we would clean up Firestore data here too
-    // But let's stick to the auth part first.
+    // Clean up Firestore data before removing auth
+    try {
+      await firestoreService.updateUserProfile(user.uid, { deleted: true } as any); // Mark as deleted at least
+      // In a real production app we'd use a Cloud Function for deep cleanup
+    } catch (e) {
+      console.warn('Failed to mark profile as deleted:', e);
+    }
     await deleteUser(user);
     return true;
   },

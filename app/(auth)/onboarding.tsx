@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
     View,
     Text,
@@ -9,7 +9,9 @@ import {
     Platform,
     Dimensions,
     ActivityIndicator,
-    Animated
+    Animated,
+    Modal,
+    FlatList
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +26,7 @@ import { Button, AuthFeedback } from '../../src/components/ui';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useAppStore } from '../../src/store/useAppStore';
 import { firestoreService } from '../../src/services/firebase/firestore';
+import { searchTimezones, autoDetectTimezone, TimezoneEntry } from '../../src/utils/timezoneHelper';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,6 +42,13 @@ export default function OnboardingScreen() {
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [feedback, setFeedback] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+    const [timezone, setTimezone] = useState(() => {
+        try { return autoDetectTimezone().id || Intl.DateTimeFormat().resolvedOptions().timeZone; }
+        catch { return 'UTC'; }
+    });
+    const [timezoneModalVisible, setTimezoneModalVisible] = useState(false);
+    const [tzSearch, setTzSearch] = useState('');
+    const filteredTimezones = useMemo(() => searchTimezones(tzSearch), [tzSearch]);
 
     // Animated values for premium aesthetics
     const borderGlow = useRef(new Animated.Value(0)).current;
@@ -99,6 +109,8 @@ export default function OnboardingScreen() {
         setStatus('validating');
         setErrorMsg('');
 
+        let isMounted = true;
+
         if (lookupTimeoutRef.current) {
             clearTimeout(lookupTimeoutRef.current);
         }
@@ -106,6 +118,8 @@ export default function OnboardingScreen() {
         lookupTimeoutRef.current = setTimeout(async () => {
             try {
                 const isAvailable = await firestoreService.checkUsernameAvailability(username);
+                if (!isMounted) return;
+
                 if (isAvailable) {
                     setStatus('available');
                     // Smooth pulse notification
@@ -134,6 +148,7 @@ export default function OnboardingScreen() {
         }, 500); // 500ms debounce
 
         return () => {
+            isMounted = false;
             if (lookupTimeoutRef.current) clearTimeout(lookupTimeoutRef.current);
         };
     }, [username]);
@@ -178,30 +193,31 @@ export default function OnboardingScreen() {
             await firestoreService.updateUserProfile(user.id, {
                 username: username,
                 email: user.email || '',
+                timezone: timezone.trim(),
                 hasCompletedOnboarding: true,
                 usernameClaimed: true
             });
 
-            // Fetch refreshed user record
-            const refreshedProfile = await firestoreService.getUserProfile(user.id);
-            if (refreshedProfile) {
-                // Sync to app cache
-                setUser(refreshedProfile);
-            } else {
-                // Fallback update in case of profile fetch latency
-                await updateProfile({
-                    username: username,
-                    hasCompletedOnboarding: true,
-                    usernameClaimed: true
-                });
-            }
+            // IMMEDIATELY update local store so routing guard sees completed state
+            // This prevents the race condition where the guard re-fires before Firestore syncs
+            await updateProfile({
+                username: username,
+                timezone: timezone.trim(),
+                hasCompletedOnboarding: true,
+                usernameClaimed: true
+            });
+
+            // Async: fetch refreshed profile in background to get any server-side fields
+            firestoreService.getUserProfile(user.id).then(refreshedProfile => {
+                if (refreshedProfile) setUser(refreshedProfile);
+            }).catch(() => { });
 
             setFeedback({ message: 'Welcome to the Grid! Identity claimed.', type: 'success' });
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-            setTimeout(() => {
-                router.replace('/(tabs)/home');
-            }, 1200);
+            // Let the routing guard in _layout.tsx handle the navigation naturally
+            // It will detect hasCompletedOnboarding=true and redirect to home
+            router.replace('/(tabs)/home');
 
         } catch (error: any) {
             console.error(error);
@@ -264,7 +280,7 @@ export default function OnboardingScreen() {
 
                     <View style={styles.header}>
                         <Text style={styles.title}>Create Your Anime Identity</Text>
-                        <Text style={styles.subtitle}>Choose your permanent globally unique username handle</Text>
+                        <Text style={styles.subtitle}>Enter a username handle</Text>
                     </View>
 
                     <Animated.View style={[styles.form, { transform: [{ scale: pulseAnim }] }]}>
@@ -340,6 +356,31 @@ export default function OnboardingScreen() {
                             )}
                         </View>
 
+                        <View style={[styles.inputContainer, { marginTop: spacing.lg }]}>
+                            <View style={styles.labelRow}>
+                                <Text style={styles.label}>Release Timezone</Text>
+                                <View style={styles.statusRow}>
+                                    <Feather name="globe" size={14} color="#32CD32" style={{ marginRight: 4 }} />
+                                    <Text style={[styles.statusText, { color: '#32CD32' }]}>Auto-detected</Text>
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                style={[styles.staticField, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: spacing.md }]}
+                                activeOpacity={0.7}
+                                onPress={() => setTimezoneModalVisible(true)}
+                            >
+                                <Text style={styles.inputText}>
+                                    {timezone || 'Select a Timezone'}
+                                </Text>
+                                <Feather name="chevron-down" size={18} color="rgba(255,255,255,0.5)" />
+                            </TouchableOpacity>
+
+                            <Text style={styles.helpText}>
+                                Ensures anime episode schedules appear entirely in your local date/time.
+                            </Text>
+                        </View>
+
                         {/* Suggestions Render Area */}
                         {suggestions.length > 0 && (
                             <View style={styles.suggestionsContainer}>
@@ -373,6 +414,79 @@ export default function OnboardingScreen() {
                     </Animated.View>
                 </View>
             </KeyboardAvoidingView>
+
+            {/* Timezone Selection Modal */}
+            <Modal
+                visible={timezoneModalVisible}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setTimezoneModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <TouchableOpacity
+                        style={styles.modalDismissOverlay}
+                        activeOpacity={1}
+                        onPress={() => setTimezoneModalVisible(false)}
+                    />
+                    <View style={[styles.modalContent, { backgroundColor: '#131317' }]}>
+                        <View style={styles.modalDragHandle} />
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Select Timezone</Text>
+                            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setTimezoneModalVisible(false)}>
+                                <Feather name="x" size={20} color="white" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={[styles.searchContainer, { backgroundColor: '#1D1D22' }]}>
+                            <Feather name="search" size={18} color="rgba(255,255,255,0.5)" style={{ marginLeft: spacing.xs }} />
+                            <TextInput
+                                style={[styles.searchInput, { color: 'white' }]}
+                                placeholder="Search city or country..."
+                                placeholderTextColor="rgba(255,255,255,0.3)"
+                                value={tzSearch}
+                                onChangeText={setTzSearch}
+                                autoCorrect={false}
+                            />
+                            {tzSearch ? (
+                                <TouchableOpacity onPress={() => setTzSearch('')}>
+                                    <Feather name="x-circle" size={16} color={theme.textDim} style={{ marginRight: spacing.xs }} />
+                                </TouchableOpacity>
+                            ) : null}
+                        </View>
+                        <FlatList
+                            data={filteredTimezones}
+                            keyExtractor={(item) => item.id}
+                            initialNumToRender={12}
+                            contentContainerStyle={styles.listScrollContainer}
+                            ListEmptyComponent={
+                                <View style={styles.emptySearchContainer}>
+                                    <Text style={[styles.emptySearchText, { color: 'rgba(255,255,255,0.5)' }]}>No timezones found</Text>
+                                </View>
+                            }
+                            renderItem={({ item }) => {
+                                const isSelected = item.id === timezone;
+                                return (
+                                    <TouchableOpacity
+                                        style={[styles.tzItemRow, { backgroundColor: isSelected ? 'rgba(229, 9, 20, 0.12)' : 'transparent' }]}
+                                        onPress={() => {
+                                            setTimezone(item.id);
+                                            setTimezoneModalVisible(false);
+                                        }}
+                                    >
+                                        <View style={styles.tzMetaCol}>
+                                            <Text style={[styles.tzCountryCityText, { color: isSelected ? '#E50914' : 'white', fontWeight: isSelected ? 'bold' : 'normal' }]}>
+                                                {item.country} — {item.city}
+                                            </Text>
+                                            <Text style={[styles.tzLabelText, { color: 'rgba(255,255,255,0.5)' }]}>
+                                                {item.id} ({item.label})
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </AnimatedScreen>
     );
 }
@@ -476,10 +590,21 @@ const styles = StyleSheet.create({
         height: 56,
     },
     prefix: {
-        color: 'rgba(255,255,255,0.5)',
-        fontSize: typography.sizes.lg,
-        fontWeight: typography.weights.bold as any,
-        marginRight: 2,
+        color: '#E50914',
+        fontSize: 16,
+        fontWeight: 'bold' as any,
+        marginRight: 8,
+    },
+    staticField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        height: 54,
+        borderRadius: borderRadius.md,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.1)',
+        marginBottom: spacing.xs,
     },
     input: {
         flex: 1,
@@ -532,5 +657,108 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.8)',
         fontSize: 13,
         fontWeight: '700',
+    },
+    inputText: {
+        color: '#FFFFFF',
+        fontSize: typography.sizes.md,
+        fontWeight: typography.weights.medium as any,
+    },
+    // Timezone Modal Styles
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+    },
+    modalDismissOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    },
+    modalContent: {
+        width: '100%',
+        height: '75%',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.xxxl,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    modalDragHandle: {
+        width: 40,
+        height: 5,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        alignSelf: 'center',
+        marginBottom: spacing.md,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.xl,
+        marginBottom: spacing.sm,
+    },
+    modalTitle: {
+        fontSize: typography.sizes.lg,
+        fontWeight: '900',
+        color: 'white',
+        letterSpacing: -0.5,
+    },
+    modalCloseBtn: {
+        padding: spacing.xs,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 20,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: spacing.xl,
+        marginBottom: spacing.md,
+        borderRadius: 12,
+        height: 44,
+        paddingHorizontal: spacing.sm,
+    },
+    searchInput: {
+        flex: 1,
+        height: '100%',
+        paddingLeft: spacing.sm,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    emptySearchContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 60,
+    },
+    emptySearchText: {
+        marginTop: 12,
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    listScrollContainer: {
+        paddingHorizontal: spacing.xl,
+        paddingBottom: spacing.xxl,
+    },
+    tzItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: spacing.sm,
+        marginBottom: 6,
+        borderRadius: 12,
+    },
+    tzMetaCol: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    tzCountryCityText: {
+        fontSize: 15,
+        marginBottom: 2,
+    },
+    tzLabelText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
 });

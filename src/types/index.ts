@@ -3,11 +3,13 @@ export interface Media {
   title: string;
   description: string;
   posterPath: string;
+  posterImageMedium?: string;
   backdropPath: string;
   rating?: number;
   releaseYear?: number;
   genres: string[];
   type: 'anime';
+  format?: string;
   duration?: string;
   episodes?: number;
   trailerUrl?: string;
@@ -32,6 +34,11 @@ export interface Media {
     url?: string;
     youtubeId?: string;
     embedUrl?: string;
+  };
+  nextAiringEpisode?: {
+    airingAt: number;
+    timeUntilAiring: number;
+    episode: number;
   };
 }
 
@@ -84,9 +91,13 @@ export interface User {
   followingCount?: number;
   hasCompletedOnboarding?: boolean;
   usernameClaimed?: boolean;
+  timezone?: string;
+  timezoneLabel?: string;
+  country?: string;
+  timeFormat?: '12h' | '24h';
 }
 
-export type WatchStatus = 'watching' | 'completed' | 'plan-to-watch' | 'dropped';
+export type WatchStatus = 'watching' | 'completed' | 'plan-to-watch' | 'dropped' | 'awaiting';
 
 export interface WatchlistItem {
   mediaId: string;
@@ -96,9 +107,11 @@ export interface WatchlistItem {
   // Cached media data for fast rendering
   title: string;
   posterPath: string;
+  posterImageMedium?: string;
   backdropPath?: string;
   rating?: number;
   genres: string[];
+  format?: string;
   episodes?: number;
   durationMinutes?: number;
   broadcast?: {
@@ -164,16 +177,34 @@ export interface UserRating {
 
 export interface ActivityFeedItem {
   id: string;
-  type: 'rated' | 'reviewed' | 'favorited' | 'added' | 'follow';
+  type: 'rated' | 'reviewed' | 'favorited' | 'added' | 'follow' | 'watched';
+  userId?: string;
+  username?: string;
+  userAvatar?: string;
   animeId?: string;
   animeTitle?: string;
   animePoster?: string;
   targetId?: string; // For follow events
   timestamp: string;
   detail?: string;
+  score?: number;
+  episode?: number;
 }
 
-export type PostType = 'discussion' | 'news' | 'poll';
+export type PostType = 'discussion' | 'news' | 'poll' | 'versus' | 'episode_discussion';
+
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+}
+
+export interface VersusEntity {
+  id: string;
+  title: string;
+  imageUrl?: string;
+  votes: number;
+}
 
 export interface CommunityPost {
   id: string;
@@ -181,8 +212,9 @@ export interface CommunityPost {
   username: string;
   userAvatar?: string;
   type: PostType;
-  category: 'Discussion' | 'Meme' | 'News' | 'Theory' | 'Recommendation' | 'Hot Take' | 'Question';
+  category: 'Discussion' | 'Question' | 'Fun' | 'Recommendation' | 'News' | 'Review' | string;
   content: string;
+  mediaUrl?: string;
   hashtags: string[];
   likes: number;
   comments: number;
@@ -190,7 +222,22 @@ export interface CommunityPost {
   engagementScore?: number; // For trending algorithm
   isLiked?: boolean;
   isSaved?: boolean;
-  isSpoiler?: boolean;
+
+  hasSpoilers?: boolean;
+  spoilerSeverity?: 'anime' | 'manga';
+
+  // For polls
+  pollOptions?: PollOption[];
+  hasVotedPoll?: string;
+
+  // For versus / anime wars
+  versusLeft?: VersusEntity;
+  versusRight?: VersusEntity;
+  hasVotedVersus?: 'left' | 'right';
+
+  // Episode Discussion Tracking
+  episodeNumber?: number;
+
   createdAt: any; // Using Firestore Timestamp
   animeId?: string;
   animeTitle?: string;

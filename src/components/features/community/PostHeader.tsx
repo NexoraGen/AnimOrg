@@ -15,6 +15,7 @@ interface PostHeaderProps {
     timestamp: any;
     type?: string;
     userId: string;
+    onPressProfile?: () => void;
 }
 
 export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
@@ -22,7 +23,8 @@ export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
     avatarUrl,
     timestamp,
     type,
-    userId
+    userId,
+    onPressProfile
 }) => {
     const theme = useThemeColors();
     const currentUser = useAppStore(state => state.user);
@@ -61,19 +63,22 @@ export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
     return (
         <View style={styles.container}>
             <View style={styles.left}>
-                <Image
-                    source={avatarUrl ? { uri: avatarUrl } : require('../../../../assets/guest-avatar.png')}
-                    style={styles.avatar}
-                    contentFit="cover"
-                />
+                <TouchableOpacity onPress={onPressProfile} activeOpacity={0.8} delayPressIn={150}>
+                    <Image
+                        source={avatarUrl ? { uri: avatarUrl } : require('../../../../assets/guest-avatar.png')}
+                        style={styles.avatar}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                    />
+                </TouchableOpacity>
                 <View style={styles.info}>
                     <View style={styles.userRow}>
-                        <View>
+                        <TouchableOpacity onPress={onPressProfile} activeOpacity={0.8} delayPressIn={150}>
                             <Text style={[styles.username, { color: theme.text }]}>{username ? `@${username}` : '@anonymous'}</Text>
                             <Text style={[styles.timestamp, { color: theme.textDim }]}>
                                 {timestamp?.toDate ? formatDistanceToNow(timestamp.toDate()) + ' ago' : (typeof timestamp === 'string' ? timestamp : '')}
                             </Text>
-                        </View>
+                        </TouchableOpacity>
 
                         {currentUser?.id !== userId && (
                             <TouchableOpacity

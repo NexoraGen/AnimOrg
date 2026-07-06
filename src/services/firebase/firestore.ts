@@ -21,7 +21,8 @@ import {
   startAfter,
   limitToLast,
   runTransaction,
-  collectionGroup
+  collectionGroup,
+  getCountFromServer
 } from 'firebase/firestore';
 import { db, auth } from './config';
 import { User, WatchlistItem, Review, Comment, WatchHistoryEntry, ActivityFeedItem, AnimeProgress, CommunityPost, PostComment, CommunityNotification, Follow, TrendingTag } from '../../types';
@@ -82,35 +83,34 @@ export const firestoreService = {
     }
     try {
       const postsRef = collection(db, 'posts');
-      let q;
+      let constraints: any[] = [];
 
-      if (options.category === 'Trending') {
-        q = query(
-          postsRef,
-          orderBy('engagementScore', 'desc'),
-          orderBy('createdAt', 'desc'),
-          limit(options.pageSize || 10)
-        );
-      } else {
-        q = query(
-          postsRef,
-          orderBy('createdAt', 'desc'),
-          limit(options.pageSize || 10)
-        );
-      }
-
+      // Always push 'where' constraints first, before any 'orderBy' clauses
       if (options.category && options.category !== 'Latest' && options.category !== 'Trending' && options.category !== 'Following') {
-        q = query(q, where('category', '==', options.category));
+        constraints.push(where('category', '==', options.category));
       }
 
       if (options.userId) {
-        q = query(q, where('userId', '==', options.userId));
+        constraints.push(where('userId', '==', options.userId));
       }
 
+      // Then push 'orderBy' constraints
+      if (options.category === 'Trending') {
+        constraints.push(orderBy('engagementScore', 'desc'));
+        constraints.push(orderBy('createdAt', 'desc'));
+      } else {
+        constraints.push(orderBy('createdAt', 'desc'));
+      }
+
+      // Then cursor constraint
       if (options.lastDoc) {
-        q = query(q, startAfter(options.lastDoc));
+        constraints.push(startAfter(options.lastDoc));
       }
 
+      // Finally limit constraint
+      constraints.push(limit(options.pageSize || 10));
+
+      const q = query(postsRef, ...constraints);
       const snap = await getDocs(q);
       return {
         posts: snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityPost)),
@@ -158,6 +158,84 @@ export const firestoreService = {
       await setDoc(saveRef, { postId, savedAt: serverTimestamp() });
       return true;
     }
+  },
+
+  // --- Fandom Enhancements ---
+
+  getHotDiscussions: async () => {
+    try {
+      const postsRef = collection(db, 'posts');
+      // Sort primarily by engagement score to surface viral takes and hyped polls
+      const q = query(
+        postsRef,
+        orderBy('engagementScore', 'desc'),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityPost));
+    } catch (error) {
+      console.error('[FirestoreService] Error getting hot discussions:', error);
+      return [];
+    }
+  },
+
+  getFriendActivity: async (userId: string) => {
+    if (!userId) return [];
+    try {
+      const followsRef = collection(db, 'follows');
+      const fSnap = await getDocs(query(followsRef, where('followerId', '==', userId)));
+      const followingIds = fSnap.docs.map(d => d.data().followingId);
+
+      if (followingIds.length === 0) return [];
+
+      const chunkedIds = followingIds.slice(0, 10);
+      const activitiesRef = collectionGroup(db, 'activities');
+      const q = query(
+        activitiesRef,
+        where('userId', 'in', chunkedIds),
+        orderBy('timestamp', 'desc'),
+        limit(20)
+      );
+
+      const aSnap = await getDocs(q);
+      const activities = aSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as ActivityFeedItem));
+      // Fallback sorting since collectionGroup ordering might have missing indexes sometimes
+      return activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    } catch (error) {
+      console.error('[FirestoreService] Error getting friend activity:', error);
+      return [];
+    }
+  },
+
+  votePoll: async (postId: string, optionId: string) => {
+    const postRef = doc(db, 'posts', postId);
+    await runTransaction(db, async (transaction) => {
+      const postSnap = await transaction.get(postRef);
+      if (!postSnap.exists()) throw new Error("Post not found");
+      const data = postSnap.data();
+      const pollOptions = data.pollOptions || [];
+      const index = pollOptions.findIndex((o: any) => o.id === optionId);
+      if (index > -1) {
+        pollOptions[index].votes += 1;
+        transaction.update(postRef, { pollOptions, engagementScore: increment(2) }); // High weight for interaction
+      }
+    });
+  },
+
+  voteVersus: async (postId: string, side: 'left' | 'right') => {
+    const postRef = doc(db, 'posts', postId);
+    await runTransaction(db, async (transaction) => {
+      const postSnap = await transaction.get(postRef);
+      if (!postSnap.exists()) throw new Error("Post not found");
+      const data = postSnap.data();
+      if (side === 'left' && data.versusLeft) {
+        data.versusLeft.votes = (data.versusLeft.votes || 0) + 1;
+        transaction.update(postRef, { versusLeft: data.versusLeft, engagementScore: increment(2) });
+      } else if (side === 'right' && data.versusRight) {
+        data.versusRight.votes = (data.versusRight.votes || 0) + 1;
+        transaction.update(postRef, { versusRight: data.versusRight, engagementScore: increment(2) });
+      }
+    });
   },
 
   getPostComments: async (postId: string, lastDoc?: any) => {
@@ -258,6 +336,28 @@ export const firestoreService = {
     const followId = `${followerId}_${followingId}`;
     const snap = await getDoc(doc(db, 'follows', followId));
     return snap.exists();
+  },
+
+  getUserFollowing: async (userId: string): Promise<string[]> => {
+    if (!userId) return [];
+    try {
+      const snap = await getDocs(query(collection(db, 'follows'), where('followerId', '==', userId)));
+      return snap.docs.map(d => d.data().followingId);
+    } catch (error) {
+      console.error('[FirestoreService] Error getting following list:', error);
+      return [];
+    }
+  },
+
+  getUserFollowers: async (userId: string): Promise<string[]> => {
+    if (!userId) return [];
+    try {
+      const snap = await getDocs(query(collection(db, 'follows'), where('followingId', '==', userId)));
+      return snap.docs.map(d => d.data().followerId);
+    } catch (error) {
+      console.error('[FirestoreService] Error getting followers list:', error);
+      return [];
+    }
   },
 
   // --- Notifications ---
@@ -794,16 +894,14 @@ export const firestoreService = {
   },
 
   getAnimeLikeCount: async (animeId: string): Promise<number> => {
-    // In a real production app, we'd use an aggregation counter or a separate collection
-    // For now, let's keep it simple and just query the count if small, 
-    // or use a mock/seed base + real likes as before but stored in firestore
+    // Uses aggregation counter to avoid billing for full collection scans
     const likesRef = collection(db, 'likes');
     const q = query(likesRef, where('animeId', '==', animeId));
-    const snap = await getDocs(q);
+    const snapshot = await getCountFromServer(q);
 
     const seed = animeId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const mockBase = (seed % 450) + 50;
-    return mockBase + snap.size;
+    return mockBase + snapshot.data().count;
   },
 
   toggleAnimeLike: async (userId: string, animeId: string): Promise<boolean> => {

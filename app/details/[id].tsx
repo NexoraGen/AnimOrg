@@ -35,7 +35,8 @@ import {
   GenreChip,
   EpisodeList,
   SkeletonLoader,
-  ReviewComposer
+  ReviewComposer,
+  AuthPromptModal
 } from '../../src/components/ui';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { CinematicModal } from '../../src/components/layout/CinematicModal';
@@ -49,28 +50,138 @@ import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { formatRating, hasValidRating } from '../../src/utils/formatters';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_BACKDROP } from '../../src/constants/images';
 
+// ─── PAGE-LEVEL SAFETY NET ─────────────────────────────────────────────────
+// Wraps the entire screen so crashes never bubble up to the global layout boundary.
+class DetailErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(e: any, info: any) {
+    console.error('[DetailsScreen] Render crash caught by local boundary:', e, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#0F0F0F', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Feather name="alert-circle" size={56} color="#E50914" />
+          <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold', marginTop: 20, marginBottom: 8, textAlign: 'center' }}>Could not load this anime</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.55)', textAlign: 'center', marginBottom: 32 }}>An unexpected error occurred. This has been noted.</Text>
+          <TouchableOpacity onPress={() => this.setState({ hasError: false })} style={{ backgroundColor: '#E50914', paddingHorizontal: 28, paddingVertical: 12, borderRadius: 24, marginBottom: 12 }}>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── PER-SECTION SAFETY NET ────────────────────────────────────────────────
+// Swallows crashes in individual sections (episodes, characters, etc.).
+class SectionGuard extends React.Component<
+  { children: React.ReactNode; fallback?: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(e: any) { console.warn('[SectionGuard] Section render error:', e?.message); }
+  render() {
+    if (this.state.hasError) return this.props.fallback ?? null;
+    return this.props.children;
+  }
+}
+
+interface HeroBackdropProps {
+  backdropPath?: string | null;
+  trailerUrl?: string | null;
+  themeColors: any;
+}
+
+const HeroBackdrop = React.memo(({ backdropPath, trailerUrl, themeColors }: HeroBackdropProps) => {
+  const source = React.useMemo(() => (
+    typeof backdropPath === 'string' && backdropPath.trim() ? { uri: backdropPath } : { uri: PLACEHOLDER_BACKDROP }
+  ), [backdropPath]);
+
+  return (
+    <View style={styles.backdropContainer}>
+      <Image
+        source={source}
+        style={styles.backdrop}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
+      <LinearGradient
+        colors={['rgba(0,0,0,0.5)', 'transparent', 'transparent', themeColors.background]}
+        locations={[0, 0.4, 0.6, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      {trailerUrl && (
+        <TouchableOpacity
+          style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', paddingBottom: 40 }]}
+          onPress={() => Linking.openURL(trailerUrl)}
+        >
+          <View style={[styles.playOverlay, { backgroundColor: `${themeColors.primary}CC` }]}>
+            <Feather name="play" size={32} color="#FFF" fill="#FFF" style={{ marginLeft: 4 }} />
+          </View>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+});
+
+interface HeroPosterProps {
+  posterPath?: string | null;
+  themeColors: any;
+}
+
+const HeroPoster = React.memo(({ posterPath, themeColors }: HeroPosterProps) => {
+  const source = React.useMemo(() => (
+    typeof posterPath === 'string' && posterPath.trim() ? { uri: posterPath } : { uri: PLACEHOLDER_POSTER }
+  ), [posterPath]);
+
+  return (
+    <View style={[styles.posterWrapper, { shadowColor: themeColors.primary }]}>
+      <Image
+        source={source}
+        style={[styles.poster, { borderColor: 'rgba(255,255,255,0.1)' }]}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
+    </View>
+  );
+});
+
 export default function DetailsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  return (
+    <DetailErrorBoundary>
+      <DetailsScreenInner />
+    </DetailErrorBoundary>
+  );
+}
+
+function DetailsScreenInner() {
+  const params = useLocalSearchParams<{ id: string }>();
+  const rawId = params?.id;
+  const id = Array.isArray(rawId) ? rawId[0] : rawId || '';
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const { width, height } = useWindowDimensions();
   const isDesktop = width > 900;
 
-  const {
-    watchlist,
-    user,
-    addToWatchlist,
-    removeFromWatchlist,
-    updateWatchlistStatus,
-    toggleFavorite,
-    addToRecentlyViewed,
-    rateAnime,
-    userRatings,
-    setModalActive
-  } = useAppStore();
+  const watchlist = useAppStore(state => state.watchlist);
+  const user = useAppStore(state => state.user);
+  const addToWatchlist = useAppStore(state => state.addToWatchlist);
+  const removeFromWatchlist = useAppStore(state => state.removeFromWatchlist);
+  const updateWatchlistStatus = useAppStore(state => state.updateWatchlistStatus);
+  const toggleFavorite = useAppStore(state => state.toggleFavorite);
+  const addToRecentlyViewed = useAppStore(state => state.addToRecentlyViewed);
+  const rateAnime = useAppStore(state => state.rateAnime);
+  const userRatings = useAppStore(state => state.userRatings);
+  const setModalActive = useAppStore(state => state.setModalActive);
 
-  const scrollY = useRef(new Animated.Value(0)).current;
   const shareScale = useRef(new Animated.Value(1)).current;
 
   const [media, setMedia] = useState<Media | null>(null);
@@ -82,6 +193,7 @@ export default function DetailsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
   const [isPostingReview, setIsPostingReview] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   useEffect(() => {
     setModalActive(isStatusModalVisible);
@@ -178,14 +290,7 @@ export default function DetailsScreen() {
 
   const handleStatusSelect = (status: WatchStatus) => {
     if (!user) {
-      Alert.alert(
-        'Login Required',
-        'Please sign in or register to track anime in your watchlist!',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/(auth)/login') }
-        ]
-      );
+      setShowAuthGate(true);
       setStatusModalVisible(false);
       return;
     }
@@ -213,14 +318,7 @@ export default function DetailsScreen() {
   const handleRatingChange = (score: number) => {
     if (!media) return;
     if (!user) {
-      Alert.alert(
-        'Login Required',
-        'Please sign in or register to rate anime and export your progress!',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/(auth)/login') }
-        ]
-      );
+      setShowAuthGate(true);
       return;
     }
     setUserRating(score);
@@ -258,14 +356,7 @@ export default function DetailsScreen() {
   const handleFavoriteToggle = async () => {
     triggerHaptic('light');
     if (!user) {
-      Alert.alert(
-        'Login Required',
-        'Please sign in or register to customize your favorites!',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Sign In', onPress: () => router.push('/(auth)/login') }
-        ]
-      );
+      setShowAuthGate(true);
       return;
     }
     if (isInWatchlist) {
@@ -303,6 +394,17 @@ export default function DetailsScreen() {
       console.error(error);
     }
   };
+
+  if (!id) {
+    return (
+      <View style={[styles.container, styles.center, { backgroundColor: themeColors.background }]}>
+        <Feather name="alert-circle" size={64} color={themeColors.primary} style={{ marginBottom: spacing.lg }} />
+        <Text style={[styles.errorText, { color: themeColors.text, fontSize: 20, fontWeight: 'bold' }]}>Invalid Anime ID</Text>
+        <Text style={{ color: themeColors.textDim, marginBottom: 30, textAlign: 'center', paddingHorizontal: 40 }}>The link you followed appears to be broken or incomplete.</Text>
+        <Button title="Return to Home" onPress={() => router.replace('/(tabs)/home')} />
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -351,76 +453,28 @@ export default function DetailsScreen() {
         </Animated.View>
       </View>
 
-      <Animated.ScrollView
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: Platform.OS !== 'web' }
-        )}
         scrollEventThrottle={16}
       >
         <View style={isDesktop ? styles.desktopContainer : null}>
           <View style={styles.imageContainer}>
-            <Animated.View style={[
-              styles.backdropContainer,
-              {
-                transform: [
-                  {
-                    translateY: scrollY.interpolate({
-                      inputRange: [-height * 0.45, 0, height * 0.45],
-                      outputRange: [-height * 0.45 / 2, 0, height * 0.45 * 0.75],
-                    })
-                  },
-                  {
-                    scale: scrollY.interpolate({
-                      inputRange: [-height * 0.45, 0],
-                      outputRange: [2, 1],
-                      extrapolate: 'clamp',
-                    })
-                  }
-                ]
-              }
-            ]}>
-              <Image
-                source={media.backdropPath?.trim() ? { uri: media.backdropPath } : { uri: PLACEHOLDER_BACKDROP }}
-                style={styles.backdrop}
-                contentFit="cover"
-                transition={300}
-              />
-              <LinearGradient
-                colors={['rgba(0,0,0,0.5)', 'transparent', 'transparent', themeColors.background]}
-                locations={[0, 0.4, 0.6, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-              {media.trailerUrl && (
-                <TouchableOpacity
-                  style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', paddingBottom: 40 }]}
-                  onPress={() => Linking.openURL(media.trailerUrl!)}
-                >
-                  <View style={[styles.playOverlay, { backgroundColor: `${themeColors.primary}CC` }]}>
-                    <Feather name="play" size={32} color="#FFF" fill="#FFF" style={{ marginLeft: 4 }} />
-                  </View>
-                </TouchableOpacity>
-              )}
-            </Animated.View>
+            <HeroBackdrop
+              backdropPath={media.backdropPath}
+              trailerUrl={media.trailerUrl}
+              themeColors={themeColors}
+            />
 
             <View style={styles.posterOverlay}>
-              <View style={[styles.posterWrapper, { shadowColor: themeColors.primary }]}>
-                <Image
-                  source={media.posterPath?.trim() ? { uri: media.posterPath } : { uri: PLACEHOLDER_POSTER }}
-                  style={[styles.poster, { borderColor: 'rgba(255,255,255,0.1)' }]}
-                  contentFit="cover"
-                  transition={300}
-                />
-              </View>
+              <HeroPoster posterPath={media.posterPath} themeColors={themeColors} />
               <View style={styles.mainInfo}>
                 <Text style={[styles.title, { color: themeColors.text }]}>{media.title}</Text>
                 <View style={styles.metaRow}>
-                  <Text style={[styles.year, { color: themeColors.textDim }]}>{media.releaseYear} • {media.status} • {media.episodes || '?'} Eps</Text>
+                  <Text style={[styles.year, { color: themeColors.textMuted }]}>{media.releaseYear} • {media.status} • {media.format === 'Movie' ? 'Movie' : `${media.episodes || '?'} Eps`}</Text>
                   {hasValidRating(media.rating) && (
-                    <View style={[styles.ratingBox, { backgroundColor: `${themeColors.primary}25` }]}>
+                    <View style={[styles.ratingBox, { backgroundColor: 'transparent' }]}>
                       <Feather name="star" color={themeColors.primary} size={14} fill={themeColors.primary} />
-                      <Text style={[styles.ratingText, { color: themeColors.primary }]}>{formatRating(media.rating)}</Text>
+                      <Text style={[styles.ratingText, { color: themeColors.textMuted }]}>{formatRating(media.rating)}</Text>
                     </View>
                   )}
                 </View>
@@ -474,14 +528,14 @@ export default function DetailsScreen() {
             </View>
 
             <View style={styles.genresRow}>
-              {media.genres.map(genre => (
+              {(media.genres || []).map(genre => (
                 <GenreChip key={genre} label={genre} />
               ))}
             </View>
 
             <Text style={[styles.sectionTitle, { color: themeColors.text }]}>Overview</Text>
             <ExpandableText
-              text={media.description}
+              text={media.description || 'No overview available for this title.'}
               maxLines={4}
               style={styles.description}
             />
@@ -504,8 +558,8 @@ export default function DetailsScreen() {
               </View>
               <View style={[styles.infoRow, { marginTop: spacing.md }]}>
                 <View style={styles.infoItem}>
-                  <Text style={[styles.infoLabel, { color: themeColors.textMuted }]}>Episodes</Text>
-                  <Text style={[styles.infoValue, { color: themeColors.text }]}>{media.episodes || '?'}</Text>
+                  <Text style={[styles.infoLabel, { color: themeColors.textMuted }]}>{media.format === 'Movie' ? 'Format' : 'Episodes'}</Text>
+                  <Text style={[styles.infoValue, { color: themeColors.text }]}>{media.format === 'Movie' ? 'Movie' : (media.episodes || '?')}</Text>
                 </View>
                 <View style={styles.infoItem}>
                   <Text style={[styles.infoLabel, { color: themeColors.textMuted }]}>Studio</Text>
@@ -518,26 +572,56 @@ export default function DetailsScreen() {
               </View>
             </View>
 
-            {/* Episode Tracking Section (Phase 2) */}
-            <EpisodeList
-              animeId={id}
-              totalEpisodes={media.episodes}
-              media={media}
-            />
-
-            {characters.length > 0 && (
-              <View style={styles.section}>
-                <SectionHeader title="Characters" />
-                <FlatList
-                  data={characters}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => <CharacterCard character={item} />}
-                  contentContainerStyle={{ paddingHorizontal: spacing.md }}
+            {/* Episode Tracking Section */}
+            {media.format !== 'Movie' && (
+              <SectionGuard>
+                <EpisodeList
+                  animeId={id}
+                  totalEpisodes={media.episodes}
+                  media={media}
                 />
-              </View>
+              </SectionGuard>
             )}
+
+            {/* Episode Discussions Community CTA */}
+            <View style={[styles.section, { marginTop: spacing.md }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                <Text style={[styles.sectionTitle, { color: themeColors.text, marginBottom: 0 }]}>Live Discussions</Text>
+                <TouchableOpacity onPress={() => router.push(`/(tabs)/social`)}>
+                  <Text style={{ color: themeColors.primary, fontWeight: '700' }}>Join Community</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={{ backgroundColor: themeColors.surfaceVariant, padding: spacing.md, borderRadius: borderRadius.md, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: themeColors.border }}
+                onPress={() => router.push(`/(tabs)/social`)}
+              >
+                <View style={{ backgroundColor: themeColors.primary + '20', padding: 12, borderRadius: 24 }}>
+                  <Feather name="message-circle" size={24} color={themeColors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: themeColors.text, fontSize: 16, fontWeight: '700' }}>Active Episode Threads</Text>
+                  <Text style={{ color: themeColors.textDim, fontSize: 14, marginTop: 4 }}>Interact with the fandom and debate recent episodes.</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={themeColors.textDim} />
+              </TouchableOpacity>
+            </View>
+
+            <SectionGuard>
+              {characters.length > 0 && (
+                <View style={styles.section}>
+                  <SectionHeader title="Characters" />
+                  <FlatList
+                    data={characters}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => <CharacterCard character={item} />}
+                    contentContainerStyle={{ paddingHorizontal: spacing.md }}
+                  />
+                </View>
+              )}
+            </SectionGuard>
 
             {/* Reviews Section (Phase 4.5) */}
             <View style={styles.section}>
@@ -555,16 +639,22 @@ export default function DetailsScreen() {
               ) : (
                 <View style={[styles.loginPrompt, { backgroundColor: themeColors.surfaceVariant }]}>
                   <Text style={[styles.loginPromptText, { color: themeColors.text }]}>Sign in to join the discussion</Text>
-                  <Button title="Sign In" onPress={() => router.push('/(auth)/login')} style={{ marginTop: spacing.sm }} />
+                  <Button title="Sign In" onPress={() => setShowAuthGate(true)} style={{ marginTop: spacing.sm }} />
                 </View>
               )}
 
               <View style={styles.reviewsList}>
-                {reviews.map(review => (
+                {(reviews || []).map(review => (
                   <View key={review.id} style={{ marginBottom: spacing.md }}>
                     <ReviewCard
                       review={review}
-                      onLike={(reviewId) => firestoreService.likeReview(id, reviewId)}
+                      onLike={(reviewId) => {
+                        if (!user) {
+                          setShowAuthGate(true);
+                          return;
+                        }
+                        firestoreService.likeReview(id, reviewId);
+                      }}
                     />
                   </View>
                 ))}
@@ -579,18 +669,20 @@ export default function DetailsScreen() {
               </View>
             </View>
 
-            {recommendations.length > 0 && (
-              <HorizontalCarousel
-                title="You May Also Like"
-                data={recommendations}
-                onPress={(id) => router.push(`/details/${id}`)}
-              />
-            )}
+            <SectionGuard>
+              {recommendations.length > 0 && (
+                <HorizontalCarousel
+                  title="You May Also Like"
+                  data={recommendations}
+                  onPress={(id) => router.push(`/details/${id}`)}
+                />
+              )}
+            </SectionGuard>
 
             <View style={{ height: insets.bottom + 40 }} />
           </View>
         </View>
-      </Animated.ScrollView>
+      </ScrollView>
 
       {/* Status Modal */}
       <CinematicModal
@@ -665,6 +757,12 @@ export default function DetailsScreen() {
           </BlurView>
         </Animated.View>
       )}
+
+      <AuthPromptModal
+        visible={showAuthGate}
+        onClose={() => setShowAuthGate(false)}
+        message="Sign in to track episode progress, post reviews, and personalize your recommendations!"
+      />
     </AnimatedScreen>
   );
 }

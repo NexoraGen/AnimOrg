@@ -1,0 +1,32 @@
+﻿=== STARTING COMMUNITY FEATURE VERIFICATION ===
+
+--- USER 1: Authenticating... ---
+[Auth] Logged in existing user: test_user1_community@example.com (pjjtYvFaUlVIkzvQe1FexX7HlRe2)
+[Firestore] Profile already exists for UID: pjjtYvFaUlVIkzvQe1FexX7HlRe2
+
+--- USER 1: Creating a community post... ---
+[Firestore] Post created successfully with ID: kcZbPC25cYHZcBXNORsX
+[Auth] User 1 logged out.
+
+--- USER 2: Authenticating... ---
+[Auth] Logged in existing user: test_user2_community@example.com (e0LyR0pZTufHEyePMrTLNJSsxWi2)
+[Firestore] Profile already exists for UID: e0LyR0pZTufHEyePMrTLNJSsxWi2
+
+--- USER 2: Fetching community feed to verify post visibility... ---
+[Firestore] Retrieved 2 posts from community feed.
+
+======================================================
+≡ƒÄë SUCCESS: USER 2 can see the post created by USER 1!
+Post ID: kcZbPC25cYHZcBXNORsX
+Posted By: @tester_one
+Content: "Automated verification post at 2026-06-12T05:35:26.215Z #testing #animorg"
+======================================================
+
+[Auth] User 2 logged out.
+
+--- CLEANUP: Deleting test post... ---
+[Auth] Signed back in as User 1.
+[Firestore] Deleted test post doc: kcZbPC25cYHZcBXNORsX
+[Auth] User 1 logged out.
+
+=== VERIFICATION COMPLETED ===

@@ -70,9 +70,10 @@ export const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
     );
   }, [renderItem, variant, onPress, width, height]);
 
-  const keyExtractor = React.useCallback((item: any) =>
-    `${title}-${item.id || item.animeId || Math.random()}`,
-    [title]);
+  const keyExtractor = React.useCallback((item: any) => {
+    const itemId = item.id || item.animeId || item.anime?.id;
+    return `${title}-${itemId || Math.random()}`;
+  }, [title]);
 
   return (
     <View style={styles.container}>
@@ -115,7 +116,9 @@ export const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
           drawDistance={width * 2}
-          removeClippedSubviews={Platform.OS !== 'web'}
+          removeClippedSubviews
+          // @ts-ignore
+          initialNumToRender={5}
         />
       )}
     </View>
@@ -124,7 +127,7 @@ export const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.xxl,
     marginTop: 0,
   },
   listContent: {

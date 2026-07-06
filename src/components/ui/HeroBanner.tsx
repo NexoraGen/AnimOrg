@@ -1,12 +1,16 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, useWindowDimensions, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { spacing, borderRadius, typography } from '../../theme';
 import { formatRating } from '../../utils/formatters';
-import { PLACEHOLDER_BACKDROP } from '../../constants/images';
+import { PLACEHOLDER_BACKDROP, PLACEHOLDER_POSTER } from '../../constants/images';
+
+// Creating an Animated wrapper for expo-image to enable scale transforms
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 interface HeroBannerProps {
   media: any; // Media type from app
@@ -15,30 +19,46 @@ interface HeroBannerProps {
 
 export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPress }) => {
   const theme = useThemeColors();
-  const opacity = useRef(new Animated.Value(1)).current;
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const opacity = useRef(new Animated.Value(0)).current;
+  const zoomAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Animate opacity when media changes
-  useEffect(() => {
-    // Smoother cross-fade effect
-    Animated.sequence([
-      Animated.timing(opacity, {
-        toValue: 0.4,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const isMobile = screenWidth < 768;
 
-    // Continuous pulse for trailer visibility
+  // Premium, 40-50% screen height max on mobile, to avoid feeling awkwardly stretched
+  const bannerHeight = isMobile
+    ? Math.min(screenWidth * 1.0, screenHeight * 0.48) // Cinematic portrait
+    : 450; // Landscaped desktop cinematic ratio
+
+  // Use poster for mobile if preferred, or backdrop. Backdrop covers better with slow pan.
+  const imageSource = media.posterPath || media.backdropPath || PLACEHOLDER_BACKDROP;
+
+  // Animate opacity when media changes and start slow zoom
+  useEffect(() => {
+    // Reset animations
+    opacity.setValue(0);
+    zoomAnim.setValue(1);
+
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+
+    // Infinite slow scale for cinematic effect
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(zoomAnim, { toValue: 1.05, duration: 18000, useNativeDriver: true }),
+        Animated.timing(zoomAnim, { toValue: 1, duration: 18000, useNativeDriver: true }),
+      ])
+    ).start();
+
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.03, duration: 2500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 2500, useNativeDriver: true }),
       ])
     );
     pulse.start();
@@ -46,50 +66,93 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
   }, [media?.id]);
 
   return (
-    <Animated.View style={[styles.container, { opacity }]}>
-      <Image
-        source={media.backdropPath || PLACEHOLDER_BACKDROP}
-        style={styles.backdrop}
+    <Animated.View style={[styles.container, { height: bannerHeight, opacity }]}>
+      <AnimatedImage
+        source={imageSource}
+        style={[styles.backdrop, { transform: [{ scale: zoomAnim }] }]}
         contentFit="cover"
-        transition={500}
+        contentPosition="top center"
+        transition={600}
+        cachePolicy="memory-disk"
+        priority="high"
       />
+
+      {/* Extreme top padding gradient to ensure text readability under header */}
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(11, 11, 11, 1)']}
+        colors={['rgba(5, 5, 6, 0.5)', 'transparent']}
+        locations={[0, 1]}
+        style={[StyleSheet.absoluteFillObject, { height: 120 }]}
+      />
+
+      {/* Vignette edge blending */}
+      <LinearGradient
+        colors={['transparent', 'rgba(5, 5, 6, 0.2)', 'rgba(5, 5, 6, 0.4)']}
+        locations={[0, 0.8, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Primary absolute black fade for content blending */}
+      <LinearGradient
+        colors={[
+          'transparent',
+          'transparent',
+          'rgba(5, 5, 6, 0.5)',
+          'rgba(5, 5, 6, 0.85)',
+          'rgba(5, 5, 6, 1)',
+        ]}
+        locations={[0, 0.4, 0.7, 0.85, 1]}
         style={styles.gradient}
       >
-        <View style={styles.content}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>TOP RATED</Text>
-          </View>
-          <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
+        <View style={[styles.content, { paddingBottom: 20 }]}>
+          <Text
+            style={[
+              styles.title,
+              { color: '#FFFFFF', fontSize: isMobile ? 26 : 36 },
+            ]}
+            numberOfLines={2}
+          >
             {media.title}
           </Text>
+
           <View style={styles.metadataRow}>
-            <Text style={[styles.metadataText, { color: theme.primary }]}>
-              ⭐ {formatRating(media.rating)}
-            </Text>
-            <Text style={styles.metadataDivider}>•</Text>
-            <Text style={[styles.metadataText, { color: theme.textDim }]}>
-              {media.genres?.slice(0, 2).join(' • ')}
-            </Text>
+            <View style={styles.ratingBadge}>
+              <Text style={styles.ratingText}>⭐ {formatRating(media.rating)}</Text>
+            </View>
+            {media.genres && media.genres.length > 0 && (
+              <>
+                <Text style={styles.metadataDivider}>•</Text>
+                <Text style={styles.metadataText}>
+                  {media.genres.slice(0, 3).join(' • ')}
+                </Text>
+              </>
+            )}
+            {media.type && (
+              <>
+                <Text style={styles.metadataDivider}>•</Text>
+                <Text style={styles.metadataText}>{media.type.toUpperCase()}</Text>
+              </>
+            )}
           </View>
+
           <View style={styles.actions}>
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: theme.primary }]}
+              style={[styles.primaryButton, { backgroundColor: '#E50914' }]} // Netflix style red
               onPress={() => onPress(media.id)}
+              activeOpacity={0.8}
             >
-              <Feather name="info" size={20} color="#FFF" />
-              <Text style={styles.buttonText}>View Details</Text>
+              <Feather name="play" size={18} color="#FFF" fill="#FFF" />
+              <Text style={styles.primaryButtonText}>View Details</Text>
             </TouchableOpacity>
 
             {media.trailerUrl && (
-              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Animated.View style={[styles.secondaryButtonWrapper, { transform: [{ scale: pulseAnim }] }]}>
                 <TouchableOpacity
-                  style={[styles.glassButton, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
+                  style={[styles.glassButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
                   onPress={() => Linking.openURL(media.trailerUrl)}
+                  activeOpacity={0.8}
                 >
-                  <Feather name="play" size={20} color="#FFF" fill="#FFF" />
-                  <Text style={styles.buttonText}>Trailer</Text>
+                  <Feather name="video" size={18} color="#FFF" />
+                  <Text style={styles.secondaryButtonText}>Trailer</Text>
                 </TouchableOpacity>
               </Animated.View>
             )}
@@ -102,55 +165,54 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
 
 const styles = StyleSheet.create({
   container: {
-    height: 420,
-    marginBottom: spacing.sm,
+    width: '100%',
     overflow: 'hidden',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
-    opacity: 0.85,
   },
   gradient: {
     flex: 1,
     justifyContent: 'flex-end',
-    padding: spacing.md,
+    paddingHorizontal: spacing.xl,
   },
   content: {
-    paddingBottom: spacing.xxxl,
-  },
-  badge: {
-    backgroundColor: 'rgba(183, 28, 28, 0.9)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: spacing.sm,
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
+    alignItems: 'center', // Centers everything inside horizontally for cinematic balance
+    width: '100%',
   },
   title: {
-    fontSize: 34,
     fontWeight: '900' as any,
-    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowColor: 'rgba(0,0,0,0.9)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-    marginBottom: spacing.xs,
+    textShadowRadius: 6,
+    marginBottom: spacing.sm,
     letterSpacing: -0.5,
+    textAlign: 'center', // Center title text
+    width: '100%', // Prevent squishing
   },
   metadataRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    justifyContent: 'center', // Center metadata row
+    marginBottom: spacing.xl,
+  },
+  ratingBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: '800' as any,
+    color: '#FFF',
   },
   metadataText: {
-    fontSize: 14,
-    fontWeight: '700' as any,
+    fontSize: 13,
+    fontWeight: '600' as any,
+    color: 'rgba(255,255,255,0.7)',
   },
   metadataDivider: {
     color: 'rgba(255,255,255,0.4)',
@@ -160,31 +222,44 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
+    justifyContent: 'center', // Center action buttons
+    width: '100%',
+    gap: spacing.md, // Clean equal gap between buttons
   },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: borderRadius.md,
-    marginRight: spacing.sm,
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    minWidth: 150,
+    height: 48,
+    borderRadius: 24, // highly rounded Pill shape
     shadowColor: '#E50914',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
-    shadowRadius: 8,
+    shadowRadius: 10,
+    elevation: 6, // Better shadows on android
+  },
+  primaryButtonText: {
+    color: '#FFF',
+    fontWeight: '800' as any,
+    fontSize: 15,
+    marginLeft: 8,
+  },
+  secondaryButtonWrapper: {
+    minWidth: 140,
   },
   glassButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: borderRadius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+    height: 48,
+    borderRadius: 24, // highly rounded Pill shape
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  buttonText: {
+  secondaryButtonText: {
     color: '#FFF',
     fontWeight: '800' as any,
     fontSize: 15,

@@ -5,6 +5,7 @@ import { User, WatchlistItem, Media, WatchHistoryEntry, UserRating, ActivityFeed
 import { firebaseAuthService } from '../services/firebase/auth';
 import { firestoreService } from '../services/firebase/firestore';
 import { notificationService } from '../services/notifications';
+import { resolveAnimeTrackingStatus, getCurrentlyReleasedEpisodesCount } from '../utils/releaseHelper';
 
 interface AppState {
   // Auth State
@@ -13,9 +14,12 @@ interface AppState {
   isLoadingAuth: boolean;
   isGuest: boolean;
   setIsGuest: (val: boolean) => void;
+  loginAsGuest: () => void;
+  clearSession: () => void;
   setUser: (user: User | null) => void;
   initializeAuth: () => () => void;
   updateProfile: (data: Partial<User>) => Promise<void>;
+  refreshUserData: () => Promise<void>;
   isAppInitializing: boolean;
   setIsAppInitializing: (val: boolean) => void;
 
@@ -91,6 +95,8 @@ interface AppState {
   setDataSaver: (val: boolean) => void;
   appLanguage: string;
   setAppLanguage: (val: string) => void;
+  use24Hour: boolean;
+  setUse24Hour: (val: boolean) => void;
 
   // Trailer Cache
   trailerCache: Record<string, { url: string; cachedAt: number }>;
@@ -101,6 +107,8 @@ interface AppState {
   hasHydrated: boolean;
   setHasHydrated: (val: boolean) => void;
 }
+
+let globalTrackedListener: (() => void) | null = null;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -122,6 +130,29 @@ export const useAppStore = create<AppState>()(
       isLoadingAuth: true,
       setUser: (user) => set({ user, isAuthenticated: !!user, isGuest: user ? false : get().isGuest }),
 
+      loginAsGuest: () => set({
+        isGuest: true,
+        isAuthenticated: false,
+        isLoadingAuth: false,
+        isAppInitializing: true,
+        user: null,
+      }),
+
+      clearSession: () => set({
+        user: null,
+        isAuthenticated: false,
+        isGuest: false,
+        watchlist: [],
+        activityFeed: [],
+        continueWatching: [],
+        searchHistory: [],
+        recentlyViewed: [],
+        userRatings: [],
+        animeProgress: {},
+        notInterested: [],
+        recommendationHistory: [],
+      }),
+
       initializeAuth: () => {
         // High-fidelity background automatic retry helper for startup database queries
         const fetchWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> => {
@@ -131,7 +162,6 @@ export const useAppStore = create<AppState>()(
             if (retries <= 0) {
               throw error;
             }
-            console.log(`[Auth Retry] Fetch query failed. Retrying in ${delay}ms... (${retries} attempts left)`);
             await new Promise(resolve => setTimeout(resolve, delay));
             return fetchWithRetry(fn, retries - 1, delay * 1.5); // Exponential delay
           }
@@ -139,24 +169,23 @@ export const useAppStore = create<AppState>()(
 
         const unsubscribeAuth = firebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
           if (firebaseUser) {
+            // Guard: If we are already authenticated as the same user and app is fully initialized, do not re-trigger loading sequence
+            if (get().isAuthenticated && get().user?.id === firebaseUser.uid && !get().isAppInitializing) {
+              return;
+            }
             try {
-              // Ensure we are in loading mode while fetching live profile
               set({ isLoadingAuth: true, isAppInitializing: true });
 
               // 1. Fetch initial profile once - wait / poll if profile is currently being created on Login/Google Sign-In
               let userProfile = await fetchWithRetry(() => firestoreService.getUserProfile(firebaseUser.uid)).catch((err) => {
-                console.warn("[Auth] Failed to fetch profile doc after retries. Restoring fallback from hydrated store cache if present.", err);
-                return get().user; // Fallback directly to hydrated store cache profile
+                return get().user;
               });
 
               if (!userProfile) {
-                console.log("[Auth] Profile not found immediately. Running polling loop...");
-                // Wait up to 3.5 seconds (checking every 500ms) to allow the signup/google creation thread to complete
                 for (let i = 0; i < 7; i++) {
                   await new Promise(resolve => setTimeout(resolve, 500));
                   userProfile = await firestoreService.getUserProfile(firebaseUser.uid);
                   if (userProfile) {
-                    console.log("[Auth] User profile found after polling retry block successfully.");
                     break;
                   }
                 }
@@ -164,7 +193,6 @@ export const useAppStore = create<AppState>()(
 
               // Self-heal: If profile document is still absent, auto-create it now so user is never marked raw Guest User
               if (!userProfile) {
-                console.log("[Auth] Profile document still missing after polling. Creating backup user profile.");
                 const backupProfile = {
                   id: firebaseUser.uid,
                   email: firebaseUser.email || '',
@@ -182,60 +210,86 @@ export const useAppStore = create<AppState>()(
               }
 
               // 2. Set up real-time listener for "trackedAnime" (Primary for Hub)
-              const unsubscribeTracked = firestoreService.onTrackedAnimeSnapshot(firebaseUser.uid, (trackedItems) => {
+              if (globalTrackedListener) {
+                globalTrackedListener();
+              }
+
+              globalTrackedListener = firestoreService.onTrackedAnimeSnapshot(firebaseUser.uid, (trackedItems) => {
                 const currentWatchlist = get().watchlist;
-                let merged = [...currentWatchlist];
                 let hasChanges = false;
 
-                console.log(`[Sync] Received ${trackedItems.length} items from trackedAnime snapshot`);
+                if (currentWatchlist.length !== trackedItems.length) {
+                  hasChanges = true;
+                }
+
+                const currentMap = new Map(currentWatchlist.map(w => [String(w.mediaId), w]));
+                const mergedMap = new Map();
 
                 trackedItems.forEach(ta => {
                   const taId = String(ta.mediaId);
-                  const idx = merged.findIndex(w => String(w.mediaId) === taId);
+                  const existing = currentMap.get(taId);
 
-                  if (idx === -1) {
-                    console.log(`[Sync] Adding new tracked item: ${ta.title} (${taId})`);
-                    merged.push(ta);
+                  if (!existing) {
                     hasChanges = true;
+                    mergedMap.set(taId, ta);
                   } else {
-                    const existing = merged[idx];
-                    const statusChanged = ta.status && ta.status !== existing.status;
-                    const broadcastAdded = ta.broadcast && !existing.broadcast;
+                    const statusChanged = ta.status !== existing.status;
+                    const favoriteChanged = ta.isFavorite !== existing.isFavorite;
+                    const ratingChanged = ta.rating !== existing.rating;
+                    const broadcastChanged = JSON.stringify(ta.broadcast) !== JSON.stringify(existing.broadcast);
+                    const mediaStatusMismatched = ta.mediaStatus !== existing.mediaStatus;
+                    const thumbUpdated = !existing.posterImageMedium && ta.posterImageMedium;
 
-                    if (statusChanged || broadcastAdded) {
-                      console.log(`[Sync] Updating existing item: ${ta.title} (${taId}) | StatusChange: ${statusChanged}, BroadcastAdd: ${broadcastAdded}`);
-                      merged[idx] = { ...existing, ...ta };
+                    if (statusChanged || favoriteChanged || ratingChanged || broadcastChanged || mediaStatusMismatched || thumbUpdated) {
                       hasChanges = true;
+                      mergedMap.set(taId, { ...existing, ...ta });
+                    } else {
+                      mergedMap.set(taId, existing);
                     }
                   }
                 });
 
-                if (hasChanges || currentWatchlist.length === 0) {
-                  set({ watchlist: merged });
+                if (hasChanges) {
+                  set({ watchlist: Array.from(mergedMap.values()) });
                 }
               });
 
               // 3. Fetch data once with background retries and cached values as ultimate fallbacks
-              const [history, activity, allProgress, ratings, notInterested] = await Promise.all([
-                fetchWithRetry(() => firestoreService.getContinueWatching(firebaseUser.uid)).catch(err => {
-                  console.warn("[Auth] Failed to fetch continueWatching, using cache fallback.", err);
+              const [history, activity, allProgress, ratings, notInterested, followingList, followersList] = await Promise.all([
+                fetchWithRetry(() => {
+                  return firestoreService.getContinueWatching(firebaseUser.uid);
+                }).catch(err => {
                   return get().continueWatching || [];
                 }),
-                fetchWithRetry(() => firestoreService.getActivityFeed(firebaseUser.uid)).catch(err => {
-                  console.warn("[Auth] Failed to fetch activityFeed, using cache fallback.", err);
+                fetchWithRetry(() => {
+                  return firestoreService.getActivityFeed(firebaseUser.uid);
+                }).catch(err => {
                   return get().activityFeed || [];
                 }),
-                fetchWithRetry(() => firestoreService.getAllProgress(firebaseUser.uid)).catch(err => {
-                  console.warn("[Auth] Failed to fetch allProgress, using cache fallback.", err);
+                fetchWithRetry(() => {
+                  return firestoreService.getAllProgress(firebaseUser.uid);
+                }).catch(err => {
                   return Object.values(get().animeProgress || {});
                 }),
-                fetchWithRetry(() => firestoreService.getUserRatings(firebaseUser.uid)).catch(err => {
-                  console.warn("[Auth] Failed to fetch userRatings, using cache fallback.", err);
+                fetchWithRetry(() => {
+                  return firestoreService.getUserRatings(firebaseUser.uid);
+                }).catch(err => {
                   return get().userRatings || [];
                 }),
-                fetchWithRetry(() => firestoreService.getNotInterested(firebaseUser.uid)).catch(err => {
-                  console.warn("[Auth] Failed to fetch notInterested, using cache fallback.", err);
+                fetchWithRetry(() => {
+                  return firestoreService.getNotInterested(firebaseUser.uid);
+                }).catch(err => {
                   return get().notInterested || [];
+                }),
+                fetchWithRetry(() => {
+                  return firestoreService.getUserFollowing(firebaseUser.uid);
+                }).catch(err => {
+                  return get().following || [];
+                }),
+                fetchWithRetry(() => {
+                  return firestoreService.getUserFollowers(firebaseUser.uid);
+                }).catch(err => {
+                  return get().followers || [];
                 }),
               ]);
 
@@ -243,6 +297,23 @@ export const useAppStore = create<AppState>()(
               allProgress.forEach(p => {
                 progressMap[String(p.animeId)] = p;
               });
+
+              if (userProfile && !userProfile.timezone) {
+                try {
+                  const { autoDetectTimezone } = require('../utils/timezoneHelper');
+                  const detected = autoDetectTimezone();
+                  userProfile.timezone = detected.id;
+                  userProfile.timezoneLabel = detected.label;
+                  userProfile.country = detected.country;
+                  firestoreService.updateUserProfile(firebaseUser.uid, {
+                    timezone: detected.id,
+                    timezoneLabel: detected.label,
+                    country: detected.country
+                  }).catch((e: any) => console.warn('Failed to auto-save detected timezone on signup:', e));
+                } catch (e) {
+                  console.warn('Failed to auto-detect timezone during initialization:', e);
+                }
+              }
 
               set({
                 user: userProfile,
@@ -254,6 +325,8 @@ export const useAppStore = create<AppState>()(
                 animeProgress: progressMap,
                 userRatings: ratings || [],
                 notInterested: notInterested || [],
+                following: followingList || [],
+                followers: followersList || [],
                 isGuest: false // User is authenticated, so not guest!
               });
 
@@ -261,9 +334,7 @@ export const useAppStore = create<AppState>()(
                 get().registerNotifications();
               }
 
-              return () => {
-                unsubscribeTracked();
-              };
+              // Async returns to onAuthStateChanged are swallowed by Firebase. Do not return cleanup here.
             } catch (error) {
               console.error("Failed to initialize user data under catastrophic catch:", error);
               set({
@@ -299,7 +370,14 @@ export const useAppStore = create<AppState>()(
             }
           }
         });
-        return unsubscribeAuth;
+
+        return () => {
+          if (globalTrackedListener) {
+            globalTrackedListener();
+            globalTrackedListener = null;
+          }
+          unsubscribeAuth();
+        };
       },
 
       updateProfile: async (data) => {
@@ -513,17 +591,15 @@ export const useAppStore = create<AppState>()(
           });
         }
 
-        // Determine next status
-        let newStatus: WatchlistItem['status'] | undefined;
-        if (totalEpisodes > 0 && highestEp >= totalEpisodes) {
-          newStatus = 'completed';
-        } else if (highestEp > 0) {
-          newStatus = 'watching';
-        } else if (highestEp === 0 && currentAnime?.status === 'watching') {
-          // If they unwatch everything, maybe move back to plan-to-watch? 
-          // Let's keep it simple: if 0 watched and was watching, stay watching or move to plan-to-watch
-          newStatus = 'plan-to-watch';
-        }
+        // Determine next status using CENTRAL resolver
+        const infoStatus = media?.status || currentAnime?.mediaStatus || '';
+        const releasedCount = media ? getCurrentlyReleasedEpisodesCount(media) : totalEpisodes;
+        const newStatus = resolveAnimeTrackingStatus({
+          mediaStatus: infoStatus,
+          totalEpisodes,
+          watchedCount: highestEp,
+          releasedCount,
+        });
 
         set({
           animeProgress: {
@@ -822,6 +898,8 @@ export const useAppStore = create<AppState>()(
       setDataSaver: (val) => set({ dataSaver: val }),
       appLanguage: 'English',
       setAppLanguage: (val) => set({ appLanguage: val }),
+      use24Hour: false,
+      setUse24Hour: (val) => set({ use24Hour: val }),
 
       // Trailer Cache
       trailerCache: {},
@@ -834,6 +912,54 @@ export const useAppStore = create<AppState>()(
         }));
       },
       getTrailerCache: () => get().trailerCache,
+
+      refreshUserData: async () => {
+        const user = get().user;
+        if (!user) return;
+
+        const fetchWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> => {
+          try {
+            return await fn();
+          } catch (error) {
+            if (retries <= 0) throw error;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return fetchWithRetry(fn, retries - 1, delay * 1.5);
+          }
+        };
+
+        try {
+          const [userProfile, history, activity, allProgress, ratings, notInterested, followingList, followersList] = await Promise.all([
+            fetchWithRetry(() => firestoreService.getUserProfile(user.id)).catch(() => get().user),
+            fetchWithRetry(() => firestoreService.getContinueWatching(user.id)).catch(() => get().continueWatching || []),
+            fetchWithRetry(() => firestoreService.getActivityFeed(user.id)).catch(() => get().activityFeed || []),
+            fetchWithRetry(() => firestoreService.getAllProgress(user.id)).catch(() => Object.values(get().animeProgress || {})),
+            fetchWithRetry(() => firestoreService.getUserRatings(user.id)).catch(() => get().userRatings || []),
+            fetchWithRetry(() => firestoreService.getNotInterested(user.id)).catch(() => get().notInterested || []),
+            fetchWithRetry(() => firestoreService.getUserFollowing(user.id)).catch(() => get().following || []),
+            fetchWithRetry(() => firestoreService.getUserFollowers(user.id)).catch(() => get().followers || []),
+          ]);
+
+          const progressMap: Record<string, AnimeProgress> = {};
+          if (allProgress) {
+            allProgress.forEach(p => {
+              progressMap[String(p.animeId)] = p;
+            });
+          }
+
+          set((state) => ({
+            user: userProfile || state.user,
+            continueWatching: history || [],
+            activityFeed: activity || [],
+            animeProgress: progressMap,
+            userRatings: ratings || [],
+            notInterested: notInterested || [],
+            following: followingList || [],
+            followers: followersList || [],
+          }));
+        } catch (error) {
+          console.error("Failed to refresh user data:", error);
+        }
+      },
     }),
     {
       name: 'animorg-storage',
@@ -853,25 +979,23 @@ export const useAppStore = create<AppState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         isGuest: state.isGuest,
-        watchlist: state.watchlist,
-        searchHistory: state.searchHistory,
-        recentlyViewed: state.recentlyViewed,
         theme: state.theme,
-        userRatings: state.userRatings,
-        activityFeed: state.activityFeed,
-        continueWatching: state.continueWatching,
-        animeProgress: state.animeProgress,
         notificationsEnabled: state.notificationsEnabled,
         pushToken: state.pushToken,
-        following: state.following,
-        followers: state.followers,
         autoplayTrailer: state.autoplayTrailer,
         reduceHaptics: state.reduceHaptics,
         videoQuality: state.videoQuality,
         dataSaver: state.dataSaver,
         appLanguage: state.appLanguage,
-        trailerCache: state.trailerCache,
-        notInterested: state.notInterested,
+        use24Hour: state.use24Hour,
+        // Severely prune massive datasets strictly prior to JSON serialization saving to SQLite
+        watchlist: state.watchlist,
+        animeProgress: Object.fromEntries(Object.entries(state.animeProgress || {}).slice(0, 150)),
+        searchHistory: (state.searchHistory || []).slice(0, 10),
+        recentlyViewed: (state.recentlyViewed || []).slice(0, 10),
+        continueWatching: (state.continueWatching || []).slice(0, 15),
+        notInterested: (state.notInterested || []).slice(0, 50),
+        userRatings: state.userRatings,
       }),
     }
   )

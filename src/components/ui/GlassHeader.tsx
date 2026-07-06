@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, View, Text, Image } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, typography } from '../../theme';
@@ -40,6 +41,7 @@ export const GlassHeader: React.FC<GlassHeaderProps> = ({
               <Image
                 source={require('../../../assets/icon.png')}
                 style={styles.logoImage}
+                cachePolicy="memory-disk"
               />
               <Text style={[styles.title, styles.brandTitle, { color: colors.text }]}>
                 Anim<Text style={[styles.accentTitle, { color: colors.primary }]}>Org</Text>

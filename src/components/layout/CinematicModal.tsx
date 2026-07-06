@@ -4,14 +4,15 @@ import {
     StyleSheet,
     Modal,
     TouchableOpacity,
-    Animated,
     useWindowDimensions,
     Platform,
     KeyboardAvoidingView,
 } from 'react-native';
+import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { motion } from '../../theme/motion';
 
 interface CinematicModalProps {
     visible: boolean;
@@ -34,30 +35,6 @@ export const CinematicModal: React.FC<CinematicModalProps> = ({
     const insets = useSafeAreaInsets();
     const theme = useThemeColors();
 
-    const scaleAnim = useRef(new Animated.Value(0.95)).current;
-    const opacityAnim = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        if (visible) {
-            Animated.parallel([
-                Animated.spring(scaleAnim, {
-                    toValue: 1,
-                    friction: 8,
-                    tension: 40,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(opacityAnim, {
-                    toValue: 1,
-                    duration: 250,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        } else {
-            scaleAnim.setValue(0.95);
-            opacityAnim.setValue(0);
-        }
-    }, [visible]);
-
     if (!visible && Platform.OS !== 'web') return null;
 
     return (
@@ -77,10 +54,11 @@ export const CinematicModal: React.FC<CinematicModalProps> = ({
                     />
                 )}
                 <Animated.View
+                    entering={FadeIn.duration(motion.durations.base)}
+                    exiting={FadeOut.duration(motion.durations.fast)}
                     style={[
                         styles.backdrop,
                         {
-                            opacity: opacityAnim,
                             backgroundColor: 'rgba(0,0,0,0.7)'
                         }
                     ]}
@@ -97,15 +75,15 @@ export const CinematicModal: React.FC<CinematicModalProps> = ({
                     style={styles.keyboardView}
                 >
                     <Animated.View
+                        entering={SlideInDown.springify().damping(motion.springs.modal.damping).stiffness(motion.springs.modal.stiffness).mass(motion.springs.modal.mass)}
+                        exiting={SlideOutDown.duration(motion.durations.fast)}
                         style={[
                             styles.modalContainer,
                             {
                                 width: '92%',
                                 maxWidth: maxWidth,
-                                transform: [{ scale: scaleAnim }],
-                                opacity: opacityAnim,
                                 backgroundColor: theme.surfaceVariant,
-                                maxHeight: screenHeight - insets.top - insets.bottom - 60,
+                                maxHeight: screenHeight * 0.95,
                             }
                         ]}
                     >

@@ -16,8 +16,8 @@ export const trailerService = {
    * Checks persistent cache first, then Jikan data, then falls back to YouTube search.
    */
   resolveTrailerUrl: async (
-    animeId: string, 
-    title: string, 
+    animeId: string,
+    title: string,
     jikanTrailer?: JikanTrailer
   ): Promise<string | null> => {
     const { getTrailerCache, setTrailerCache } = useAppStore.getState();
@@ -28,7 +28,7 @@ export const trailerService = {
     if (cachedEntry) {
       const isNegativeCache = cachedEntry.url === '';
       const ttl = isNegativeCache ? NEGATIVE_CACHE_TTL : TRAILER_CACHE_TTL;
-      
+
       if (Date.now() - cachedEntry.cachedAt < ttl) {
         return isNegativeCache ? null : cachedEntry.url;
       }
@@ -36,7 +36,7 @@ export const trailerService = {
 
     // Try Jikan data
     let trailerUrl: string | null = null;
-    
+
     if (jikanTrailer) {
       if (jikanTrailer.url) {
         trailerUrl = jikanTrailer.url;
@@ -57,7 +57,7 @@ export const trailerService = {
 
     // Fallback: YouTube Search
     trailerUrl = await trailerService.searchYoutubeTrailer(title);
-    
+
     // Cache result (even if null, to prevent repeated failing searches)
     setTrailerCache(animeId, trailerUrl || '');
     return trailerUrl;
@@ -71,7 +71,7 @@ export const trailerService = {
     const { getTrailerCache } = useAppStore.getState();
     const cache = getTrailerCache();
     const cachedEntry = cache[animeId];
-    
+
     if (cachedEntry && Date.now() - cachedEntry.cachedAt < (cachedEntry.url ? TRAILER_CACHE_TTL : NEGATIVE_CACHE_TTL)) {
       return cachedEntry.url !== '';
     }
@@ -85,7 +85,7 @@ export const trailerService = {
     const { getTrailerCache } = useAppStore.getState();
     const cache = getTrailerCache();
     const cachedEntry = cache[animeId];
-    
+
     if (cachedEntry && cachedEntry.url !== '' && Date.now() - cachedEntry.cachedAt < TRAILER_CACHE_TTL) {
       return cachedEntry.url;
     }
@@ -106,23 +106,38 @@ export const trailerService = {
       `${animeTitle} anime trailer`
     ];
 
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     for (const q of queries) {
-      try {
-        const query = encodeURIComponent(q);
-        const response = await fetch(`https://www.youtube.com/results?search_query=${query}`);
-        const text = await response.text();
-        
-        // Look for the first valid video ID that isn't a playlist or channel
-        const match = text.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/);
-        if (match && match[1]) {
-          return `https://www.youtube.com/watch?v=${match[1]}`;
+      let attempts = 2;
+      for (let attempt = 1; attempt <= attempts; attempt++) {
+        try {
+          const query = encodeURIComponent(q);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+
+          const response = await fetch(`https://www.youtube.com/results?search_query=${query}`, {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          const text = await response.text();
+
+          // Look for the first valid video ID that isn't a playlist or channel
+          const match = text.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/);
+          if (match && match[1]) {
+            return `https://www.youtube.com/watch?v=${match[1]}`;
+          }
+          break; // If fetch succeeded but no match, no need to retry this query
+        } catch (error: any) {
+          console.warn(`Trailer fallback search failed for query "${q}" (Attempt ${attempt}/${attempts}):`, error.message);
+          if (attempt < attempts) {
+            await delay(1000 * Math.pow(2, attempt - 1));
+          }
         }
-      } catch (error) {
-        console.warn(`Trailer fallback search failed for query "${q}":`, error);
-        // Continue to next query if network error on first
       }
     }
-    
+
     return null;
   },
 

@@ -9,7 +9,11 @@ import {
   useWindowDimensions,
   Animated,
   StatusBar,
-  ActivityIndicator
+  ActivityIndicator,
+  TextInput,
+  Modal,
+  FlatList,
+  RefreshControl
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -34,6 +38,8 @@ import { calculateUserLevel } from '../../src/utils/levelSystem';
 import { CommunityPostCard } from '../../src/components/features/community/CommunityPostCard';
 import { CommunityPost } from '../../src/types';
 import { firestoreService } from '../../src/services/firebase/firestore';
+import { searchTimezones, autoDetectTimezone, TimezoneEntry } from '../../src/utils/timezoneHelper';
+import { getLocalAiringInfo } from '../../src/utils/releaseHelper';
 
 const DEFAULT_BANNER = require('../../assets/profile-banner.png');
 const GUEST_AVATAR = require('../../assets/guest-avatar.png');
@@ -47,76 +53,71 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const { width } = useWindowDimensions();
-  const {
-    isLoadingAuth,
-    hasHydrated,
-    user,
-    watchlist,
-    userRatings,
-    notificationsEnabled,
-    setNotificationsEnabled,
-    getFavoriteGenres,
-    animeProgress,
-    following,
-    followers,
-    activityFeed,
-    isAuthenticated
-  } = useAppStore();
+  const isLoadingAuth = useAppStore(state => state.isLoadingAuth);
+  const hasHydrated = useAppStore(state => state.hasHydrated);
+  const user = useAppStore(state => state.user);
+  const updateProfile = useAppStore(state => state.updateProfile);
+  const watchlist = useAppStore(state => state.watchlist);
+  const userRatings = useAppStore(state => state.userRatings);
+  const notificationsEnabled = useAppStore(state => state.notificationsEnabled);
+  const setNotificationsEnabled = useAppStore(state => state.setNotificationsEnabled);
+  const getFavoriteGenres = useAppStore(state => state.getFavoriteGenres);
+  const animeProgress = useAppStore(state => state.animeProgress);
+  const following = useAppStore(state => state.following);
+  const followers = useAppStore(state => state.followers);
+  const activityFeed = useAppStore(state => state.activityFeed);
+  const isAuthenticated = useAppStore(state => state.isAuthenticated);
+  const clearSession = useAppStore(state => state.clearSession);
+  const refreshUserData = useAppStore(state => state.refreshUserData);
+  const isAppInitializing = useAppStore(state => state.isAppInitializing);
 
   const [userPosts, setUserPosts] = React.useState<CommunityPost[]>([]);
+  const [timezoneModalVisible, setTimezoneModalVisible] = React.useState(false);
+  const [searchText, setSearchText] = React.useState('');
+  const [refreshing, setRefreshing] = React.useState(false);
 
-  React.useEffect(() => {
-    if (user) {
-      loadUserPosts();
-    }
-  }, [user]);
+  // Stable ref for scroll animations — must be above early-returns (Rules of Hooks)
+  const scrollY = React.useRef(new Animated.Value(0)).current;
+  const bannerTranslateY = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [0, 100],
+    extrapolate: 'clamp',
+  });
 
-  const loadUserPosts = async () => {
-    try {
-      const result = await firestoreService.getCommunityFeed({
-        userId: user?.id,
-        pageSize: 5
-      });
-      setUserPosts(result.posts);
-    } catch (error) {
-      console.error(error);
-    }
+  const use24Hour = useAppStore(state => state.use24Hour);
+  const setUse24Hour = useAppStore(state => state.setUse24Hour);
+
+  const activeTimezoneId = user?.timezone || autoDetectTimezone().id;
+  const filteredTimezones = useMemo(() => {
+    return searchTimezones(searchText);
+  }, [searchText]);
+
+  const previewBroadcast = { day: 'Sundays', time: '00:00' };
+  const getLocalizedPreviewText = (tzId: string) => {
+    const info = getLocalAiringInfo(previewBroadcast, tzId, 'en-US', use24Hour);
+    if (!info) return 'Unknown Release Slot';
+    return `${info.localDay} • ${info.localTime}`;
   };
 
   const isGuest = !user || !user.email || !isAuthenticated;
 
+  // --- All useMemo calls placed here, above any conditional return (Rules of Hooks) ---
   const userLevel = useMemo(() => calculateUserLevel(watchlist || [], userRatings || []), [watchlist, userRatings]);
 
-  // --- STATS CALCULATION ---
   const stats = useMemo(() => {
     const totalEpisodesWatched = Object.values(animeProgress || {}).reduce((acc, p) => acc + (p.lastWatchedEpisode || 0), 0);
-
     const totalMinutesWatched = Object.entries(animeProgress || {}).reduce((acc, [id, progress]) => {
       const item = (watchlist || []).find(w => w.mediaId === id);
       const mins = item?.durationMinutes || 24;
       return acc + ((progress.lastWatchedEpisode || 0) * mins);
     }, 0);
-
-    const totalDays = (totalMinutesWatched / 1440).toFixed(1);
-
     return {
       episodes: totalEpisodesWatched,
-      days: totalDays,
+      days: (totalMinutesWatched / 1440).toFixed(1),
     };
   }, [watchlist, animeProgress]);
 
-  // Fallback if data is missing, loading, or not hydrated yet to prevent React Web hydration mismatches
-  if (isLoadingAuth || !hasHydrated || !watchlist || !animeProgress) {
-    return (
-      <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color={themeColors.primary} size="large" />
-        <Text style={{ color: themeColors.textDim, marginTop: spacing.md }}>Loading profile...</Text>
-      </View>
-    );
-  }
-
-  // --- DATA SECTIONS ---
-  const favoriteAnime = useMemo(() => watchlist.filter(item => item.isFavorite).map(item => ({
+  const favoriteAnime = useMemo(() => (watchlist || []).filter(item => item.isFavorite).map(item => ({
     id: item.mediaId,
     title: item.title || 'Unknown',
     posterPath: item.posterPath || '',
@@ -140,7 +141,7 @@ export default function ProfileScreen() {
     releaseYear: 0
   })), [userRatings]);
 
-  const currentlyWatching = useMemo(() => watchlist.filter(item => item.status === 'watching').map(item => ({
+  const currentlyWatching = useMemo(() => (watchlist || []).filter(item => item.status === 'watching').map(item => ({
     id: item.mediaId,
     title: item.title,
     posterPath: item.posterPath,
@@ -152,6 +153,48 @@ export default function ProfileScreen() {
     releaseYear: 0
   })), [watchlist]);
 
+  // Memoize avatar source to prevent image refetch on every render
+  const avatarSource = useMemo(
+    () => user?.avatarUrl?.trim() ? { uri: user.avatarUrl } : GUEST_AVATAR,
+    [user?.avatarUrl]
+  );
+
+  const loadUserPosts = React.useCallback(async () => {
+    if (!user?.id || !isAuthenticated) return;
+    try {
+      const result = await firestoreService.getCommunityFeed({
+        userId: user.id,
+        pageSize: 5
+      });
+      setUserPosts(result.posts);
+    } catch (error) {
+      console.error('[Profile] Failed to load user posts:', error);
+    }
+  }, [user?.id, isAuthenticated]);
+
+  // Only load posts once auth is fully settled — no Firestore calls during hydration
+  React.useEffect(() => {
+    if (user?.id && isAuthenticated && !isAppInitializing) {
+      loadUserPosts();
+    }
+  }, [user?.id, isAuthenticated, isAppInitializing, loadUserPosts]);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (user) {
+        await Promise.all([
+          refreshUserData(),
+          loadUserPosts()
+        ]);
+      }
+    } catch (error) {
+      console.error('Failed to reload profile:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user, refreshUserData, loadUserPosts]);
+
   const handleLogout = async () => {
     try {
       await firebaseAuthService.logout();
@@ -161,37 +204,20 @@ export default function ProfileScreen() {
     }
   };
 
-  const scrollY = React.useRef(new Animated.Value(0)).current;
-
-  const bannerScale = scrollY.interpolate({
-    inputRange: [-100, 0],
-    outputRange: [1.2, 1],
-    extrapolate: 'clamp',
-  });
-
-  const bannerTranslateY = scrollY.interpolate({
-    inputRange: [0, 200],
-    outputRange: [0, 100],
-    extrapolate: 'clamp',
-  });
+  // --- LOADING GUARD: all hooks above; conditional render safely below ---
+  // Guard includes isAppInitializing so we never render the profile during Firestore hydration
+  if (isLoadingAuth || !hasHydrated || isAppInitializing) {
+    return (
+      <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator color={themeColors.primary} size="large" />
+        <Text style={{ color: themeColors.textDim, marginTop: spacing.md }}>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
       <StatusBar barStyle="light-content" />
-      <GlassHeader
-        title=""
-        transparent
-        rightComponent={
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.iconButton} onPress={() => setNotificationsEnabled(!notificationsEnabled)}>
-              <Feather name={notificationsEnabled ? "bell" : "bell-off"} size={20} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/app-settings')}>
-              <Feather name="settings" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
-        }
-      />
 
       <Animated.ScrollView
         onScroll={Animated.event(
@@ -201,8 +227,25 @@ export default function ProfileScreen() {
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={themeColors.primary}
+          />
+        }
       >
         <View style={[styles.headerHero, { paddingTop: insets.top + spacing.sm }]}>
+          <View style={{ position: 'absolute', top: insets.top + spacing.sm, right: spacing.md, zIndex: 100 }}>
+            <View style={styles.headerActions}>
+              <TouchableOpacity style={styles.iconButton} onPress={() => setNotificationsEnabled(!notificationsEnabled)}>
+                <Feather name={notificationsEnabled ? "bell" : "bell-off"} size={20} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/app-settings')}>
+                <Feather name="settings" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
           <Animated.View
             style={[
               styles.bannerWrapper,
@@ -237,10 +280,11 @@ export default function ProfileScreen() {
                 <View style={styles.avatarWrapper}>
                   <View style={[styles.avatarGlow, { backgroundColor: themeColors.primary }]} />
                   <Image
-                    source={user?.avatarUrl?.trim() ? { uri: user.avatarUrl } : GUEST_AVATAR}
+                    source={avatarSource}
                     style={[styles.avatar, { borderColor: themeColors.primary }]}
                     contentFit="cover"
                     transition={300}
+                    cachePolicy="memory-disk"
                   />
 
                 </View>
@@ -257,7 +301,21 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {!isGuest && (
+            {isGuest ? (
+              <TouchableOpacity
+                style={[styles.pillActionButton, { backgroundColor: themeColors.primary }]}
+                onPress={() => {
+                  clearSession();
+                  setTimeout(() => {
+                    router.replace('/(auth)/login');
+                  }, 100);
+                }}
+                activeOpacity={0.8}
+              >
+                <Feather name="log-in" size={14} color="white" />
+                <Text style={styles.pillActionButtonText}>Sign In / Register</Text>
+              </TouchableOpacity>
+            ) : (
               <TouchableOpacity
                 style={styles.pillActionButton}
                 onPress={() => router.push('/edit-profile')}
@@ -282,9 +340,10 @@ export default function ProfileScreen() {
         <ProfileStatsStrip
           followingCount={following?.length || 0}
           followersCount={followers?.length || 0}
-          reviewsCount={userRatings?.length || 0}
+          postsCount={userPosts?.length || 0}
           onFollowingPress={() => { }}
           onFollowersPress={() => { }}
+          onPostsPress={() => { }}
         />
 
         {/* --- PREMIUM COMPACT STATS --- */}
@@ -316,7 +375,12 @@ export default function ProfileScreen() {
           <View style={styles.listsGrid}>
             {[
               { title: 'Watching', count: currentlyWatching.length, icon: 'play', image: WATCHING_SILHOUETTE },
-              { title: 'Completed', count: (watchlist || []).filter(i => i.status === 'completed').length, icon: 'check', image: COMPLETED_SILHOUETTE },
+              {
+                title: 'Completed',
+                count: (watchlist || []).filter(i => i.status === 'completed').length,
+                icon: 'check',
+                image: COMPLETED_SILHOUETTE
+              },
               { title: 'Planned', count: (watchlist || []).filter(i => i.status === 'plan-to-watch').length, icon: 'clock', image: PLANNED_SILHOUETTE },
               { title: 'Dropped', count: (watchlist || []).filter(i => i.status === 'dropped').length, icon: 'x', image: DROPPED_SILHOUETTE },
             ].map((list, i) => (
@@ -371,35 +435,7 @@ export default function ProfileScreen() {
         )}
 
 
-        {/* --- SOCIAL ACTIVITY --- */}
-        <View style={styles.section}>
-          <SectionHeader title="Recent Posts" />
-          {userPosts.length > 0 ? (
-            userPosts.map(post => (
-              <CommunityPostCard key={post.id} post={post} />
-            ))
-          ) : (
-            <View style={styles.emptySocial}>
-              <Feather name="message-square" size={32} color={themeColors.textDim} />
-              {isGuest ? (
-                <>
-                  <Text style={[styles.emptySocialText, { color: themeColors.textDim, marginBottom: spacing.sm, textAlign: 'center', paddingHorizontal: spacing.xl }]}>
-                    Sign in to join communities, post reviews, and connect!
-                  </Text>
-                  <Button
-                    title="Sign In"
-                    onPress={() => router.push('/(auth)/login')}
-                    style={{ paddingHorizontal: spacing.lg, height: 38 }}
-                  />
-                </>
-              ) : (
-                <Text style={[styles.emptySocialText, { color: themeColors.textDim }]}>
-                  You haven't posted anything yet.
-                </Text>
-              )}
-            </View>
-          )}
-        </View>
+
 
         {/* --- FAVORITES --- */}
         {favoriteAnime.length > 0 && (
@@ -424,6 +460,206 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* --- RELEASE SETTINGS --- */}
+        <View style={[styles.section, { marginTop: spacing.md }]}>
+          <SectionHeader title="Release Settings" />
+          <View style={styles.settingsCard}>
+            <TouchableOpacity
+              style={styles.settingsRowClickable}
+              onPress={() => {
+                if (isGuest) return;
+                setTimezoneModalVisible(true);
+              }}
+              disabled={isGuest}
+              activeOpacity={0.7}
+            >
+              <Feather name="globe" size={20} color={themeColors.textDim} style={{ marginRight: spacing.sm }} />
+              <View style={styles.settingsTextCol}>
+                <Text style={[styles.settingsTitle, { color: 'white' }]}>Timezone</Text>
+                <Text style={[styles.settingsSub, { color: themeColors.textDim }]}>
+                  {isGuest
+                    ? `Guest Default — ${autoDetectTimezone().city} (${autoDetectTimezone().label})`
+                    : user?.country && user?.timezoneLabel
+                      ? `${user.country} — ${user.timezoneLabel}`
+                      : user?.timezone
+                        ? `${user.timezone}`
+                        : `Auto-Detected — ${autoDetectTimezone().city} (${autoDetectTimezone().label})`}
+                </Text>
+              </View>
+              {!isGuest && <Feather name="chevron-right" size={20} color={themeColors.textDim} style={{ marginLeft: 'auto' }} />}
+              {isGuest && (
+                <View style={[styles.guestBadge, { backgroundColor: 'rgba(255,255,255,0.08)', marginLeft: 'auto' }]}>
+                  <Text style={{ color: themeColors.textDim, fontSize: 10, fontWeight: 'bold' }}>SYSTEM</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={[styles.settingsSeparator, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+
+            <View style={styles.settingsRowClickable}>
+              <Feather name="clock" size={20} color={themeColors.textDim} style={{ marginRight: spacing.sm }} />
+              <View style={styles.settingsTextCol}>
+                <Text style={[styles.settingsTitle, { color: 'white' }]}>Time Display Format</Text>
+                <Text style={[styles.settingsSub, { color: themeColors.textDim }]}>
+                  {use24Hour ? '24-Hour Format' : '12-Hour Format'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.toggleSwitch,
+                  { backgroundColor: use24Hour ? themeColors.primary : '#3A3A3C', marginLeft: 'auto' }
+                ]}
+                activeOpacity={0.8}
+                onPress={() => {
+                  const nextVal = !use24Hour;
+                  setUse24Hour(nextVal);
+                  if (!isGuest) {
+                    updateProfile({ timeFormat: nextVal ? '24h' : '12h' });
+                    if (user?.id) {
+                      firestoreService.updateUserProfile(user.id, { timeFormat: nextVal ? '24h' : '12h' });
+                    }
+                  }
+                }}
+              >
+                <View style={[styles.toggleThumb, { transform: [{ translateX: use24Hour ? 20 : 0 }] }]} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* --- TIMEZONE SELECTOR MODAL --- */}
+        <Modal
+          visible={timezoneModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setTimezoneModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              style={styles.modalDismissOverlay}
+              activeOpacity={1}
+              onPress={() => setTimezoneModalVisible(false)}
+            />
+            <View style={[styles.modalContent, { backgroundColor: '#131317' }]}>
+              {/* Grab handle indicator */}
+              <View style={styles.modalDragHandle} />
+
+              {/* Modal Header */}
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Region & Timezone</Text>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setTimezoneModalVisible(false)}
+                >
+                  <Feather name="x" size={20} color="white" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Live Airing Preview Card */}
+              <View style={[styles.previewCard, { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.06)' }]}>
+                <View style={styles.previewCardHeader}>
+                  <Feather name="tv" size={16} color={themeColors.primary} />
+                  <Text style={[styles.previewCardTitle, { color: 'white' }]}>Dynamic Live Preview</Text>
+                </View>
+                <Text style={[styles.previewAnimeName, { color: 'white' }]}>Solo Leveling Episode 9 Releases:</Text>
+                <Text style={[styles.previewTimeText, { color: themeColors.primary }]}>
+                  {getLocalizedPreviewText(searchText ? (filteredTimezones[0]?.id || activeTimezoneId) : activeTimezoneId)}
+                </Text>
+                <Text style={[styles.previewZoneInfo, { color: themeColors.textDim }]}>
+                  Automatically recalculates release timings relative to selected timezone preference.
+                </Text>
+              </View>
+
+              {/* Search input bar */}
+              <View style={[styles.searchContainer, { backgroundColor: '#1D1D22' }]}>
+                <Feather name="search" size={18} color={themeColors.textDim} style={{ marginLeft: spacing.xs }} />
+                <TextInput
+                  style={[styles.searchInput, { color: 'white' }]}
+                  placeholder="Search city, country, or code..."
+                  placeholderTextColor={themeColors.textDim}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  autoCorrect={false}
+                  clearButtonMode="while-editing"
+                />
+                {searchText ? (
+                  <TouchableOpacity onPress={() => setSearchText('')}>
+                    <Feather name="x-circle" size={16} color={themeColors.textDim} style={{ marginRight: spacing.xs }} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {/* Virtualized/Optimized Timezone FlatList */}
+              <FlatList
+                data={filteredTimezones}
+                keyExtractor={(item) => item.id}
+                removeClippedSubviews={Platform.OS !== 'web'}
+                initialNumToRender={12}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                getItemLayout={(_data, index) => (
+                  { length: 58, offset: 58 * index, index }
+                )}
+                contentContainerStyle={styles.listScrollContainer}
+                ListEmptyComponent={
+                  <View style={styles.emptySearchContainer}>
+                    <Feather name="alert-circle" size={32} color={themeColors.textDim} />
+                    <Text style={[styles.emptySearchText, { color: themeColors.textDim }]}>
+                      No matching timezones found
+                    </Text>
+                  </View>
+                }
+                renderItem={({ item }) => {
+                  const isSelected = item.id === activeTimezoneId;
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.tzItemRow,
+                        { backgroundColor: isSelected ? 'rgba(255, 35, 83, 0.12)' : 'transparent' }
+                      ]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        updateProfile({
+                          timezone: item.id,
+                          timezoneLabel: item.label,
+                          country: item.country
+                        });
+                        if (user?.id) {
+                          firestoreService.updateUserProfile(user.id, {
+                            timezone: item.id,
+                            timezoneLabel: item.label,
+                            country: item.country
+                          });
+                        }
+                        setTimezoneModalVisible(false);
+                        setSearchText('');
+                      }}
+                    >
+                      <View style={styles.tzFlagCol}>
+                        <View style={[styles.flagBadge, { backgroundColor: isSelected ? themeColors.primary : 'rgba(255,255,255,0.06)' }]}>
+                          <Text style={styles.flagText}>{item.countryCode}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.tzMetaCol}>
+                        <Text style={[styles.tzCountryCityText, { color: isSelected ? themeColors.primary : 'white', fontWeight: isSelected ? 'bold' : 'normal' }]}>
+                          {item.country} — {item.city}
+                        </Text>
+                        <Text style={[styles.tzLabelText, { color: themeColors.textDim }]}>
+                          {item.id} ({item.label})
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <View style={{ marginLeft: 'auto' }}>
+                          <Feather name="check" size={20} color={themeColors.primary} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
 
         <View style={styles.footerActions}>
           <Button
@@ -433,7 +669,7 @@ export default function ProfileScreen() {
             textStyle={{ color: themeColors.error }}
             icon={<Feather name="log-out" color={themeColors.error} size={20} />}
           />
-          <Text style={[styles.versionText, { color: themeColors.textDim }]}>AnimOrg v2.5.0 • Cinematic Edition</Text>
+          <Text style={[styles.versionText, { color: themeColors.textDim }]}>AnimOrg v1.0.0</Text>
         </View>
       </Animated.ScrollView>
     </AnimatedScreen>
@@ -705,6 +941,43 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
+  settingsCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 16,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  settingsTextCol: {
+    flex: 1,
+  },
+  settingsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  settingsSub: {
+    fontSize: 12,
+  },
+  settingsInputWrapper: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    height: 44,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  settingsInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
   footerActions: {
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
@@ -730,5 +1003,176 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     opacity: 0.5,
-  }
+  },
+
+  // upgraded settings layout
+  settingsRowClickable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 0,
+  },
+  settingsSeparator: {
+    height: 1,
+    width: '100%',
+  },
+  toggleSwitch: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'white',
+  },
+  guestBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+
+  // Premium modal sheet styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalDismissOverlay: {
+    flex: 1,
+  },
+  modalContent: {
+    width: '100%',
+    maxHeight: '75%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 28,
+    paddingHorizontal: spacing.md,
+  },
+  modalDragHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignSelf: 'center',
+    marginVertical: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    marginBottom: spacing.xs,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  modalCloseBtn: {
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+
+  // Live preview card styles
+  previewCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  previewCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: 8,
+  },
+  previewCardTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  previewAnimeName: {
+    fontSize: 14,
+    fontWeight: 'normal',
+    marginBottom: 4,
+  },
+  previewTimeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  previewZoneInfo: {
+    fontSize: 11,
+  },
+
+  // timezone search interface
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    paddingHorizontal: spacing.sm,
+    height: 48,
+    marginBottom: spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingHorizontal: spacing.sm,
+    height: '100%',
+  },
+
+  // timezone list scroll style
+  listScrollContainer: {
+    paddingBottom: 30,
+  },
+  emptySearchContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    gap: spacing.xs,
+  },
+  emptySearchText: {
+    fontSize: 14,
+  },
+  tzItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginBottom: 6,
+    height: 52,
+  },
+  tzFlagCol: {
+    marginRight: spacing.sm,
+  },
+  flagBadge: {
+    width: 32,
+    height: 24,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  flagText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+    opacity: 0.95,
+  },
+  tzMetaCol: {
+    flex: 1,
+  },
+  tzCountryCityText: {
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  tzLabelText: {
+    fontSize: 11,
+  },
 });

@@ -22,3 +22,4 @@ export * from './ProfileStatsStrip';
 export * from './AnimatedPressable';
 export * from './GradientBorder';
 export * from './AnimatedToggle';
+export * from './AuthPromptModal';

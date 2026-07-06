@@ -25,7 +25,8 @@ import { WatchlistItem, Media } from '../../src/types';
 export default function WatchlistScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { watchlist, animeProgress } = useAppStore();
+  const watchlist = useAppStore(state => state.watchlist);
+  const animeProgress = useAppStore(state => state.animeProgress);
   const [activeTab, setActiveTab] = useState<string>('all');
   const themeColors = useThemeColors();
   const { width } = useWindowDimensions();

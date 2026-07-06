@@ -7,7 +7,12 @@ export interface LocalAiringInfo {
     airingDate: Date;
 }
 
-export const getLocalAiringInfo = (broadcast?: Media['broadcast']): LocalAiringInfo | null => {
+export const getLocalAiringInfo = (
+    broadcast?: Media['broadcast'],
+    userTimezone?: string,
+    userLocale: string = 'en-US',
+    use24Hour: boolean = false
+): LocalAiringInfo | null => {
     if (!broadcast || !broadcast.day || !broadcast.time) return null;
 
     const DAYS_MAP: Record<string, number> = {
@@ -40,16 +45,37 @@ export const getLocalAiringInfo = (broadcast?: Media['broadcast']): LocalAiringI
     }
     targetJst.setUTCDate(targetJst.getUTCDate() + daysDiff);
 
-    // 2. Adjust back to universal absolute UTC and user's local browser context
+    // 2. Adjust back to universal absolute UTC
     const absoluteBroadcastTime = new Date(targetJst.getTime() - 9 * 60 * 60 * 1000);
 
-    const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const localDay = DAYS_OF_WEEK[absoluteBroadcastTime.getDay()];
-    const localHours = String(absoluteBroadcastTime.getHours()).padStart(2, '0');
-    const localMinutes = String(absoluteBroadcastTime.getMinutes()).padStart(2, '0');
-    const localTime = `${localHours}:${localMinutes}`;
+    // 3. Format strictly to the requested Timezone using Intl natively
+    let localDay = '';
+    let localTime = '';
+    try {
+        const defaultTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const targetTz = userTimezone && userTimezone.includes('/') ? userTimezone : defaultTz;
 
-    // 3. Compute relative countdown dynamic string
+        localDay = new Intl.DateTimeFormat(userLocale, {
+            weekday: 'long',
+            timeZone: targetTz
+        }).format(absoluteBroadcastTime);
+
+        localTime = new Intl.DateTimeFormat(userLocale, {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: !use24Hour,
+            timeZone: targetTz
+        }).format(absoluteBroadcastTime);
+    } catch (e) {
+        // Fallback for invalid timezone strings
+        const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        localDay = DAYS_OF_WEEK[absoluteBroadcastTime.getDay()];
+        const localHours = String(absoluteBroadcastTime.getHours()).padStart(2, '0');
+        const localMinutes = String(absoluteBroadcastTime.getMinutes()).padStart(2, '0');
+        localTime = use24Hour ? `${localHours}:${localMinutes}` : `${Number(localHours) % 12 || 12}:${localMinutes} ${Number(localHours) >= 12 ? 'PM' : 'AM'}`;
+    }
+
+    // 4. Compute relative countdown dynamic string
     const diffMs = absoluteBroadcastTime.getTime() - Date.now();
     let countdown = '';
     if (diffMs <= 0) {
@@ -80,8 +106,8 @@ export const getLocalAiringInfo = (broadcast?: Media['broadcast']): LocalAiringI
     };
 };
 
-export const calculateCountdown = (broadcast?: Media['broadcast']): string => {
-    const info = getLocalAiringInfo(broadcast);
+export const calculateCountdown = (broadcast?: Media['broadcast'], userTimezone?: string, use24Hour: boolean = false): string => {
+    const info = getLocalAiringInfo(broadcast, userTimezone, 'en-US', use24Hour);
     return info?.countdown || 'TBD';
 };
 
@@ -96,6 +122,15 @@ export const getCurrentlyReleasedEpisodesCount = (media: Media, now: number = Da
     const status = media.status?.toLowerCase() || '';
     if (status === 'completed' || status === 'finished airing' || status === 'finished') {
         return media.episodes || 12;
+    }
+
+    if (media.nextAiringEpisode) {
+        const nextEp = media.nextAiringEpisode.episode;
+        const airTime = media.nextAiringEpisode.airingAt * 1000;
+        if (now >= airTime) {
+            return nextEp;
+        }
+        return nextEp - 1;
     }
 
     if (media.airing_start) {
@@ -125,3 +160,44 @@ export const getEpisodeAiringTime = (media: Media, episodeNum: number): number |
     const jstStart = new Date(media.airing_start).getTime();
     return jstStart + (episodeNum - 1) * 7 * 24 * 60 * 60 * 1000;
 };
+
+/**
+ * CENTRAL STATUS RESOLVER — Single source of truth for anime tracking status.
+ * Use this everywhere instead of inline status logic.
+ *
+ * Rules:
+ * - watchedCount === 0 → 'plan-to-watch'
+ * - Airing anime → NEVER 'completed'. Return 'awaiting' if caught up, else 'watching'
+ * - Finished airing + watchedCount >= totalEpisodes → 'completed'
+ * - Otherwise → 'watching'
+ */
+export const resolveAnimeTrackingStatus = (opts: {
+    mediaStatus: string;
+    totalEpisodes: number;
+    watchedCount: number;
+    releasedCount: number;
+}): 'watching' | 'completed' | 'awaiting' | 'plan-to-watch' => {
+    const { mediaStatus, totalEpisodes, watchedCount, releasedCount } = opts;
+
+    if (watchedCount <= 0) return 'plan-to-watch';
+
+    const status = (mediaStatus || '').toLowerCase();
+    const isFinished = ['finished airing', 'finished', 'completed'].includes(status);
+    const isAiring = !isFinished && !['upcoming', 'not yet aired'].includes(status);
+
+    if (isAiring) {
+        // AIRING anime can NEVER be completed
+        if (releasedCount > 0 && watchedCount >= releasedCount) {
+            return 'awaiting'; // Caught up to latest release
+        }
+        return 'watching';
+    }
+
+    // Finished airing
+    if (isFinished && totalEpisodes > 0 && watchedCount >= totalEpisodes) {
+        return 'completed';
+    }
+
+    return 'watching';
+};
+

@@ -8,14 +8,19 @@ import { useAppStore } from '../../../store/useAppStore';
 import { PostHeader } from './PostHeader';
 import { PostActions } from './PostActions';
 import { CommentSection } from './CommentSection';
+import { PollCard } from '../../community/PollCard';
+import { VersusCard } from '../../community/VersusCard';
+import { SpoilerWrapper } from '../../community/SpoilerWrapper';
+import { Image } from 'expo-image';
 
 interface CommunityPostCardProps {
     post: CommunityPost;
     onPress?: () => void;
     onAuthRequired?: () => void;
+    onPressProfile?: (userId: string) => void;
 }
 
-export const CommunityPostCard: React.FC<CommunityPostCardProps> = React.memo(({ post, onPress, onAuthRequired }) => {
+export const CommunityPostCard: React.FC<CommunityPostCardProps> = React.memo(({ post, onPress, onAuthRequired, onPressProfile }) => {
     const theme = useThemeColors();
     const setModalActive = useAppStore(state => state.setModalActive);
     const currentUser = useAppStore(state => state.user);
@@ -26,18 +31,50 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = React.memo(({
     }, [showComments]);
 
     const renderContent = () => {
-        return (
+        let injectedData = null;
+
+        if (post.type === 'poll' && post.pollOptions) {
+            injectedData = <PollCard postId={post.id} options={post.pollOptions} hasVotedId={post.hasVotedPoll} />;
+        } else if (post.type === 'versus' && post.versusLeft && post.versusRight) {
+            injectedData = <VersusCard postId={post.id} leftEntity={post.versusLeft} rightEntity={post.versusRight} hasVoted={post.hasVotedVersus} />;
+        } else if (post.type === 'episode_discussion') {
+            injectedData = (
+                <View style={[styles.episodeBadge, { backgroundColor: theme.primary + '20' }]}>
+                    <Text style={[styles.episodeText, { color: theme.primary }]}>
+                        {post.animeTitle} • Episode {post.episodeNumber}
+                    </Text>
+                </View>
+            );
+        }
+
+        const innerContent = (
             <View style={[styles.discussionContent, { borderLeftColor: theme.primary }]}>
+                {post.mediaUrl && (
+                    <View style={styles.mediaWrap}>
+                        <Image source={post.mediaUrl} style={styles.mediaImage} contentFit="cover" />
+                    </View>
+                )}
                 <Text style={[styles.discussionText, { color: theme.text }]}>
                     {post.content}
                 </Text>
+                {injectedData}
             </View>
         );
+
+        if (post.hasSpoilers) {
+            return (
+                <SpoilerWrapper severity={post.spoilerSeverity}>
+                    {innerContent}
+                </SpoilerWrapper>
+            );
+        }
+
+        return innerContent;
     };
 
     return (
         <TouchableOpacity
-            style={[styles.container, { backgroundColor: theme.surface, borderColor: theme.border }]}
+            style={[styles.container, { borderBottomColor: theme.border }]}
             activeOpacity={0.9}
             onPress={onPress}
         >
@@ -47,7 +84,14 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = React.memo(({
                 timestamp={post.createdAt}
                 type={post.type}
                 userId={post.userId}
+                onPressProfile={() => onPressProfile?.(post.userId)}
             />
+
+            {post.category && (
+                <View style={[styles.categoryBadge, { backgroundColor: `${theme.primary}18`, borderColor: `${theme.primary}30` }]}>
+                    <Text style={[styles.categoryBadgeText, { color: theme.primary }]}>{post.category}</Text>
+                </View>
+            )}
 
             <View style={styles.content}>
                 {renderContent()}
@@ -99,28 +143,22 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = React.memo(({
 
 const styles = StyleSheet.create({
     container: {
-        padding: spacing.md,
-        borderRadius: 20,
-        marginBottom: spacing.md,
-        borderWidth: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.sm,
+        borderBottomWidth: 1,
     },
     content: {
         marginTop: spacing.xs,
     },
     discussionContent: {
-        borderLeftWidth: 4,
-        paddingLeft: spacing.md,
-        paddingVertical: 4,
+        paddingVertical: 2,
+        marginTop: 4,
     },
     discussionText: {
-        fontSize: 17,
-        fontWeight: '700',
-        lineHeight: 24,
+        fontSize: 15,
+        fontWeight: '400',
+        lineHeight: 22,
     },
     hashtagRow: {
         flexDirection: 'row',
@@ -131,5 +169,41 @@ const styles = StyleSheet.create({
     hashtag: {
         fontSize: 13,
         fontWeight: '700',
-    }
+    },
+    episodeBadge: {
+        marginTop: spacing.sm,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 16,
+        alignSelf: 'flex-start',
+    },
+    episodeText: {
+        fontSize: 13,
+        fontWeight: '800',
+    },
+    mediaWrap: {
+        width: '100%',
+        height: 180,
+        borderRadius: 12,
+        overflow: 'hidden',
+        marginBottom: spacing.sm,
+    },
+    mediaImage: {
+        width: '100%',
+        height: '100%',
+    },
+    categoryBadge: {
+        alignSelf: 'flex-start',
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginBottom: spacing.xs,
+        marginTop: 2,
+    },
+    categoryBadgeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        letterSpacing: 0.3,
+    },
 });

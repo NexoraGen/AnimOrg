@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth, getAuth, Auth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+// @ts-ignore - Exported natively inside Firebase core, ignore typing errors
+import { initializeAuth, getAuth, Auth, getReactNativePersistence } from 'firebase/auth';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
@@ -22,14 +23,18 @@ let auth: Auth;
 if (Platform.OS === 'web') {
     auth = getAuth(app);
 } else {
-    // Use require dynamically from 'firebase/auth' to prevent Metro resolution errors on both Android and Web builds
-    const { getReactNativePersistence } = require('firebase/auth');
     auth = initializeAuth(app, {
         persistence: getReactNativePersistence(AsyncStorage)
     });
 }
 
-const db = getFirestore(app);
+// Ensure offline persistence is heavily enforced for Resilience & Reliability mode
+const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager() // Native/Web-safe resilient offline local caching
+    })
+});
+
 const storage = getStorage(app);
 
 export { auth, db, storage };

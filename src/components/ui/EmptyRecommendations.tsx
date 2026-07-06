@@ -14,34 +14,23 @@ export const EmptyRecommendations: React.FC<EmptyRecommendationsProps> = ({ onPr
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['rgba(229, 9, 20, 0.1)', 'transparent']}
-                style={styles.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-            />
+            <View style={styles.card}>
+                <Feather name="layers" size={28} color={themeColors.textDim} style={{ marginBottom: spacing.md }} />
 
-            <View style={[styles.card, { borderColor: 'rgba(255, 255, 255, 0.1)' }]}>
-                <View style={styles.iconContainer}>
-                    <Feather name="heart" size={32} color={colors.primary} />
-                    <View style={styles.glowEffect} />
-                </View>
-
-                <Text style={[styles.title, { color: themeColors.text }]}>
-                    Your Personalized Hub awaits
+                <Text style={[styles.title, { color: themeColors.textDim }]}>
+                    No Recommendations
                 </Text>
 
-                <Text style={[styles.subtitle, { color: themeColors.textDim }]}>
-                    Add anime to your watchlist to unlock custom recommendations tailored to your taste.
+                <Text style={[styles.subtitle, { color: themeColors.textMuted }]}>
+                    Interact with anime to unlock your curated hub.
                 </Text>
 
                 <TouchableOpacity
-                    style={[styles.button, { backgroundColor: colors.primary }]}
+                    style={[styles.button, { borderColor: themeColors.border, borderWidth: 1 }]}
                     onPress={onPress}
                     activeOpacity={0.8}
                 >
-                    <Feather name="plus-circle" size={18} color="#FFF" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Start Exploring</Text>
+                    <Text style={[styles.buttonText, { color: themeColors.textDim }]}>Explore Anime</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -51,21 +40,12 @@ export const EmptyRecommendations: React.FC<EmptyRecommendationsProps> = ({ onPr
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: spacing.md,
-        marginBottom: spacing.xl,
-        position: 'relative',
-    },
-    gradient: {
-        ...StyleSheet.absoluteFillObject,
-        height: 150,
+        marginVertical: spacing.xxl,
+        alignItems: 'center',
     },
     card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-        borderRadius: borderRadius.xl,
-        padding: spacing.xl,
         alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        overflow: 'hidden',
+        paddingVertical: spacing.xl,
     },
     iconContainer: {
         width: 64,

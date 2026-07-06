@@ -18,14 +18,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, onSnapshot, orderBy, limit, collectionGroup, startAfter } from 'firebase/firestore';
 import { db } from '../../src/services/firebase/config';
 
 import { colors, spacing, borderRadius } from '../../src/theme';
 import {
     GlassHeader,
     HEADER_HEIGHT,
-    AuthModal
+    AuthPromptModal
 } from '../../src/components/ui';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
@@ -35,11 +35,12 @@ import { CommunityPostCard } from '../../src/components/features/community/Commu
 import { UserSearchCard } from '../../src/components/features/community/UserSearchCard';
 import { firestoreService } from '../../src/services/firebase/firestore';
 import { PostComposer } from '../../src/components/features/community/PostComposer';
+import { ActivityFeedCard } from '../../src/components/community/ActivityFeedCard';
 import { useAppStore } from '../../src/store/useAppStore';
 
 const { width } = Dimensions.get('window');
 
-const TABS = ['Trending', 'Following', 'Search Users', 'Latest', 'Memes', 'Discussions', 'News'];
+const TABS = ['For You', 'Friend Activity', 'Latest', 'Discussions', 'Questions', 'Fun', 'News', 'Reviews', 'Recommendations'];
 
 export default function SocialScreen() {
     const router = useRouter();
@@ -49,11 +50,14 @@ export default function SocialScreen() {
 
     const setModalActive = useAppStore(state => state.setModalActive);
 
-    const [activeTab, setActiveTab] = useState('Trending');
+    const [activeTab, setActiveTab] = useState('For You');
+    const [showSearchView, setShowSearchView] = useState(false);
     const [posts, setPosts] = useState<CommunityPost[]>([]);
     const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([]);
-    const [lastDoc, setLastDoc] = useState<any>(null);
+    const [limitCount] = useState(10);
+    const [hasMore, setHasMore] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
+    const [lastVisible, setLastVisible] = useState<any>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const [authModalVisible, setAuthModalVisible] = useState(false);
@@ -94,40 +98,113 @@ export default function SocialScreen() {
         setTrendingTags(tags);
     };
 
-    const fetchPosts = useCallback(async (refresh = false) => {
-        if (isLoading || (posts.length > 0 && !refresh && !lastDoc)) return;
+    const fetchFeed = async (isLoadMore = false) => {
+        if (showSearchView) return;
 
-        setIsLoading(refresh ? false : true);
-        if (refresh) setRefreshing(true);
+        if (!isLoadMore) {
+            setIsLoading(true);
+            setPosts([]); // Clear immediately when switching tabs to prevent state bleeding
+        }
 
         try {
-            const result = await firestoreService.getCommunityFeed({
-                category: activeTab,
-                lastDoc: refresh ? null : lastDoc,
-                pageSize: 10
+            const postsRef = collection(db, 'posts');
+            let q;
+
+            // Map display tab names to Firestore category field values with strict lowercase
+            const TAB_TO_CATEGORY: Record<string, string> = {
+                'Discussions': 'discussion',
+                'Questions': 'question',
+                'Fun': 'fun',
+                'News': 'news',
+                'Reviews': 'review',
+                'Recommendations': 'recommendation',
+            };
+
+            if (activeTab === 'For You') {
+                q = query(postsRef, orderBy('engagementScore', 'desc'), limit(limitCount));
+                if (isLoadMore && lastVisible) {
+                    q = query(postsRef, orderBy('engagementScore', 'desc'), startAfter(lastVisible), limit(limitCount));
+                }
+            } else if (activeTab === 'Friend Activity') {
+                const followedIds = await firestoreService.getUserFollowing(user?.id || '');
+                if (followedIds.length === 0) {
+                    setPosts([]);
+                    setHasMore(false);
+                    return;
+                }
+                const chunkedIds = followedIds.slice(0, 10);
+                const activitiesRef = collectionGroup(db, 'activities');
+                q = query(activitiesRef, where('userId', 'in', chunkedIds), orderBy('timestamp', 'desc'), limit(limitCount));
+                if (isLoadMore && lastVisible) {
+                    q = query(activitiesRef, where('userId', 'in', chunkedIds), orderBy('timestamp', 'desc'), startAfter(lastVisible), limit(limitCount));
+                }
+            } else if (activeTab === 'Latest') {
+                // All categories, newest first
+                q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
+                if (isLoadMore && lastVisible) {
+                    q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(limitCount));
+                }
+            } else if (TAB_TO_CATEGORY[activeTab]) {
+                // Category-specific tabs — query only matching posts
+                const cat = TAB_TO_CATEGORY[activeTab];
+                q = query(postsRef, where('category', '==', cat), limit(limitCount));
+                if (isLoadMore && lastVisible) {
+                    q = query(postsRef, where('category', '==', cat), startAfter(lastVisible), limit(limitCount));
+                }
+            } else {
+                // Fallback (Search Users is handled separately, should never reach here)
+                q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
+            }
+
+            const snapshot = await getDocs(q);
+
+            // Temporary debug logs
+            const queryCategory = TAB_TO_CATEGORY[activeTab] || activeTab;
+            console.log(`[DEBUG] Query Category: ${queryCategory} | Returned Posts Count: ${snapshot.docs.length}`);
+
+            const fetchedPosts = snapshot.docs.map(doc => {
+                const data = doc.data() as any;
+
+                // Background migration for old posts without a category
+                if (!data.category) {
+                    updateDoc(doc.ref, { category: 'discussion' }).catch(e => console.warn('Migration update failed', e));
+                    data.category = 'discussion';
+                }
+
+                console.log(`[DEBUG] Post ID: ${doc.id} | Category: ${data.category}`);
+
+                return { id: doc.id, ...data };
             });
 
-            if (refresh) {
-                setPosts(result.posts);
-            } else {
-                setPosts(prev => [...prev, ...result.posts]);
+            if (activeTab === 'Friend Activity') {
+                fetchedPosts.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
             }
-            setLastDoc(result.lastDoc);
+
+            if (isLoadMore) {
+                setPosts(prev => [...prev, ...fetchedPosts]);
+            } else {
+                setPosts(fetchedPosts);
+            }
+
+            if (snapshot.docs.length > 0) {
+                setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+            }
+            setHasMore(snapshot.docs.length >= limitCount);
         } catch (error) {
-            console.error('[SocialScreen] Error fetching feed:', error);
+            console.error('[Feed Fetch] error:', error);
+            if (!isLoadMore) setPosts([]); // Prevents state bleeding from previous tabs if query fails
         } finally {
             setIsLoading(false);
             setRefreshing(false);
         }
-    }, [activeTab, lastDoc, isLoading, posts.length]);
+    };
 
     useEffect(() => {
-        if (activeTab === 'Search Users') return;
-        fetchPosts(true);
-    }, [activeTab]);
+        fetchFeed(false);
+    }, [activeTab, user]);
 
     useEffect(() => {
-        if (activeTab !== 'Search Users') return;
+        if (!showSearchView) return;
 
         const delayDebounceFn = setTimeout(async () => {
             if (searchQuery.length >= 2) {
@@ -140,21 +217,39 @@ export default function SocialScreen() {
             }
         }, 500);
         return () => clearTimeout(delayDebounceFn);
-    }, [searchQuery, activeTab]);
+    }, [searchQuery, showSearchView]);
 
-    const handleTabChange = (tab: string) => {
+    const handleTabChange = useCallback((tab: string) => {
         if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setActiveTab(tab);
-    };
+        setHasMore(true);
+        setLastVisible(null);
+    }, []);
 
-    const onRefresh = () => {
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
         loadTrending();
-        fetchPosts(true);
-    };
+        setLastVisible(null);
+        fetchFeed(false);
+    }, [activeTab, user]);
 
-    const onLoadMore = () => {
-        fetchPosts();
-    };
+    const onLoadMore = useCallback(() => {
+        if (hasMore && !isLoading && !showSearchView) {
+            fetchFeed(true);
+        }
+    }, [hasMore, isLoading, activeTab, user, lastVisible, showSearchView]);
+
+    const handleAuthRequired = useCallback(() => {
+        setAuthModalVisible(true);
+    }, []);
+
+    const handleProfilePress = useCallback((id: string) => {
+        router.push(`/user/${id}`);
+    }, [router]);
+
+    const handleAnimePress = useCallback((id: string) => {
+        router.push(`/details/${id}`);
+    }, [router]);
 
     const renderTrendingSection = () => (
         <View style={styles.trendingSection}>
@@ -197,6 +292,11 @@ export default function SocialScreen() {
             <GlassHeader
                 title="Community"
                 showLogo={false}
+                leftComponent={
+                    <TouchableOpacity style={[styles.headerBtn, { marginLeft: 8 }]} onPress={() => setShowSearchView(!showSearchView)}>
+                        <Feather name={showSearchView ? "arrow-left" : "search"} color={theme.text} size={22} />
+                    </TouchableOpacity>
+                }
                 rightComponent={
                     <View style={styles.headerActions}>
                         <TouchableOpacity style={styles.headerBtn} onPress={() => {
@@ -216,17 +316,19 @@ export default function SocialScreen() {
                 }
             />
 
-            <View style={[styles.tabContainer, { top: insets.top + HEADER_HEIGHT }]}>
-                <FeedTabs
-                    tabs={TABS}
-                    activeTab={activeTab}
-                    onTabPress={handleTabChange}
-                />
-            </View>
+            {!showSearchView && (
+                <View style={[styles.tabContainer, { top: insets.top + HEADER_HEIGHT }]}>
+                    <FeedTabs
+                        tabs={TABS}
+                        activeTab={activeTab}
+                        onTabPress={handleTabChange}
+                    />
+                </View>
+            )}
 
             <View style={styles.feedContainer}>
-                {activeTab === 'Search Users' ? (
-                    <View style={[styles.listContent, { paddingTop: insets.top + HEADER_HEIGHT + 60, flex: 1 }]}>
+                {showSearchView ? (
+                    <View style={[styles.listContent, { paddingTop: insets.top + HEADER_HEIGHT + 20, flex: 1 }]}>
                         <View style={[styles.searchBox, { backgroundColor: theme.surfaceVariant, borderColor: theme.border }]}>
                             <Feather name="search" size={20} color={theme.textDim} />
                             <TextInput
@@ -251,6 +353,8 @@ export default function SocialScreen() {
                             <FlashList<any>
                                 {...{ estimatedItemSize: 80 } as any}
                                 data={searchResults}
+                                decelerationRate="fast"
+                                showsVerticalScrollIndicator={false}
                                 renderItem={({ item }) => (
                                     <UserSearchCard user={item} onAuthRequired={() => setAuthModalVisible(true)} />
                                 )}
@@ -270,10 +374,15 @@ export default function SocialScreen() {
                     <FlashList<CommunityPost>
                         {...{ estimatedItemSize: 200 } as any}
                         data={posts}
-                        ListHeaderComponent={activeTab === 'Trending' ? renderTrendingSection() : null}
-                        renderItem={({ item }) => (
-                            <CommunityPostCard post={item} onAuthRequired={() => setAuthModalVisible(true)} />
-                        )}
+                        decelerationRate="fast"
+                        showsVerticalScrollIndicator={false}
+                        ListHeaderComponent={activeTab === 'For You' ? renderTrendingSection() : null}
+                        renderItem={({ item }) => {
+                            if (activeTab === 'Friend Activity' || ('timestamp' in item && 'type' in item && ['rated', 'reviewed', 'favorited', 'added', 'follow', 'watched'].includes(item.type as string))) {
+                                return <ActivityFeedCard activity={item as any} onPressProfile={handleProfilePress} onPressAnime={handleAnimePress} />;
+                            }
+                            return <CommunityPostCard post={item as any} onAuthRequired={handleAuthRequired} onPressProfile={handleProfilePress} />;
+                        }}
                         keyExtractor={(item) => item.id}
                         contentContainerStyle={[
                             styles.listContent,
@@ -322,7 +431,7 @@ export default function SocialScreen() {
                 <Feather name="plus" size={28} color="#fff" />
             </TouchableOpacity>
 
-            <AuthModal
+            <AuthPromptModal
                 visible={authModalVisible}
                 onClose={() => setAuthModalVisible(false)}
             />

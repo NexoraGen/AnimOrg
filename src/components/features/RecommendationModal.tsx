@@ -5,7 +5,9 @@ import {
     StyleSheet,
     TouchableOpacity,
     ActivityIndicator,
-    Animated
+    Animated,
+    ScrollView,
+    useWindowDimensions
 } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -47,6 +49,7 @@ export const RecommendationModal: React.FC<RecommendationModalProps> = ({
     isAdding = false
 }) => {
     const theme = useThemeColors();
+    const { height: screenHeight } = useWindowDimensions();
 
     // Premium Netflix-style cross-fade and translation animation drivers
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -97,150 +100,157 @@ export const RecommendationModal: React.FC<RecommendationModalProps> = ({
             onClose={onClose}
             maxWidth={500}
         >
-            <View style={styles.container}>
+            <View style={[styles.container, { maxHeight: screenHeight * 0.95 }]}>
                 {isLoading && !showCard ? (
                     <View style={styles.loaderContainer}>
                         <ActivityIndicator size="large" color={theme.primary} />
                         <AnimatedLoadingText />
                     </View>
                 ) : displayRec ? (
-                    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-                        {/* Image Section */}
-                        <View style={styles.imageSection}>
-                            <Image
-                                source={displayRec.anime.posterPath}
-                                style={styles.poster}
-                                contentFit="cover"
-                                transition={400}
-                            />
-                            <LinearGradient
-                                colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(28, 28, 30, 1)']}
-                                style={styles.imageOverlay}
-                            />
-                            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                                <View style={styles.closeIconWrapper}>
-                                    <Feather name="x" size={20} color="#FFF" />
-                                </View>
-                            </TouchableOpacity>
+                    <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], flex: 1 }}>
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            bounces={false}
+                            style={{ flex: 1 }}
+                            contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}
+                        >
+                            {/* Image Section */}
+                            <View style={styles.imageSection}>
+                                <Image
+                                    source={displayRec.anime.posterPath}
+                                    style={styles.poster}
+                                    contentFit="cover"
+                                    transition={400}
+                                />
+                                <LinearGradient
+                                    colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(28, 28, 30, 1)']}
+                                    style={styles.imageOverlay}
+                                />
+                                <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                                    <View style={styles.closeIconWrapper}>
+                                        <Feather name="x" size={20} color="#FFF" />
+                                    </View>
+                                </TouchableOpacity>
 
-                            <View style={styles.headerBadges}>
-                                <View style={[
-                                    styles.badge,
-                                    displayRec.mode === 'community' && { backgroundColor: '#E06600' }
-                                ]}>
-                                    <Feather
-                                        name={displayRec.mode === 'community' ? "activity" : "user"}
-                                        size={10}
-                                        color="#FFF"
-                                        style={{ marginRight: 4 }}
-                                    />
-                                    <Text style={styles.badgeText}>
-                                        {displayRec.mode === 'community' ? '🔥 POPULAR AMONG COMMUNITY' : '✨ RECOMMENDED FOR YOU'}
-                                    </Text>
-                                </View>
-                                <View style={[styles.matchBadge, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-                                    <Feather name="target" size={10} color={colors.primary} />
-                                    <Text style={styles.matchBadgeText}>
-                                        {Math.min(98, Math.max(76, Math.floor(displayRec.score || 88)))}% MATCH
-                                    </Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.titleOverlay}>
-                                <Text style={styles.overlayTitle} numberOfLines={2}>
-                                    {displayRec.anime.title}
-                                </Text>
-                                <View style={styles.ratingRow}>
-                                    <Feather name="star" size={16} color={colors.primary} fill={colors.primary} />
-                                    <Text style={styles.ratingTextOverlay}>{displayRec.anime.score || 'N/A'}</Text>
-                                    <Text style={styles.ratingLabelOverlay}>MAL Rating</Text>
-
-                                    {isLoading && (
-                                        <ActivityIndicator
-                                            size="small"
-                                            color="#E50914"
-                                            style={{ marginLeft: 15 }}
+                                <View style={styles.headerBadges}>
+                                    <View style={[
+                                        styles.badge,
+                                        displayRec.mode === 'community' && { backgroundColor: '#E06600' }
+                                    ]}>
+                                        <Feather
+                                            name={displayRec.mode === 'community' ? "activity" : "user"}
+                                            size={10}
+                                            color="#FFF"
+                                            style={{ marginRight: 4 }}
                                         />
-                                    )}
-                                </View>
-                            </View>
-                        </View>
-
-                        {/* Content Section */}
-                        <View style={styles.content}>
-                            <View style={styles.headerRow}>
-                                <View style={styles.titleInfo}>
-                                    <View style={styles.metadata}>
-                                        <Text style={[styles.genres, { color: theme.textDim }]} numberOfLines={1}>
-                                            {displayRec.anime.genres.slice(0, 3).join(' • ')}
+                                        <Text style={styles.badgeText}>
+                                            {displayRec.mode === 'community' ? '🔥 POPULAR AMONG COMMUNITY' : '✨ RECOMMENDED FOR YOU'}
+                                        </Text>
+                                    </View>
+                                    <View style={[styles.matchBadge, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                                        <Feather name="target" size={10} color={colors.primary} />
+                                        <Text style={styles.matchBadgeText}>
+                                            {Math.min(98, Math.max(76, Math.floor(displayRec.score || 88)))}% MATCH
                                         </Text>
                                     </View>
                                 </View>
+
+                                <View style={styles.titleOverlay}>
+                                    <Text style={styles.overlayTitle} numberOfLines={2}>
+                                        {displayRec.anime.title}
+                                    </Text>
+                                    <View style={styles.ratingRow}>
+                                        <Feather name="star" size={16} color={colors.primary} fill={colors.primary} />
+                                        <Text style={styles.ratingTextOverlay}>{displayRec.anime.score || 'N/A'}</Text>
+                                        <Text style={styles.ratingLabelOverlay}>MAL Rating</Text>
+
+                                        {isLoading && (
+                                            <ActivityIndicator
+                                                size="small"
+                                                color="#E50914"
+                                                style={{ marginLeft: 15 }}
+                                            />
+                                        )}
+                                    </View>
+                                </View>
                             </View>
 
-                            {/* Reasoning Section */}
-                            <View style={[styles.reasoningCard, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
-                                <View style={styles.reasonHeader}>
-                                    <View style={styles.zapIcon}>
-                                        <Feather
-                                            name={displayRec.mode === 'community' ? "trending-up" : "heart"}
-                                            size={12}
-                                            color={colors.primary}
-                                        />
+                            {/* Content Section */}
+                            <View style={styles.content}>
+                                <View style={styles.headerRow}>
+                                    <View style={styles.titleInfo}>
+                                        <View style={styles.metadata}>
+                                            <Text style={[styles.genres, { color: theme.textDim }]} numberOfLines={1}>
+                                                {displayRec.anime.genres.slice(0, 3).join(' • ')}
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <Text style={[styles.reasonLabel, { color: theme.primary }]}>
-                                        {displayRec.mode === 'community' ? 'COMMUNITY BUZZ' : 'WHY THIS MATCHES'}
+                                </View>
+
+                                {/* Reasoning Section */}
+                                <View style={[styles.reasoningCard, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                                    <View style={styles.reasonHeader}>
+                                        <View style={styles.zapIcon}>
+                                            <Feather
+                                                name={displayRec.mode === 'community' ? "trending-up" : "heart"}
+                                                size={12}
+                                                color={colors.primary}
+                                            />
+                                        </View>
+                                        <Text style={[styles.reasonLabel, { color: theme.primary }]}>
+                                            {displayRec.mode === 'community' ? 'COMMUNITY BUZZ' : 'WHY THIS MATCHES'}
+                                        </Text>
+                                    </View>
+                                    <Text style={[styles.reasonText, { color: theme.text }]}>
+                                        {displayRec.reason}
                                     </Text>
                                 </View>
-                                <Text style={[styles.reasonText, { color: theme.text }]}>
-                                    {displayRec.reason}
-                                </Text>
-                            </View>
 
-                            {/* Actions */}
-                            <View style={styles.actions}>
-                                <View style={styles.mainActions}>
-                                    <Button
-                                        title="View Details"
-                                        variant="outline"
-                                        onPress={() => onViewDetails(displayRec.anime.id)}
-                                        style={[styles.mainAction, { borderColor: theme.primary }]}
-                                        textStyle={[styles.mainActionText, { color: theme.primary }]}
-                                    />
-                                    <Button
-                                        title={isAdded ? "Added to Watchlist" : "Add to Watchlist"}
-                                        icon={<Feather name={isAdded ? "check" : "plus"} size={20} color="#FFF" />}
-                                        onPress={() => onAddToWatchlist(displayRec.anime)}
-                                        style={[
-                                            styles.mainAction,
-                                            isAdded && { backgroundColor: '#4CAF50', shadowColor: '#4CAF50' }
-                                        ]}
-                                        textStyle={styles.mainActionText}
-                                        isLoading={isAdding}
-                                        disabled={isAdded}
-                                    />
-                                </View>
+                                {/* Actions */}
+                                <View style={styles.actions}>
+                                    <View style={styles.mainActions}>
+                                        <Button
+                                            title="View Details"
+                                            variant="outline"
+                                            onPress={() => onViewDetails(displayRec.anime.id)}
+                                            style={[styles.mainAction, { borderColor: theme.primary }]}
+                                            textStyle={[styles.mainActionText, { color: theme.primary }]}
+                                        />
+                                        <Button
+                                            title={isAdded ? "Added to Watchlist" : "Add to Watchlist"}
+                                            icon={<Feather name={isAdded ? "check" : "plus"} size={20} color="#FFF" />}
+                                            onPress={() => onAddToWatchlist(displayRec.anime)}
+                                            style={[
+                                                styles.mainAction,
+                                                isAdded && { backgroundColor: '#4CAF50', shadowColor: '#4CAF50' }
+                                            ]}
+                                            textStyle={styles.mainActionText}
+                                            isLoading={isAdding}
+                                            disabled={isAdded}
+                                        />
+                                    </View>
 
-                                <View style={styles.secondaryActions}>
-                                    <TouchableOpacity
-                                        style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}
-                                        onPress={() => onNotInterested(displayRec.anime.id)}
-                                    >
-                                        <Feather name="eye-off" size={16} color={theme.textDim} />
-                                        <Text style={[styles.actionBtnText, { color: theme.textDim }]}>Not Interested</Text>
-                                    </TouchableOpacity>
+                                    <View style={styles.secondaryActions}>
+                                        <TouchableOpacity
+                                            style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}
+                                            onPress={() => onNotInterested(displayRec.anime.id)}
+                                        >
+                                            <Feather name="eye-off" size={16} color={theme.textDim} />
+                                            <Text style={[styles.actionBtnText, { color: theme.textDim }]}>Not Interested</Text>
+                                        </TouchableOpacity>
 
-                                    <TouchableOpacity
-                                        style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}
-                                        onPress={onRecommendAgain}
-                                        disabled={isLoading}
-                                    >
-                                        <Feather name="refresh-cw" size={16} color={theme.textDim} />
-                                        <Text style={[styles.actionBtnText, { color: theme.textDim }]}>Try Again</Text>
-                                    </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.actionBtn, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}
+                                            onPress={onRecommendAgain}
+                                            disabled={isLoading}
+                                        >
+                                            <Feather name="refresh-cw" size={16} color={theme.textDim} />
+                                            <Text style={[styles.actionBtnText, { color: theme.textDim }]}>Try Again</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
-                        </View>
+                        </ScrollView>
                     </Animated.View>
                 ) : (
                     <View style={styles.errorContainer}>
@@ -267,6 +277,7 @@ const AnimatedLoadingText = () => {
 const styles = StyleSheet.create({
     container: {
         width: '100%',
+        flexShrink: 1,
     },
     loaderContainer: {
         height: 380,

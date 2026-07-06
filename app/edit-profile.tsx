@@ -27,8 +27,6 @@ import { CinematicModal } from '../src/components/layout/CinematicModal';
 import { firestoreService } from '../src/services/firebase/firestore';
 import { storage } from '../src/services/firebase/config';
 
-type CategoryFilter = 'all' | 'glow' | 'masked' | 'swordsman' | 'silhouette' | 'cyber';
-
 export default function EditProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -56,7 +54,6 @@ export default function EditProfileScreen() {
   const [showPresetModal, setShowPresetModal] = useState(false);
 
   // Preset picker extra features state
-  const [activePresetTab, setActivePresetTab] = useState<CategoryFilter>('all');
   const [recentAvatars, setRecentAvatars] = useState<string[]>([]);
   const [recommendedAvatars] = useState<string[]>([
     'https://cdn.myanimelist.net/images/characters/15/422168.jpg', // Gojo
@@ -276,11 +273,8 @@ export default function EditProfileScreen() {
     setSelectedAvatar(ANIME_AVATARS[0].url); // Saitama Preset Fallback
   };
 
-  // Filter presets based on category choice
-  const filteredPresets = ANIME_AVATARS.filter(preset => {
-    if (activePresetTab === 'all') return true;
-    return preset.category === activePresetTab;
-  });
+  // Load all presets natively
+  const filteredPresets = ANIME_AVATARS;
 
   return (
     <KeyboardAvoidingView
@@ -504,7 +498,7 @@ export default function EditProfileScreen() {
           <View style={[styles.presetModalContainer, { backgroundColor: '#161618' }]}>
             <View style={styles.presetHeader}>
               <Text style={styles.presetTitle}>Select Preset Avatar</Text>
-              <Text style={styles.presetSubtitle}>Segmented catalog matching premium styling</Text>
+              <Text style={styles.presetSubtitle}>A large collection of popular anime characters</Text>
             </View>
 
             {/* A. RECENTLY USED CAROUSEL */}
@@ -545,34 +539,6 @@ export default function EditProfileScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
-
-            {/* C. STREAM-LEVEL CATEGORIES TABS */}
-            <View style={styles.presetTabsWrapper}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScrollContent}>
-                {(['all', 'glow', 'masked', 'swordsman', 'silhouette', 'cyber'] as const).map(tab => {
-                  const labelMap: Record<CategoryFilter, string> = {
-                    all: 'All',
-                    glow: '🔥 Glow',
-                    masked: '🎭 Masked',
-                    swordsman: '⚔️ Blade',
-                    silhouette: '👤 Shadow',
-                    cyber: '🌐 Cyber'
-                  };
-                  const isActive = activePresetTab === tab;
-                  return (
-                    <TouchableOpacity
-                      key={tab}
-                      style={[styles.presetTabBtn, isActive && { borderBottomColor: colors.primary }]}
-                      onPress={() => setActivePresetTab(tab)}
-                    >
-                      <Text style={[styles.presetTabText, isActive ? { color: colors.primary, fontWeight: '900' } : { color: '#8E8E93' }]}>
-                        {labelMap[tab]}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
             </View>
 
             {/* D. PRESETS GRID */}

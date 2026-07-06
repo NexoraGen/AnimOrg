@@ -40,7 +40,12 @@ export default function UpcomingScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
-    const { watchlist, animeProgress, isAuthenticated, user } = useAppStore();
+    // Individual selectors to prevent full-store rerender cascades
+    const watchlist = useAppStore(s => s.watchlist);
+    const animeProgress = useAppStore(s => s.animeProgress);
+    const isAuthenticated = useAppStore(s => s.isAuthenticated);
+    const user = useAppStore(s => s.user);
+    const use24Hour = useAppStore(s => s.use24Hour);
 
     const [selectedDay, setSelectedDay] = useState('');
     const [allAnime, setAllAnime] = useState<Media[]>([]);
@@ -55,7 +60,9 @@ export default function UpcomingScreen() {
     const [tick, setTick] = useState(0);
 
     const numColumns = width > 1024 ? 5 : width > 768 ? 4 : 2;
-    const cardWidth = (width - spacing.md * 2 - spacing.md * (numColumns - 1)) / numColumns;
+    const edgePadding = spacing.xl;
+    const itemGap = spacing.md;
+    const cardWidth = (width - (edgePadding * 2) - (itemGap * (numColumns - 1))) / numColumns;
 
     const todayName = useMemo(() => {
         const d = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -63,9 +70,11 @@ export default function UpcomingScreen() {
     }, []);
 
     useEffect(() => { setSelectedDay(todayName); }, [todayName]);
-    useEffect(() => { fetchAllData(false); }, [watchlist, isAuthenticated]);
+    const hasHydrated = useAppStore(s => s.hasHydrated);
+
+    useEffect(() => { if (hasHydrated) fetchAllData(false); }, [watchlist, isAuthenticated, hasHydrated]);
     useEffect(() => {
-        const timer = setInterval(() => setTick(p => p + 1), 30000);
+        const timer = setInterval(() => setTick(p => p + 1), 60000); // 60s (was 30s)
         return () => clearInterval(timer);
     }, []);
     useEffect(() => {
@@ -118,11 +127,13 @@ export default function UpcomingScreen() {
                             return;
                         }
                     }
-                    awaiting.push({
-                        id: wId, title: w.title, posterPath: w.posterPath,
-                        statusText: 'Release date not announced yet', nextEp: 'Completed',
-                        countdown: 'No announced sequels', badge: 'AWAITING', badgeColor: themeColors.textDim
-                    });
+                    if (w.mediaStatus?.toLowerCase() !== 'finished airing') {
+                        awaiting.push({
+                            id: wId, title: w.title, posterPath: w.posterPath,
+                            statusText: 'Release date not announced yet', nextEp: 'Completed',
+                            countdown: 'No announced sequels', badge: 'AWAITING', badgeColor: themeColors.textDim
+                        });
+                    }
                     return;
                 }
 
@@ -166,11 +177,13 @@ export default function UpcomingScreen() {
                     }
                 }
 
-                awaiting.push({
-                    id: wId, title: w.title, posterPath: w.posterPath,
-                    statusText: 'Release date not announced yet', nextEp: 'Awaiting Schedule',
-                    countdown: 'Awaiting official release schedule', badge: 'AWAITING', badgeColor: themeColors.textDim
-                });
+                if (w.mediaStatus?.toLowerCase() !== 'finished airing') {
+                    awaiting.push({
+                        id: wId, title: w.title, posterPath: w.posterPath,
+                        statusText: 'Release date not announced yet', nextEp: 'Awaiting Schedule',
+                        countdown: 'Awaiting official release schedule', badge: 'AWAITING', badgeColor: themeColors.textDim
+                    });
+                }
             });
 
             soon.sort((a, b) => a.timestamp - b.timestamp);
@@ -244,14 +257,14 @@ export default function UpcomingScreen() {
     // ═══════════════════════════════════════════════════════
     const enrichedAnimeList = useMemo(() => {
         return allAnime.map(anime => {
-            const localInfo = getLocalAiringInfo(anime.broadcast);
+            const localInfo = getLocalAiringInfo(anime.broadcast, user?.timezone, 'en-US', use24Hour);
             return {
                 ...anime, localDay: localInfo?.localDay || 'Unknown Schedule',
                 localTime: localInfo?.localTime || '', countdown: localInfo?.countdown || 'TBD',
                 airingDate: localInfo?.airingDate || null
             };
         }).filter(anime => anime.localDay !== 'Unknown Schedule');
-    }, [allAnime]);
+    }, [allAnime, user?.timezone, use24Hour]);
 
     const dayCounts = useMemo(() => {
         const c: Record<string, number> = {};
@@ -295,7 +308,7 @@ export default function UpcomingScreen() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.trackedScroll}>
                     {items.map(item => (
-                        <TrackedAnimeCard key={`${tickKey}-${item.id}-${tick}`} media={item}
+                        <TrackedAnimeCard key={`${tickKey}-${item.id}`} media={item}
                             nextEpisode={item.nextEp} releaseDate={item.releaseTime || item.statusText}
                             countdown={item.countdown} onPress={(id) => router.push(`/details/${id}`)} />
                     ))}
@@ -316,6 +329,7 @@ export default function UpcomingScreen() {
                 data={sortedDayAnime}
                 numColumns={numColumns}
                 key={numColumns}
+                columnWrapperStyle={{ paddingHorizontal: edgePadding, gap: itemGap }}
                 keyExtractor={item => item.id}
                 ListHeaderComponent={() => (
                     <View style={{ paddingTop: spacing.md }}>
@@ -400,7 +414,7 @@ export default function UpcomingScreen() {
                         </View>
                     );
                 }}
-                contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 70 }]}
+                contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 55 }]}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
                 ListFooterComponent={() => (
                     <View style={styles.footerStatsContainer}>

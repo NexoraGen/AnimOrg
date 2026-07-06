@@ -11,6 +11,10 @@ import {
 } from 'react-native';
 import { colors, spacing, borderRadius, typography } from '../../theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { motion } from '../../theme/motion';
+
+const AnimatedPressable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface ButtonProps {
   title: string;
@@ -36,6 +40,20 @@ export const Button: React.FC<ButtonProps> = ({
   icon
 }) => {
   const colors = useThemeColors();
+  const scale = useSharedValue(1);
+
+  const onPressIn = () => {
+    scale.value = withSpring(0.95, motion.springs.gentle);
+  };
+
+  const onPressOut = () => {
+    scale.value = withSpring(1, motion.springs.bouncy);
+  };
+
+  const rStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
   const getVariantStyle = () => {
     switch (variant) {
       case 'primary':
@@ -72,8 +90,10 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   return (
-    <TouchableOpacity
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={disabled || isLoading}
       activeOpacity={0.8}
       style={[
@@ -81,7 +101,8 @@ export const Button: React.FC<ButtonProps> = ({
         getVariantStyle(),
         getSizeStyle(),
         style,
-        (disabled || isLoading) && styles.disabled
+        (disabled || isLoading) && styles.disabled,
+        rStyle
       ]}
     >
       {isLoading ? (
@@ -92,7 +113,7 @@ export const Button: React.FC<ButtonProps> = ({
           <Text style={[styles.text, { color: variant === 'outline' || variant === 'ghost' ? colors.primary : colors.text }, textStyle]}>{title}</Text>
         </>
       )}
-    </TouchableOpacity>
+    </AnimatedPressable>
   );
 };
 

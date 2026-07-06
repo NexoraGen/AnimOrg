@@ -1,5 +1,6 @@
 import { anilistApi } from './api/anilist';
 import { jikanApi } from './api/jikan';
+import { getCurrentlyReleasedEpisodesCount, getEpisodeAiringTime } from '../utils/releaseHelper';
 import { apiManager } from './api/apiManager';
 import { Media, Character, Episode, AnimeRelation } from '../types';
 
@@ -160,12 +161,61 @@ export const animeApi = {
     );
   },
 
-  getAnimeEpisodes: async (id: string, page = 1): Promise<{ data: Episode[], hasNextPage: boolean, totalCount?: number }> => {
-    return apiManager.fetchWithSWR(
-      'other',
-      `episodes_${id}_p${page}`,
-      () => jikanApi.getAnimeEpisodes(id, page)
+  getAnimeEpisodes: async (id: string, onUpdate?: (data: { data: Episode[], totalCount: number }) => void, bypassCache = false): Promise<{ data: Episode[], totalCount: number }> => {
+    const wrapOnUpdate = onUpdate ? async (freshData: { data: Episode[], totalCount: number }) => {
+      const corrected = await animeApi.correctEpisodeList(id, freshData);
+      onUpdate(corrected);
+    } : undefined;
+
+    const rawResult = await apiManager.fetchWithSWR(
+      'details',
+      `episodes_${id}_all`,
+      () => jikanApi.getAnimeEpisodesAllPages(id),
+      undefined,
+      wrapOnUpdate,
+      bypassCache
     );
+
+    return animeApi.correctEpisodeList(id, rawResult);
+  },
+
+  correctEpisodeList: async (id: string, result: { data: Episode[], totalCount: number }): Promise<{ data: Episode[], totalCount: number }> => {
+    if (!result || !result.data) return result;
+
+    try {
+      const detailsKey = `details_${id}`;
+      // Retrieve the cached media details
+      const cached = await apiManager.getCache(detailsKey, 24 * 60 * 60 * 1000);
+      if (cached) {
+        const releasedCount = getCurrentlyReleasedEpisodesCount(cached);
+        const episodes = [...result.data];
+        const lastEpNum = episodes.length > 0 ? episodes[episodes.length - 1].number : 0;
+
+        if (releasedCount > lastEpNum) {
+          const now = Date.now();
+          for (let num = lastEpNum + 1; num <= releasedCount; num++) {
+            const airingTime = getEpisodeAiringTime(cached, num);
+            const dateStr = airingTime ? new Date(airingTime).toISOString() : new Date(now).toISOString();
+
+            episodes.push({
+              id: `placeholder-${id}-${num}`,
+              number: num,
+              title: `Episode ${num}`,
+              aired: dateStr,
+            });
+          }
+
+          return {
+            data: episodes,
+            totalCount: Math.max(result.totalCount, episodes.length)
+          };
+        }
+      }
+    } catch (e) {
+      console.warn('[animeApi] Episode correction failed:', e);
+    }
+
+    return result;
   },
 
   getAnimeRelations: async (id: string): Promise<AnimeRelation[]> => {

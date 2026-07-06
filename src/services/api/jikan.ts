@@ -32,25 +32,13 @@ const generateMinimalFallback = (url: string) => {
   return { data: [] };
 };
 
-const fetchWithCache = async (url: string, retries = 3): Promise<any> => {
+const fetchWithCache = async (url: string, retries = 3, bypassCache = false): Promise<any> => {
   // 1. Check in-memory cache
-  const memoryCached = inMemoryCache.get(url);
-  if (memoryCached && Date.now() - memoryCached.timestamp < CACHE_DURATION) {
-    return memoryCached.data;
-  }
-
-  // 2. Check persistent AsyncStorage cache (to survive app reloads)
-  try {
-    const asyncCached = await AsyncStorage.getItem(`jikan_cache_${url}`);
-    if (asyncCached) {
-      const parsed = JSON.parse(asyncCached);
-      if (Date.now() - parsed.timestamp < CACHE_DURATION) {
-        inMemoryCache.set(url, parsed);
-        return parsed.data;
-      }
+  if (!bypassCache) {
+    const memoryCached = inMemoryCache.get(url);
+    if (memoryCached && Date.now() - memoryCached.timestamp < CACHE_DURATION) {
+      return memoryCached.data;
     }
-  } catch (e) {
-    // Ignore async storage read errors
   }
 
   // Evict old memory cache to prevent memory leaks
@@ -58,15 +46,6 @@ const fetchWithCache = async (url: string, retries = 3): Promise<any> => {
     const oldestKey = inMemoryCache.keys().next().value;
     if (oldestKey) inMemoryCache.delete(oldestKey);
   }
-
-  // Fallback accessor from persistent storage
-  const getCachedFallback = async () => {
-    try {
-      const asyncCached = await AsyncStorage.getItem(`jikan_cache_${url}`);
-      if (asyncCached) return JSON.parse(asyncCached).data;
-    } catch (e) { }
-    return null; // Return null if nothing is cached
-  };
 
   const attemptFetch = async (attempt: number): Promise<any> => {
     const queuePromise = requestQueue.catch(() => { }).then(async () => {
@@ -97,10 +76,11 @@ const fetchWithCache = async (url: string, retries = 3): Promise<any> => {
 
         const data = await response.json();
 
-        // Save to caches upon success
-        const cachePayload = { data, timestamp: Date.now() };
-        inMemoryCache.set(url, cachePayload);
-        AsyncStorage.setItem(`jikan_cache_${url}`, JSON.stringify(cachePayload)).catch(() => { });
+        // Save to in-memory cache upon success (RAM-only caching prevents SQLITE_FULL errors)
+        if (!bypassCache) {
+          const cachePayload = { data, timestamp: Date.now() };
+          inMemoryCache.set(url, cachePayload);
+        }
 
         return data;
       } catch (error: any) {
@@ -112,7 +92,7 @@ const fetchWithCache = async (url: string, retries = 3): Promise<any> => {
     return queuePromise;
   };
 
-  // 3. Retry loop with Exponential Backoff
+  // 2. Retry loop with Exponential Backoff
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       return await attemptFetch(attempt);
@@ -125,12 +105,18 @@ const fetchWithCache = async (url: string, retries = 3): Promise<any> => {
       } else {
         console.warn(`Jikan API completely failed for ${url}. Using fallback.`);
 
-        // 4. Ultimate Fallback handling (stale cache -> offline static dataset -> empty)
-        const fallback = await getCachedFallback();
-        if (fallback) return fallback;
+        // 3. Ultimate Fallback handling (stale in-memory cache -> offline static dataset -> empty)
+        const cachedPayload = inMemoryCache.get(url);
+        if (cachedPayload?.data) return cachedPayload.data;
 
         if (url.includes('/anime?q=') || url.includes('/characters?q=')) return { data: [], pagination: { has_next_page: false } };
         if (url.includes('/random/anime')) throw new Error('Random fallback not supported');
+
+        // CRITICAL BUG FIX: If episode fetch fails completely, DO NOT return silent empty array.
+        // Throw the error so the caller knows it failed and doesn't cache empty data!
+        if (url.includes('/episodes')) {
+          throw new Error('Episode fetch failed completely');
+        }
 
         return generateMinimalFallback(url);
       }
@@ -155,6 +141,7 @@ const mapJikanToMedia = (item: any): Media => {
     title: item.title_english || item.title,
     description: item.synopsis || 'No description available.',
     posterPath: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
+    posterImageMedium: item.images?.webp?.image_url || item.images?.jpg?.image_url || item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
     backdropPath: item.trailer?.images?.maximum_image_url ||
       item.trailer?.images?.large_image_url ||
       item.trailer?.images?.medium_image_url ||
@@ -163,6 +150,7 @@ const mapJikanToMedia = (item: any): Media => {
     releaseYear: item.year || (item.aired?.from ? new Date(item.aired.from).getFullYear() : undefined),
     genres: item.genres?.map((g: any) => g.name) || [],
     type: 'anime',
+    format: item.type,
     episodes: item.episodes,
     trailerUrl: item.trailer?.url,
     status: item.status,
@@ -497,7 +485,7 @@ export const jikanApi = {
 
   getRandomAnime: async (): Promise<Media | null> => {
     try {
-      const data = await fetchWithCache(`${BASE_URL}/random/anime`);
+      const data = await fetchWithCache(`${BASE_URL}/random/anime`, 3, true);
       return mapJikanToMedia(data.data);
     } catch (error) {
       console.error('Error fetching random anime:', error);
@@ -521,7 +509,10 @@ export const jikanApi = {
   // --- Tracking Expansion ---
   getAnimeEpisodes: async (id: string, page = 1): Promise<{ data: Episode[], hasNextPage: boolean, totalCount?: number }> => {
     try {
-      const data = await fetchWithCache(`${BASE_URL}/anime/${id}/episodes?page=${page}`);
+      const url = `${BASE_URL}/anime/${id}/episodes?page=${page}`;
+
+      const data = await fetchWithCache(url);
+
       return {
         data: (data.data || []).map((ep: any) => ({
           id: ep.mal_id.toString(),
@@ -532,12 +523,53 @@ export const jikanApi = {
           recap: ep.recap,
         })),
         hasNextPage: data.pagination?.has_next_page || false,
-        totalCount: data.pagination?.items?.total
+        totalCount: data.pagination?.items?.total || (data.pagination?.last_visible_page ? (data.pagination.last_visible_page * 100) : undefined)
       };
     } catch (error) {
-      console.error(`Error fetching episodes for anime ${id}:`, error);
-      return { data: [], hasNextPage: false };
+      console.error(`[Jikan] Error fetching episodes for anime ${id}:`, error);
+      // Let the error throw up so we don't cache an empty array!
+      throw error;
     }
+  },
+
+  getAnimeEpisodesAllPages: async (id: string): Promise<{ data: Episode[], totalCount: number }> => {
+    let allEpisodes: Episode[] = [];
+    let page = 1;
+    let hasNext = true;
+    let total = 0;
+    const maxPages = 15; // 1500 episodes maximum safety guard
+
+    while (hasNext && page <= maxPages) {
+      try {
+        const result = await jikanApi.getAnimeEpisodes(id, page);
+        if (result.data.length === 0) {
+          break;
+        }
+        allEpisodes.push(...result.data);
+        total = result.totalCount || allEpisodes.length;
+        hasNext = result.hasNextPage;
+
+        if (hasNext) {
+          page++;
+        }
+      } catch (error) {
+        console.error(`[Jikan] Deep page ${page} fetch error for anime ${id}:`, error);
+        // If we throw here and haven't fetched ANY episodes, we should let it fail completely
+        if (allEpisodes.length === 0) {
+          throw error;
+        }
+        // Otherwise, break and return what we have so far
+        break;
+      }
+    }
+
+    // Sort to guarantee ascending order
+    allEpisodes.sort((a, b) => a.number - b.number);
+
+    return {
+      data: allEpisodes,
+      totalCount: total || allEpisodes.length
+    };
   },
 
   getAnimeRelations: async (id: string): Promise<AnimeRelation[]> => {
@@ -578,6 +610,24 @@ export const jikanApi = {
     } catch (error) {
       console.error(`Error fetching schedule:`, error);
       return [];
+    }
+  },
+
+  /**
+   * Health Check implementation to verify if Jikan API is responsive.
+   * Probes the root URL with a strict timeout footprint to silently verify availability without rate-limit spam.
+   */
+  checkAPIHealth: async (): Promise<boolean> => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // Strict 5s timeout
+
+      const response = await fetch(`${BASE_URL}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      return response.ok || response.status === 429; // 429 means it's alive but rate limited
+    } catch {
+      return false; // Automatically caught offline or timeout scenarios
     }
   }
 };

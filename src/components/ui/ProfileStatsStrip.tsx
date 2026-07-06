@@ -6,19 +6,19 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 interface ProfileStatsStripProps {
   followingCount: number;
   followersCount: number;
-  reviewsCount: number;
+  postsCount: number;
   onFollowingPress?: () => void;
   onFollowersPress?: () => void;
-  onReviewsPress?: () => void;
+  onPostsPress?: () => void;
 }
 
 export const ProfileStatsStrip: React.FC<ProfileStatsStripProps> = ({
   followingCount,
   followersCount,
-  reviewsCount,
+  postsCount,
   onFollowingPress,
   onFollowersPress,
-  onReviewsPress,
+  onPostsPress,
 }) => {
   const themeColors = useThemeColors();
 
@@ -40,7 +40,7 @@ export const ProfileStatsStrip: React.FC<ProfileStatsStripProps> = ({
       <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
       <StatItem label="FOLLOWERS" count={followersCount} onPress={onFollowersPress} />
       <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
-      <StatItem label="REVIEWS" count={reviewsCount} onPress={onReviewsPress} />
+      <StatItem label="POSTS" count={postsCount} onPress={onPostsPress} />
     </View>
   );
 };

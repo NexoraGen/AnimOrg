@@ -7,53 +7,45 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ScrollView
+  ScrollView,
+  ImageBackground
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, typography } from '../../src/theme';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { Button, AuthFeedback } from '../../src/components/ui';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { firebaseAuthService } from '../../src/services/firebase/auth';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
 import { GOOGLE_AUTH_CONFIG } from '../../src/services/firebase/authConfig';
 import { useAppStore } from '../../src/store/useAppStore';
-
-WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const colors = useThemeColors();
-  const setIsGuest = useAppStore(state => state.setIsGuest);
+  const themeColors = useThemeColors();
+  const loginAsGuest = useAppStore(state => state.loginAsGuest);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
 
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: GOOGLE_AUTH_CONFIG.webClientId,
-    androidClientId: GOOGLE_AUTH_CONFIG.androidClientId,
-    iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
-  });
-
   React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      handleGoogleSignInWithToken(id_token);
-    }
-  }, [response]);
+    GoogleSignin.configure({
+      webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+      iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+    });
+  }, []);
 
   const handleGoogleSignInWithToken = async (idToken: string) => {
     setIsLoading(true);
     try {
       const user = await firebaseAuthService.signInWithGoogle(idToken);
       if (user) {
-        setFeedback({ message: 'Signed in with Google!', type: 'success' });
-        setTimeout(() => router.replace('/(tabs)/home'), 1000);
+        setFeedback({ message: 'Signed in successfully!', type: 'success' });
       }
     } catch (error: any) {
       console.error(error);
@@ -72,7 +64,6 @@ export default function LoginScreen() {
       const user = await firebaseAuthService.loginWithEmail(email, password);
       if (user) {
         setFeedback({ message: 'Welcome back!', type: 'success' });
-        setTimeout(() => router.replace('/(tabs)/home'), 1000);
       }
     } catch (error: any) {
       console.error(error);
@@ -93,121 +84,167 @@ export default function LoginScreen() {
       try {
         const user = await firebaseAuthService.signInWithGoogle();
         if (user) {
-          router.replace('/(tabs)/home');
+          setFeedback({ message: 'Welcome!', type: 'success' });
         }
       } catch (error: any) {
         console.error(error);
-        alert(error.message || 'Google Sign-In failed');
+        setFeedback({ message: error.message || 'Google Sign-In failed', type: 'error' });
       } finally {
         setIsLoading(false);
       }
     } else {
-      promptAsync();
+      setIsLoading(true);
+      try {
+        await GoogleSignin.hasPlayServices();
+        const response = await GoogleSignin.signIn();
+
+        let idToken = null;
+        if (isSuccessResponse(response)) {
+          idToken = response.data?.idToken;
+        } else {
+          // Fallback for older versions if isSuccessResponse isn't exactly matching the shape
+          idToken = (response as any).data?.idToken || (response as any).idToken;
+        }
+
+        if (idToken) {
+          await handleGoogleSignInWithToken(idToken);
+        } else {
+          throw new Error('No ID token present');
+        }
+      } catch (error: any) {
+        console.error(error);
+        if (isErrorWithCode(error)) {
+          switch (error.code) {
+            case statusCodes.SIGN_IN_CANCELLED:
+              // User cancelled the login flow
+              break;
+            case statusCodes.IN_PROGRESS:
+              // operation (e.g. sign in) is in progress already
+              break;
+            case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+              setFeedback({ message: 'Play services not available or outdated', type: 'error' });
+              break;
+            default:
+              setFeedback({ message: 'Google Sign-In failed', type: 'error' });
+          }
+        } else {
+          // Fallback if user cancels or another error occurs
+          if (error?.message !== 'SIGN_IN_CANCELLED' && error?.code !== 'SIGN_IN_CANCELLED') {
+            setFeedback({ message: 'Google Sign-In failed', type: 'error' });
+          }
+        }
+        setIsLoading(false);
+      }
     }
   };
 
-  const handleForgotPassword = () => {
-    // Implement forgot password
-    alert('Forgot password functionality coming soon!');
-  };
-
   const handleGuestMode = () => {
-    setIsGuest(true);
+    loginAsGuest();
     router.replace('/(tabs)/home');
   };
 
   return (
-    <AnimatedScreen style={[styles.container, { backgroundColor: colors.background }]}>
+    <AnimatedScreen style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <AuthFeedback
-          visible={!!feedback}
-          message={feedback?.message || ''}
-          type={feedback?.type}
-          onHide={() => setFeedback(null)}
-        />
-
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }
-          ]}
+        <ImageBackground
+          source={{ uri: 'https://i.pinimg.com/736x/8e/31/53/8e31538fc1e7fca385a4dd0fbb7dbdf8.jpg' }}
+          style={styles.backgroundImage}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to continue your journey</Text>
-          </View>
+          <LinearGradient
+            colors={['rgba(9, 9, 11, 0.4)', 'rgba(9, 9, 11, 0.95)', colors.background]}
+            style={StyleSheet.absoluteFill}
+          />
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                placeholderTextColor={colors.textDim}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
+          <AuthFeedback
+            visible={!!feedback}
+            message={feedback?.message || ''}
+            type={feedback?.type}
+            onHide={() => setFeedback(null)}
+          />
+
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }
+            ]}
+          >
+            <View style={styles.header}>
+              <View style={styles.brandContainer}>
+                <View style={styles.brandDot} />
+                <Text style={styles.brandText}>ANIMORG</Text>
+              </View>
+              <Text style={styles.title}>Enter The Grid</Text>
+              <Text style={styles.subtitle}>Your premium anime streaming identity starts here.</Text>
+            </View>
+
+            <View style={styles.form}>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email address"
+                  placeholderTextColor={colors.textMuted}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor={colors.textMuted}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+              </View>
+
+              <Button
+                title="Log In"
+                onPress={handleLogin}
+                isLoading={isLoading}
+                style={styles.loginButton}
               />
+
+              <View style={styles.dividerContainer}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>OR</Text>
+                <View style={styles.divider} />
+              </View>
+
+              <View style={styles.buttonStack}>
+                <Link href="/(auth)/register" asChild>
+                  <Button
+                    title="Create Account"
+                    variant="secondary"
+                    onPress={() => { }}
+                    style={styles.stackButton}
+                  />
+                </Link>
+
+                <Button
+                  title="Continue with Google"
+                  onPress={handleGoogleSignIn}
+                  variant="outline"
+                  isLoading={isLoading}
+                  style={styles.stackButton}
+                />
+
+                <Button
+                  title="Continue as Guest"
+                  onPress={handleGuestMode}
+                  variant="outline"
+                  style={styles.guestButton}
+                />
+              </View>
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your password"
-                placeholderTextColor={colors.textDim}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-            </View>
-
-            <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
-
-            <Button
-              title="Login"
-              onPress={handleLogin}
-              isLoading={isLoading}
-              style={styles.loginButton}
-            />
-
-            <View style={styles.dividerContainer}>
-              <View style={styles.divider} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.divider} />
-            </View>
-
-            <Button
-              title="Sign in with Google"
-              onPress={handleGoogleSignIn}
-              variant="secondary"
-              isLoading={isLoading}
-              style={styles.guestButton}
-            />
-
-            <Button
-              title="Continue as Guest"
-              onPress={handleGuestMode}
-              variant="outline"
-              style={styles.guestButton}
-            />
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <Link href="/(auth)/register" asChild>
-              <TouchableOpacity>
-                <Text style={styles.footerLink}>Register</Text>
-              </TouchableOpacity>
-            </Link>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </ImageBackground>
       </KeyboardAvoidingView>
     </AnimatedScreen>
   );
@@ -218,23 +255,49 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   scrollContent: {
     flexGrow: 1,
-    padding: spacing.lg,
-    justifyContent: 'center',
+    padding: spacing.xl,
+    justifyContent: 'flex-end',
   },
   header: {
     marginBottom: spacing.xxl,
   },
+  brandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: spacing.lg,
+  },
+  brandDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  brandText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 4,
+  },
   title: {
     color: colors.text,
-    fontSize: typography.sizes.xxxl,
-    fontWeight: typography.weights.bold as any,
+    fontSize: 42,
+    fontWeight: '900',
+    letterSpacing: -1,
     marginBottom: spacing.xs,
   },
   subtitle: {
     color: colors.textMuted,
     fontSize: typography.sizes.md,
+    maxWidth: '80%',
+    lineHeight: 22,
   },
   form: {
     width: '100%',
@@ -242,36 +305,24 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: spacing.md,
   },
-  label: {
-    color: colors.text,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.medium as any,
-    marginBottom: spacing.xs,
-  },
   input: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
     color: colors.text,
     fontSize: typography.sizes.md,
     borderWidth: 1,
-    borderColor: colors.border,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: spacing.lg,
-  },
-  forgotPasswordText: {
-    color: colors.primary,
-    fontSize: typography.sizes.sm,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   loginButton: {
-    marginBottom: spacing.md,
+    marginTop: spacing.sm,
+    height: 56,
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: spacing.lg,
+    marginVertical: spacing.xl,
+    opacity: 0.5,
   },
   divider: {
     flex: 1,
@@ -279,25 +330,22 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   dividerText: {
-    color: colors.textDim,
+    color: colors.textMuted,
     marginHorizontal: spacing.md,
     fontSize: typography.sizes.xs,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  buttonStack: {
+    gap: spacing.md,
+  },
+  stackButton: {
+    height: 56,
   },
   guestButton: {
-    marginBottom: spacing.lg,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: spacing.xl,
-  },
-  footerText: {
-    color: colors.textMuted,
-    fontSize: typography.sizes.sm,
-  },
-  footerLink: {
-    color: colors.primary,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold as any,
+    height: 56,
+    marginTop: spacing.md,
+    opacity: 0.7,
+    borderColor: 'transparent',
   },
 });

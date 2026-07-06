@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { StyleSheet, Pressable, Text, View, Animated, Platform } from 'react-native';
+import { StyleSheet, Pressable, Text, View, Platform } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, FadeIn } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -9,8 +10,7 @@ import { Media } from '../../types';
 import { formatRating, hasValidRating } from '../../utils/formatters';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { PLACEHOLDER_POSTER } from '../../constants/images';
-
-
+import { motion } from '../../theme/motion';
 
 interface PosterCardProps {
   media: Media;
@@ -36,21 +36,19 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({
   variant = 'default'
 }) => {
   const themeColors = useThemeColors();
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useSharedValue(1);
 
   const handlePressIn = () => {
-    Animated.spring(scale, {
-      toValue: 0.95,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
+    scale.value = withSpring(0.95, motion.springs.gentle);
   };
 
   const handlePressOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
+    scale.value = withSpring(1, motion.springs.bouncy);
   };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
 
   if (variant === 'list') {
     return (
@@ -65,10 +63,12 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({
         ]}
       >
         <Image
-          source={media.posterPath ? { uri: media.posterPath } : { uri: PLACEHOLDER_POSTER }}
+          source={media.posterImageMedium || media.posterPath ? { uri: media.posterImageMedium || media.posterPath } : { uri: PLACEHOLDER_POSTER }}
           style={styles.listImage}
           contentFit="cover"
-          transition={300}
+          transition={200}
+          cachePolicy="memory-disk"
+          recyclingKey={media.id}
         />
         <View style={styles.listContent}>
           <Text style={[styles.listTitle, { color: themeColors.text }]} numberOfLines={1}>
@@ -76,11 +76,8 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({
           </Text>
           <View style={styles.listMeta}>
             <Text style={[styles.listRating, { color: themeColors.primary }]}>⭐ {formatRating(media.rating)}</Text>
-            <Text style={[styles.listEpisodes, { color: themeColors.textDim }]}>• {media.episodes || '?'} eps</Text>
+            <Text style={[styles.listEpisodes, { color: themeColors.textDim }]}>{media.episodes || '?'} eps</Text>
           </View>
-          <Text style={[styles.listGenres, { color: themeColors.textMuted }]} numberOfLines={1}>
-            {media.genres?.slice(0, 3).join(' • ')}
-          </Text>
         </View>
         <Feather name="chevron-right" color={themeColors.textDim} size={20} style={styles.listChevron} />
       </Pressable>
@@ -94,20 +91,22 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({
       onPressOut={handlePressOut}
       style={{ marginHorizontal: spacing.sm }}
     >
-      <Animated.View style={[
-        styles.container,
-        {
-          width,
-          height,
-          transform: [{ scale }],
-          backgroundColor: themeColors.surface,
-          shadowColor: themeColors.primary,
-          shadowOpacity: 0.4,
-          shadowRadius: 12,
-        }
-      ]}>
+      <Animated.View
+        entering={FadeIn.duration(motion.durations.epic).easing(motion.curves.cinematic)}
+        style={[
+          styles.container,
+          {
+            width,
+            height,
+            backgroundColor: themeColors.surface,
+            shadowColor: themeColors.primary,
+            shadowOpacity: 0.4,
+            shadowRadius: 12,
+          },
+          animatedStyle
+        ]}>
         <Image
-          source={media.posterPath ? { uri: media.posterPath } : { uri: PLACEHOLDER_POSTER }}
+          source={media.posterImageMedium || media.posterPath ? { uri: media.posterImageMedium || media.posterPath } : { uri: PLACEHOLDER_POSTER }}
           style={styles.image}
           contentFit="cover"
           transition={200}
@@ -118,7 +117,7 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({
           colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
           style={styles.gradient}
         >
-          <Text style={[styles.title, { color: themeColors.text }]} numberOfLines={2}>
+          <Text style={[styles.title, { color: themeColors.text }]} numberOfLines={1}>
             {media.title}
           </Text>
           {hasValidRating(media.rating) && (

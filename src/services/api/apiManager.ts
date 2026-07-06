@@ -43,34 +43,56 @@ export type CacheCategory = keyof typeof CACHE_TTL;
 
 export const apiManager = {
     /**
+     * Calculates context-aware dynamic TTL for details and episodes cache entries.
+     */
+    getDynamicTTLFor: (key: string, defaultTtl: number): number => {
+        // detail key pattern: details_${id}
+        // episodes key pattern: episodes_${id}_all
+        const match = key.match(/^(details|episodes)_([A-Za-z0-9\-]+)(_all)?$/);
+        if (!match) return defaultTtl;
+
+        const animeId = match[2];
+        const detailsKey = `details_${animeId}`;
+
+        // Lookup the in-memory cache directly
+        const memory = inMemoryCache.get(detailsKey);
+        if (memory && memory.data) {
+            const media = memory.data;
+            const status = (media.status || '').toLowerCase();
+            const popularity = media.popularity || 99999;
+
+            const isAiring = ['currently airing', 'releasing', 'currently_airing'].includes(status);
+            const isPopular = popularity > 0 && popularity <= 1500;
+
+            if (isAiring) {
+                return 1 * 60 * 60 * 1000; // 1 hour for airing anime
+            }
+            if (isPopular) {
+                return 3 * 60 * 60 * 1000; // 3 hours for popular anime
+            }
+        }
+
+        // Maximum 6 hours for any details and episodes
+        if (key.startsWith('details_') || key.startsWith('episodes_')) {
+            return Math.min(defaultTtl, 6 * 60 * 60 * 1000);
+        }
+
+        return defaultTtl;
+    },
+    /**
      * Retrieves data from the cache (in-memory -> AsyncStorage falls).
      */
     getCache: async (key: string, ttl: number): Promise<any | null> => {
-        // Check in-memory
+        // Check in-memory SWR cache (RAM-only guarantees no SQLite overflows)
         const memory = inMemoryCache.get(key);
         if (memory && Date.now() - memory.timestamp < ttl) {
             return memory.data;
-        }
-
-        // Check AsyncStorage parsing
-        try {
-            const stored = await AsyncStorage.getItem(`swr_cache_${key}`);
-            if (stored) {
-                const parsed = JSON.parse(stored);
-                if (Date.now() - parsed.timestamp < ttl) {
-                    // Sync into memory for rapid access
-                    inMemoryCache.set(key, parsed);
-                    return parsed.data;
-                }
-            }
-        } catch {
-            // Sliently fail storage read exceptions
         }
         return null;
     },
 
     /**
-     * Saves data into both memory and AsyncStorage caches.
+     * Saves data into memory caches.
      */
     setCache: async (key: string, data: any): Promise<void> => {
         const payload = { data, timestamp: Date.now() };
@@ -81,12 +103,6 @@ export const apiManager = {
             if (oldest) inMemoryCache.delete(oldest);
         }
         inMemoryCache.set(key, payload);
-
-        try {
-            await AsyncStorage.setItem(`swr_cache_${key}`, JSON.stringify(payload));
-        } catch {
-            // Sliently fail storage write errors
-        }
     },
 
     /**
@@ -97,9 +113,11 @@ export const apiManager = {
         cacheKey: string,
         primaryFetcher: () => Promise<T>,
         fallbackFetcher?: () => Promise<T>,
-        onUpdate?: (freshData: T) => void
+        onUpdate?: (freshData: T) => void,
+        bypassCache = false
     ): Promise<T> => {
-        const ttl = CACHE_TTL[category] || CACHE_TTL.other;
+        const defaultTtl = CACHE_TTL[category] || CACHE_TTL.other;
+        const ttl = apiManager.getDynamicTTLFor(cacheKey, defaultTtl);
 
         const executeAndCache = async (): Promise<T> => {
             return globalThrottler.run(async () => {
@@ -125,18 +143,10 @@ export const apiManager = {
         };
 
         // 1. Double check cached index
-        const cachedData = await apiManager.getCache(cacheKey, ttl);
+        const cachedData = bypassCache ? null : await apiManager.getCache(cacheKey, ttl);
 
         if (cachedData !== null) {
-            // If we have cached data, we check if it is still valid or stale
-            const storedPayload = inMemoryCache.get(cacheKey) ||
-                await (async () => {
-                    try {
-                        const raw = await AsyncStorage.getItem(`swr_cache_${cacheKey}`);
-                        return raw ? JSON.parse(raw) : null;
-                    } catch { return null; }
-                })();
-
+            const storedPayload = inMemoryCache.get(cacheKey);
             const isStale = storedPayload ? (Date.now() - storedPayload.timestamp >= ttl) : true;
 
             if (isStale) {
@@ -144,7 +154,6 @@ export const apiManager = {
                     // Flow 2: Refresh silently in background, return stale instantly!
                     executeAndCache()
                         .then(fresh => {
-                            // Checks if the new data differs from the cached content to avoid redundant UI re-renders
                             if (JSON.stringify(fresh) !== JSON.stringify(cachedData)) {
                                 console.log(`[API SWR] Cache revalidated with updates for ${cacheKey}. Notifying subscriber.`);
                                 onUpdate(fresh);
@@ -170,13 +179,11 @@ export const apiManager = {
         try {
             return await executeAndCache();
         } catch (error) {
-            // Retrieve expired cache if any exist (to avoid loading failure on first boot in air-tight environments)
-            try {
-                const stored = await AsyncStorage.getItem(`swr_cache_${cacheKey}`);
-                if (stored) {
-                    return JSON.parse(stored).data;
-                }
-            } catch { }
+            // Retrieve expired memory cache if any exist
+            const stored = inMemoryCache.get(cacheKey);
+            if (stored?.data) {
+                return stored.data;
+            }
             throw error;
         }
     }

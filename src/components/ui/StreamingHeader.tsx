@@ -70,10 +70,10 @@ const styles = StyleSheet.create({
   },
   bottomFade: {
     position: 'absolute',
-    bottom: -100,
+    bottom: -20,
     left: 0,
     right: 0,
-    height: 100,
+    height: 20,
   },
   brandContainer: {
     flexDirection: 'row',

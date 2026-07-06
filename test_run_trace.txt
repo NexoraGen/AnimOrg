@@ -1,0 +1,105 @@
+﻿
+============================================================
+TESTING: Hunter x Hunter (2011) (ID: 11061)
+============================================================
+
+--- PATH A: Direct jikanApi.getAnimeEpisodesAllPages ---
+[Jikan] Deep paginated episodes fetch: anime 11061, page 1...
+[Jikan] Deep paginated episodes fetch: anime 11061, page 2...
+  Result: 148 episodes, totalCount: 148
+  First episode: #1 "Departure ├ù And ├ù Friends"
+  Last episode:  #148 "Until Now ├ù And ├ù From Now"
+
+--- PATH B: Through apiManager.fetchWithSWR ---
+[Jikan] Deep paginated episodes fetch: anime 11061, page 1...
+[Jikan] Deep paginated episodes fetch: anime 11061, page 2...
+  Result: 148 episodes, totalCount: 148
+  First episode: #1 "Departure ├ù And ├ù Friends"
+
+  (waiting 2s for rate limit...)
+
+============================================================
+TESTING: Death Note (ID: 1535)
+============================================================
+
+--- PATH A: Direct jikanApi.getAnimeEpisodesAllPages ---
+[Jikan] Deep paginated episodes fetch: anime 1535, page 1...
+  Result: 37 episodes, totalCount: 37
+  First episode: #1 "Rebirth"
+  Last episode:  #37 "New World"
+
+--- PATH B: Through apiManager.fetchWithSWR ---
+[Jikan] Deep paginated episodes fetch: anime 1535, page 1...
+  Result: 37 episodes, totalCount: 37
+  First episode: #1 "Rebirth"
+
+  (waiting 2s for rate limit...)
+
+============================================================
+TESTING: One Piece (ID: 21)
+============================================================
+
+--- PATH A: Direct jikanApi.getAnimeEpisodesAllPages ---
+[Jikan] Deep paginated episodes fetch: anime 21, page 1...
+[Jikan] Deep paginated episodes fetch: anime 21, page 2...
+[Jikan] Deep paginated episodes fetch: anime 21, page 3...
+[Jikan] Deep paginated episodes fetch: anime 21, page 4...
+[Jikan] Deep paginated episodes fetch: anime 21, page 5...
+[Jikan] Deep paginated episodes fetch: anime 21, page 6...
+[Jikan] Deep paginated episodes fetch: anime 21, page 7...
+[Jikan] Deep paginated episodes fetch: anime 21, page 8...
+node : Jikan Fetch 
+Error for https://api.j
+ikan.moe/v4/anime/21/ep
+isodes?page=8 (Attempt 
+1/3): RateLimited
+At line:1 char:1
++ node 
+test_pipeline_run.js 
+2>&1 | Out-File 
+-Encoding utf8 
+test_run_tra ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Jikan Fetch E   
+ rr...3): RateLimit    
+ed:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+[Jikan] Deep paginated episodes fetch: anime 21, page 9...
+[Jikan] Deep paginated episodes fetch: anime 21, page 10...
+[Jikan] Deep paginated episodes fetch: anime 21, page 11...
+[Jikan] Deep paginated episodes fetch: anime 21, page 12...
+Jikan Fetch Error for h
+ttps://api.jikan.moe/v4
+/anime/21/episodes?page
+=12 (Attempt 1/3): 
+RateLimited
+  Result: 1162 episodes, totalCount: 1162
+  First episode: #1 "I'm Luffy! The Man Who's Gonna Be King of the Pirates!"
+  Last episode:  #1162 "A Gargantuan Wave of Emotion: The Dreamlike Scenery of Elbaph"
+
+--- PATH B: Through apiManager.fetchWithSWR ---
+[Jikan] Deep paginated episodes fetch: anime 21, page 1...
+[Jikan] Deep paginated episodes fetch: anime 21, page 2...
+[Jikan] Deep paginated episodes fetch: anime 21, page 3...
+[Jikan] Deep paginated episodes fetch: anime 21, page 4...
+[Jikan] Deep paginated episodes fetch: anime 21, page 5...
+[Jikan] Deep paginated episodes fetch: anime 21, page 6...
+[Jikan] Deep paginated episodes fetch: anime 21, page 7...
+[Jikan] Deep paginated episodes fetch: anime 21, page 8...
+[Jikan] Deep paginated episodes fetch: anime 21, page 9...
+[Jikan] Deep paginated episodes fetch: anime 21, page 10...
+[Jikan] Deep paginated episodes fetch: anime 21, page 11...
+[Jikan] Deep paginated episodes fetch: anime 21, page 12...
+  Result: 1162 episodes, totalCount: 1162
+  First episode: #1 "I'm Luffy! The Man Who's Gonna Be King of the Pirates!"
+
+============================================================
+DIAGNOSTIC COMPLETE
+============================================================

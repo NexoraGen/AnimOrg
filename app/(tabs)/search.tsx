@@ -53,7 +53,10 @@ export default function SearchScreen() {
   const themeColors = useThemeColors();
   const { width } = useWindowDimensions();
 
-  const { searchHistory, addToSearchHistory, clearSearchHistory, setModalActive } = useAppStore();
+  const searchHistory = useAppStore(state => state.searchHistory);
+  const addToSearchHistory = useAppStore(state => state.addToSearchHistory);
+  const clearSearchHistory = useAppStore(state => state.clearSearchHistory);
+  const setModalActive = useAppStore(state => state.setModalActive);
 
   const [query, setQuery] = useState('');
   const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
@@ -78,16 +81,14 @@ export default function SearchScreen() {
   }, [showRecModal]);
   const [isRecLoading, setIsRecLoading] = useState(false);
 
-  const {
-    watchlist,
-    userRatings,
-    getFavoriteGenres,
-    notInterested,
-    addToNotInterested,
-    recommendationHistory,
-    addToRecommendationHistory,
-    addToWatchlist
-  } = useAppStore();
+  const watchlist = useAppStore(state => state.watchlist);
+  const userRatings = useAppStore(state => state.userRatings);
+  const getFavoriteGenres = useAppStore(state => state.getFavoriteGenres);
+  const notInterested = useAppStore(state => state.notInterested);
+  const addToNotInterested = useAppStore(state => state.addToNotInterested);
+  const recommendationHistory = useAppStore(state => state.recommendationHistory);
+  const addToRecommendationHistory = useAppStore(state => state.addToRecommendationHistory);
+  const addToWatchlist = useAppStore(state => state.addToWatchlist);
 
   const numColumns = width > 1024 ? 5 : width > 768 ? 4 : 2;
   const cardWidth = (width - spacing.md * 2 - spacing.md * (numColumns - 1)) / numColumns;
@@ -308,63 +309,64 @@ export default function SearchScreen() {
             ))}
           </View>
         ) : (results.length > 0 || characterResults.length > 0 || selectedGenres.length > 0 || debouncedQuery.trim() !== '') ? (
-          <ScrollView
+          <FlashList<Media>
             showsVerticalScrollIndicator={false}
-            onScroll={({ nativeEvent }) => {
-              const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-              if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 200) {
-                loadMore();
-              }
-            }}
-            scrollEventThrottle={400}
-          >
-            {results.length > 0 && (
-              <View style={styles.section}>
-                <SectionHeader title="Anime Series" icon="monitor" />
-                <View style={styles.resultsGrid}>
-                  {results.map((item, index) => (
-                    <View key={`${item.id}-${index}`} style={[styles.gridItem, { width: cardWidth }]}>
-                      <PosterCard
-                        media={item}
-                        onPress={handleMediaPress}
-                        width={cardWidth}
-                      />
-                    </View>
-                  ))}
+            data={results}
+            numColumns={numColumns}
+            {...{ estimatedItemSize: 250 } as any}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            ListHeaderComponent={
+              results.length > 0 ? (
+                <View style={styles.listSectionHeader}>
+                  <SectionHeader title="Anime Series" icon="monitor" />
                 </View>
+              ) : null
+            }
+            renderItem={({ item }) => (
+              <View style={[styles.gridItem, { width: cardWidth }]}>
+                <PosterCard
+                  media={item}
+                  onPress={handleMediaPress}
+                  width={cardWidth}
+                />
               </View>
             )}
+            ListFooterComponent={
+              <>
+                {characterResults.length > 0 && (
+                  <View style={styles.section}>
+                    <SectionHeader title="Characters" icon="users" />
+                    {characterResults.map(char => (
+                      <CharacterSearchCard
+                        key={char.id}
+                        character={char}
+                        onPress={handleCharacterPress}
+                      />
+                    ))}
+                  </View>
+                )}
 
-            {characterResults.length > 0 && (
-              <View style={styles.section}>
-                <SectionHeader title="Characters" icon="users" />
-                {characterResults.map(char => (
-                  <CharacterSearchCard
-                    key={char.id}
-                    character={char}
-                    onPress={handleCharacterPress}
-                  />
-                ))}
-              </View>
-            )}
+                {results.length === 0 && characterResults.length === 0 && !isLoading && (
+                  <View style={{ alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.xl }}>
+                    <Feather name="alert-circle" size={48} color={themeColors.textDim} style={{ marginBottom: spacing.md }} />
+                    <Text style={{ color: themeColors.textDim, fontSize: 16, textAlign: 'center', fontWeight: 'bold' }}>No results found.</Text>
+                    <Text style={{ color: themeColors.textMuted, fontSize: 14, textAlign: 'center', marginTop: spacing.xs }}>
+                      (Jikan API may be overloaded. Please try again later or clear filters.)
+                    </Text>
+                  </View>
+                )}
 
-            {results.length === 0 && characterResults.length === 0 && !isLoading && (
-              <View style={{ alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.xl }}>
-                <Feather name="alert-circle" size={48} color={themeColors.textDim} style={{ marginBottom: spacing.md }} />
-                <Text style={{ color: themeColors.textDim, fontSize: 16, textAlign: 'center', fontWeight: 'bold' }}>No results found.</Text>
-                <Text style={{ color: themeColors.textMuted, fontSize: 14, textAlign: 'center', marginTop: spacing.xs }}>
-                  (Jikan API may be overloaded. Please try again later or clear filters.)
-                </Text>
-              </View>
-            )}
-
-            {isMoreLoading && (
-              <View style={styles.footerLoader}>
-                <ActivityIndicator color={themeColors.primary} size="small" />
-              </View>
-            )}
-            <View style={{ height: 100 }} />
-          </ScrollView>
+                {isMoreLoading && (
+                  <View style={styles.footerLoader}>
+                    <ActivityIndicator color={themeColors.primary} size="small" />
+                  </View>
+                )}
+              </>
+            }
+          />
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 }}>
             {/* ONLY SHOW THE BIG GRID OF THEMES IF THERE'S NO QUERY AND NO GENRE SELECTED */}

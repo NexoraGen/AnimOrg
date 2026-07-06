@@ -1,8 +1,17 @@
-import React, { useEffect, useRef } from 'react';
-import { StyleSheet, Animated, Platform, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, borderRadius } from '../../theme';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+  cancelAnimation
+} from 'react-native-reanimated';
+import { borderRadius } from '../../theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { durations } from '../../theme/motion';
 
 interface SkeletonLoaderProps {
   width?: number | string;
@@ -20,23 +29,28 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
   style
 }) => {
   const themeColors = useThemeColors();
-  const animatedValue = useRef(new Animated.Value(0)).current;
+  const translateX = useSharedValue(-100);
 
   useEffect(() => {
-    const animation = Animated.loop(
-      Animated.timing(animatedValue, {
-        toValue: 1,
-        duration: 1500,
-        useNativeDriver: Platform.OS !== 'web',
-      })
+    translateX.value = -100;
+    translateX.value = withRepeat(
+      withTiming(200, {
+        duration: 1800,
+        easing: Easing.bezier(0.2, 0.0, 0, 1.0),
+      }),
+      -1,
+      false
     );
-    animation.start();
-    return () => animation.stop();
+
+    return () => {
+      cancelAnimation(translateX);
+    };
   }, []);
 
-  const translateX = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [typeof width === 'number' ? -width : -300, typeof width === 'number' ? width * 2 : 600],
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: `${translateX.value}%` }],
+    };
   });
 
   return (
@@ -53,14 +67,7 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
         style,
       ]}
     >
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            transform: [{ translateX }],
-          },
-        ]}
-      >
+      <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]}>
         <LinearGradient
           colors={['transparent', 'rgba(255,255,255,0.08)', 'transparent']}
           start={{ x: 0, y: 0 }}
@@ -74,6 +81,6 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
 
 const styles = StyleSheet.create({
   skeleton: {
-    backgroundColor: colors.surfaceVariant,
+    // Base styles
   },
 });

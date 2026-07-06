@@ -33,28 +33,66 @@ import { Media } from '../../src/types';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { WatchNextSection } from '../../src/components/features/WatchNextSection';
 import { notificationService } from '../../src/services/notifications';
+import { RecommendationService, RecommendationResult } from '../../src/services/RecommendationService';
+import { PosterCard } from '../../src/components/ui/PosterCard';
+
+const RotatingHeroBanner = React.memo(({ topRated, onPress }: { topRated: Media[], onPress: (id: string) => void }) => {
+  const [heroAnime, setHeroAnime] = useState<Media | null>(null);
+  const heroInterval = useRef<any>(null);
+
+  useEffect(() => {
+    if (topRated.length > 0) {
+      setHeroAnime(topRated[0]);
+      if (heroInterval.current) clearInterval(heroInterval.current);
+      heroInterval.current = setInterval(() => {
+        setHeroAnime(prev => {
+          if (!prev) return topRated[0];
+          const currentIndex = topRated.findIndex(a => a.id === prev.id);
+          const nextIndex = (currentIndex + 1) % Math.min(5, topRated.length);
+          return topRated[nextIndex];
+        });
+      }, 8000);
+    }
+    return () => {
+      if (heroInterval.current) clearInterval(heroInterval.current);
+    };
+  }, [topRated]);
+
+  if (!heroAnime) return null;
+
+  return (
+    <View style={styles.heroWrapper}>
+      <HeroBanner
+        media={heroAnime}
+        onPress={onPress}
+      />
+    </View>
+  );
+});
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
   const { width } = useWindowDimensions();
-  const { user, watchlist, continueWatching, userRatings, hasHydrated } = useAppStore();
+  // Individual selectors to prevent full-store rerender cascades
+  const user = useAppStore(s => s.user);
+  const watchlist = useAppStore(s => s.watchlist);
+  const continueWatching = useAppStore(s => s.continueWatching);
+  const userRatings = useAppStore(s => s.userRatings);
+  const hasHydrated = useAppStore(s => s.hasHydrated);
 
   const [trendingAnime, setTrendingAnime] = useState<Media[]>([]);
   const [topRated, setTopRated] = useState<Media[]>([]);
   const [seasonalAnime, setSeasonalAnime] = useState<Media[]>([]);
   const [upcomingAnime, setUpcomingAnime] = useState<Media[]>([]);
   const [curatedAnime, setCuratedAnime] = useState<Record<string, Media[]>>({});
-
-  const [heroAnime, setHeroAnime] = useState<Media | null>(null);
-  const [recommendations, setRecommendations] = useState<Media[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendationResult[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const heroInterval = useRef<any>(null);
 
-  const fetchHomeData = async () => {
+  const fetchHomeData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { user, watchlist, getFavoriteGenres } = useAppStore.getState();
@@ -76,11 +114,6 @@ export default function HomeScreen() {
       if (notificationsEnabled) {
         const watchingAnime = watchlist.filter(item => item.status === 'watching');
         notificationService.checkAndScheduleAiringAlerts(watchingAnime, seasonal);
-      }
-
-      // Hero rotation setup
-      if (top.length > 0) {
-        setHeroAnime(top[0]);
       }
 
       // Premium Curated Curation Engine
@@ -133,61 +166,27 @@ export default function HomeScreen() {
 
       setCuratedAnime(premiumData);
 
-      // Advanced recommendation logic
-      let combinedRecs: Media[] = [];
-      const hasActivity = watchlist.length > 0 || (continueWatching?.length || 0) > 0 || (userRatings?.length || 0) > 0;
-
-      if (hasActivity && watchlist.length > 0) {
-        // Get recs from last 3 watchlist items
-        const itemsToUse = watchlist.slice(-3);
-        const recsPromises = itemsToUse.map(item => animeApi.getAnimeRecommendations(item.mediaId));
-        const results = await Promise.all(recsPromises);
-
-        // Flatten and deduplicate
-        const seenIds = new Set(watchlist.map(i => i.mediaId));
-        results.forEach(list => {
-          list.forEach(m => {
-            if (!seenIds.has(m.id)) {
-              combinedRecs.push(m);
-              seenIds.add(m.id);
-            }
-          });
-        });
-      }
-
-      // No fallback to trending for recommendations anymore
-      setRecommendations(combinedRecs.slice(0, 15));
+      // Advanced recommendation logic using the new Personalized Taste DNA Engine
+      const recs = await RecommendationService.getPersonalizedRecommendations(
+        watchlist,
+        userRatings,
+        getFavoriteGenres(),
+        15
+      );
+      setRecommendations(recs);
 
     } catch (error) {
       console.error('Error fetching home data:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (hasHydrated) {
       fetchHomeData();
     }
-    return () => {
-      if (heroInterval.current) clearInterval(heroInterval.current);
-    };
   }, [user?.id, hasHydrated]);
-
-  // Rotate hero banner
-  useEffect(() => {
-    if (topRated.length > 0) {
-      if (heroInterval.current) clearInterval(heroInterval.current);
-      heroInterval.current = setInterval(() => {
-        setHeroAnime(prev => {
-          if (!prev) return topRated[0];
-          const currentIndex = topRated.findIndex(a => a.id === prev.id);
-          const nextIndex = (currentIndex + 1) % Math.min(5, topRated.length);
-          return topRated[nextIndex];
-        });
-      }, 8000);
-    }
-  }, [topRated]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -195,9 +194,9 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, []);
 
-  const handleMediaPress = (id: string) => {
+  const handleMediaPress = useCallback((id: string) => {
     router.push(`/details/${id}`);
-  };
+  }, [router]);
 
   const isDesktop = width > 1024;
 
@@ -226,8 +225,12 @@ export default function HomeScreen() {
       />
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 65 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + 90 } // Adds crisp visual spacing between the header and the hero pic section
+        ]}
         showsVerticalScrollIndicator={false}
+        decelerationRate="normal"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -236,14 +239,7 @@ export default function HomeScreen() {
           />
         }
       >
-        {heroAnime && (
-          <View style={styles.heroWrapper}>
-            <HeroBanner
-              media={heroAnime}
-              onPress={handleMediaPress}
-            />
-          </View>
-        )}
+        <RotatingHeroBanner topRated={topRated} onPress={handleMediaPress} />
 
         <WatchNextSection />
 
@@ -256,10 +252,50 @@ export default function HomeScreen() {
 
         {recommendations.length > 0 ? (
           <HorizontalCarousel
-            title="Based on your liking"
+            title="Made For Your Taste"
             icon="heart"
-            data={recommendations}
+            data={recommendations as any[]}
             onPress={handleMediaPress}
+            renderItem={({ item }) => (
+              <View style={{ width: 170, paddingBottom: 4 }}>
+                <PosterCard
+                  media={item.anime}
+                  onPress={handleMediaPress}
+                  width={154}
+                  height={224}
+                />
+                <View style={{
+                  marginTop: 6,
+                  marginHorizontal: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 6,
+                  backgroundColor: 'rgba(255, 59, 48, 0.06)',
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 59, 48, 0.12)',
+                  alignItems: 'center'
+                }}>
+                  <Text style={{
+                    color: themeColors.primary,
+                    fontSize: 10,
+                    fontWeight: '900',
+                    textAlign: 'center'
+                  }} numberOfLines={1}>
+                    🔥 {item.score}% Match
+                  </Text>
+                  <Text style={{
+                    color: themeColors.textDim,
+                    fontSize: 8.5,
+                    marginTop: 2,
+                    textAlign: 'center',
+                    fontWeight: '500' as any
+                  }} numberOfLines={1}>
+                    {item.reason}
+                  </Text>
+                </View>
+              </View>
+            )}
+            itemWidth={170}
           />
         ) : (
           (watchlist.length === 0 && (continueWatching?.length || 0) === 0 && (userRatings?.length || 0) === 0) && (

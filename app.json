@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
-      "backgroundColor": "#0F0F0F"
+      "backgroundColor": "#0B0B0B"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -49,6 +49,19 @@
         }
       ],
       "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#0B0B0B",
+          "dark": {
+            "image": "./assets/splash.png",
+            "resizeMode": "cover",
+            "backgroundColor": "#0B0B0B"
+          }
+        }
+      ],
       "@react-native-google-signin/google-signin"
     ],
     "experiments": {
