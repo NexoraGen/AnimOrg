@@ -34,22 +34,31 @@ export default function LoginScreen() {
   const [feedback, setFeedback] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
 
   React.useEffect(() => {
-    GoogleSignin.configure({
-      webClientId: GOOGLE_AUTH_CONFIG.webClientId,
-      iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
-    });
+    try {
+      GoogleSignin.configure({
+        webClientId: GOOGLE_AUTH_CONFIG.webClientId,
+        iosClientId: GOOGLE_AUTH_CONFIG.iosClientId,
+      });
+      console.log('[GoogleSignin] configure SUCCESS with webClientId:', GOOGLE_AUTH_CONFIG.webClientId);
+    } catch (e) {
+      console.error('[GoogleSignin] configure ERROR', e);
+    }
   }, []);
 
   const handleGoogleSignInWithToken = async (idToken: string) => {
     setIsLoading(true);
+    console.log('[GoogleAuth] Creating firebase credential...');
     try {
       const user = await firebaseAuthService.signInWithGoogle(idToken);
       if (user) {
+        console.log('[GoogleAuth] Firebase signIn result SUCCESS. User:', user.uid);
         setFeedback({ message: 'Signed in successfully!', type: 'success' });
       }
     } catch (error: any) {
-      console.error(error);
-      setFeedback({ message: 'Google Sign-In failed', type: 'error' });
+      console.error('[GoogleAuth] Firebase Auth Error:', error, '\nStack:', error.stack);
+      const errCode = error.code || 'UNKNOWN';
+      const errMsg = error.message || 'No msg';
+      setFeedback({ message: `Firebase Error [${errCode}]: ${errMsg}`, type: 'error' });
       setIsLoading(false);
     } finally {
       setIsLoading(false);
@@ -95,8 +104,20 @@ export default function LoginScreen() {
     } else {
       setIsLoading(true);
       try {
-        await GoogleSignin.hasPlayServices();
+        console.log('[GoogleSignin] Checking hasPlayServices...');
+        const playServicesStatus = await GoogleSignin.hasPlayServices();
+        console.log('[GoogleSignin] hasPlayServices result:', playServicesStatus);
+
+        console.log('[GoogleSignin] Starting signIn()...');
         const response = await GoogleSignin.signIn();
+        console.log('[GoogleSignin] signIn() response:', JSON.stringify({
+          type: response.type,
+          data: response.data ? {
+            serverAuthCode: response.data.serverAuthCode,
+            // omit full token in logs if huge, but we need to log if it exists as user requested
+            idTokenLength: response.data.idToken ? response.data.idToken.length : 0,
+          } : null
+        }));
 
         let idToken = null;
         if (isSuccessResponse(response)) {
@@ -107,31 +128,24 @@ export default function LoginScreen() {
         }
 
         if (idToken) {
+          console.log('[GoogleSignin] Got idToken successfully');
           await handleGoogleSignInWithToken(idToken);
         } else {
-          throw new Error('No ID token present');
+          console.error('[GoogleSignin] No ID token present in response:', response);
+          setFeedback({ message: `No ID token present. Response: ${JSON.stringify(response)}`, type: 'error' });
+          setIsLoading(false);
         }
       } catch (error: any) {
-        console.error(error);
+        console.error('[GoogleSignin] Catch block error:', error, '\nStack:', error?.stack);
+        const errCode = error?.code || 'UNKNOWN';
+        const errMsg = error?.message || 'No msg';
+        const strError = `[${errCode}] ${errMsg}`;
+
         if (isErrorWithCode(error)) {
-          switch (error.code) {
-            case statusCodes.SIGN_IN_CANCELLED:
-              // User cancelled the login flow
-              break;
-            case statusCodes.IN_PROGRESS:
-              // operation (e.g. sign in) is in progress already
-              break;
-            case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
-              setFeedback({ message: 'Play services not available or outdated', type: 'error' });
-              break;
-            default:
-              setFeedback({ message: 'Google Sign-In failed', type: 'error' });
-          }
+          const codeString = Object.keys(statusCodes).find(k => (statusCodes as any)[k] === error.code) || error.code;
+          setFeedback({ message: `Google Error: ${codeString} - ${strError}`, type: 'error' });
         } else {
-          // Fallback if user cancels or another error occurs
-          if (error?.message !== 'SIGN_IN_CANCELLED' && error?.code !== 'SIGN_IN_CANCELLED') {
-            setFeedback({ message: 'Google Sign-In failed', type: 'error' });
-          }
+          setFeedback({ message: `System Error: ${strError}`, type: 'error' });
         }
         setIsLoading(false);
       }

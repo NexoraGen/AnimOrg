@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "177485044340-m7hob56sa652hfdhhkiqvoargtvv01a8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nexora.animorg",
+            "certificate_hash": "d68e412a20eeb7571087757edd7d4d2d7faa4ff8"
+          }
+        },
+        {
           "client_id": "177485044340-bpsn9l211k8kffp49mhp34402brsq4uv.apps.googleusercontent.com",
           "client_type": 3
         }

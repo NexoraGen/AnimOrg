@@ -1,0 +1,49 @@
+﻿[
+  {
+    "id": "ca9aafc0-d12f-45bc-b7fd-8c7172dffacc",
+    "status": "FINISHED",
+    "platform": "ANDROID",
+    "artifacts": {
+      "buildUrl": "https://expo.dev/artifacts/eas/wGwu2ndzrCxobA-BEju0Fud6jT2wYWncMct9_S8CiTE.aab",
+      "applicationArchiveUrl": "https://expo.dev/artifacts/eas/wGwu2ndzrCxobA-BEju0Fud6jT2wYWncMct9_S8CiTE.aab"
+    },
+    "fingerprint": {
+      "id": "019f39cf-6d83-767a-979f-82d0ffe04c97",
+      "hash": "98789aa0fc6f6f8e80e4cb99312df95db9f99b5a"
+    },
+    "initiatingActor": {
+      "id": "c988cfa6-1c34-4acb-bed1-9a5f8d56aac0",
+      "displayName": "itisnexora"
+    },
+    "logFiles": [
+      "https://storage.googleapis.com/eas-workflows-production/logs/a2a3be68-4799-4025-ab7c-f3f8070eff20/ca9aafc0-d12f-45bc-b7fd-8c7172dffacc/2026-07-06T23%3A42%3A08Z-ca4d183f-1716-49c1-80d2-a22974f5a411.txt?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=www-production%40exponentjs.iam.gserviceaccount.com%2F20260706%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260706T235531Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=6f917f6e2710ef4acff38450f25603bb9a6a3b45c535fab908c67be56e9c6810e6b518bda142752c7e324eab7943349965d89968a113326a4b7f99bfb3f1af1d62b12681cadb47479c6531579c8b02200f3ba87baa3e3aaec8fe90fef343aa6c91c5b5a648f412903df67ec38c22aa711323f4f46dac28f199d4b9dd96ff4fee653d50f72fb9dbbefb7eec8de19fdc52ebf1ec07680b5bea153a876ef2d41eace9bc925611045ce3a1d4c0db17d5bca8776ed36614c25aa14a0428335cd5ea7273ff1cb8a41b9654069af4f12493ba4520660e13d92b690fca878fb057b73be5d3cb6cfce76b0cd5cf5c06755c6162dab4bec3bcb15a2b99ab55bf0bffc3c5db"
+    ],
+    "project": {
+      "id": "a2a3be68-4799-4025-ab7c-f3f8070eff20",
+      "name": "animorg",
+      "slug": "animorg",
+      "ownerAccount": {
+        "id": "25c92711-f6c4-4fff-a611-226a67af4026",
+        "name": "itisnexora"
+      }
+    },
+    "distribution": "STORE",
+    "buildProfile": "production",
+    "sdkVersion": "54.0.0",
+    "appVersion": "1.0.4",
+    "appBuildVersion": "5",
+    "gitCommitHash": "8a46bac457ba883aaed857f7db1b92fb9ffd6f89",
+    "gitCommitMessage": "Fix splash screen and startup loading",
+    "priority": "NORMAL",
+    "createdAt": "2026-07-06T23:42:03.089Z",
+    "updatedAt": "2026-07-06T23:56:54.819Z",
+    "completedAt": "2026-07-06T23:56:54.667Z",
+    "expirationDate": "2026-08-05T23:42:03.129Z",
+    "isForIosSimulator": false,
+    "metrics": {
+      "buildWaitTime": 5049,
+      "buildQueueTime": 4640,
+      "buildDuration": 881889
+    }
+  }
+]
