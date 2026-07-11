@@ -58,10 +58,11 @@ export default function RootLayout() {
     if (isLoadingAuth || !hasHydrated || isAppInitializing) return;
 
     const performRedirect = () => {
-      const inAuthGroup = segments[0] === '(auth)';
-      const isOnOnboarding = segments[0] === '(auth)' && (segments[1] as any) === 'onboarding';
-      const isLoginScreen = segments[0] === '(auth)' && (segments[1] as any) === 'login';
-      const isRegisterScreen = segments[0] === '(auth)' && (segments[1] as any) === 'register';
+      const segmentsList = segments as string[];
+      const inAuthGroup = segmentsList[0] === '(auth)';
+      const isOnOnboarding = segmentsList[0] === '(auth)' && segmentsList[1] === 'onboarding';
+      const isLoginScreen = segmentsList[0] === '(auth)' && segmentsList[1] === 'login';
+      const isRegisterScreen = segmentsList[0] === '(auth)' && segmentsList[1] === 'register';
 
       if (isGuest) {
         // Guest users are allowed anywhere EXCEPT auth screens
@@ -86,9 +87,9 @@ export default function RootLayout() {
         }
       } else {
         // Unauthenticated -> force into login (allow register screen too)
-        const inTabs = segments[0] === '(tabs)';
+        const inTabs = segmentsList[0] === '(tabs)';
 
-        if (inTabs || isOnOnboarding || !segments[0]) {
+        if (inTabs || isOnOnboarding || !segmentsList[0]) {
           router.replace('/(auth)/login');
         }
       }
@@ -143,7 +144,7 @@ export default function RootLayout() {
   // the React Native Javascript root mounts. This transitions instantly and
   // seamlessly to the custom CinematicStartupSplash which covers the full screen.
   useEffect(() => {
-    SplashScreen.hideAsync().catch(() => {});
+    SplashScreen.hideAsync().catch(() => { });
   }, []);
 
   useEffect(() => {

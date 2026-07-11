@@ -32,22 +32,39 @@ export const RecommendationService = {
                 ...favoriteListItems.map(w => String(w.mediaId))
             ].filter((v, i, self) => self.indexOf(v) === i).slice(0, 5);
 
+            console.log('[RecommendationService] Starting recommendation generation. Seeds:', seedIds.length, 'IsGuest:', isGuest);
+
             // Fetch specific Jikan/MAL direct similarity suggestions for each seed
             let similarityCandidates: Media[] = [];
             if (seedIds.length > 0) {
                 const specificPromises = seedIds.map(id =>
-                    animeApi.getAnimeRecommendations(id).catch(() => [] as Media[])
+                    animeApi.getAnimeRecommendations(id).catch((err) => {
+                        console.warn(`[RecommendationService] Seed ${id} recommendations failed:`, err?.message || err);
+                        return [] as Media[];
+                    })
                 );
                 const results = await Promise.all(specificPromises);
                 similarityCandidates = results.flat();
+                console.log('[RecommendationService] Similarity candidates fetched:', similarityCandidates.length);
             }
 
-            // Fetch global premium catalogs
+            // Fetch global premium catalogs with individual logging
             const [trending, seasonal, top] = await Promise.all([
-                animeApi.getTrendingAnime(1).catch(() => [] as Media[]),
-                animeApi.getSeasonalAnime(1).catch(() => [] as Media[]),
-                animeApi.getTopAnime(1).catch(() => [] as Media[])
+                animeApi.getTrendingAnime(1).catch((err) => {
+                    console.warn('[RecommendationService] getTrendingAnime FAILED:', err?.message || err);
+                    return [] as Media[];
+                }),
+                animeApi.getSeasonalAnime(1).catch((err) => {
+                    console.warn('[RecommendationService] getSeasonalAnime FAILED:', err?.message || err);
+                    return [] as Media[];
+                }),
+                animeApi.getTopAnime(1).catch((err) => {
+                    console.warn('[RecommendationService] getTopAnime FAILED:', err?.message || err);
+                    return [] as Media[];
+                })
             ]);
+
+            console.log(`[RecommendationService] Catalog results — Trending: ${trending.length}, Seasonal: ${seasonal.length}, Top: ${top.length}`);
 
             // Combine into a candidate pool
             const allCandidates = [
@@ -57,6 +74,51 @@ export const RecommendationService = {
                 ...top
             ];
 
+            console.log('[RecommendationService] Total raw candidates:', allCandidates.length);
+
+            // CRITICAL FIX: If ALL API calls returned empty arrays (total production failure),
+            // attempt a direct Jikan fallback as a last resort
+            if (allCandidates.length === 0) {
+                console.warn('[RecommendationService] CRITICAL: All primary sources returned 0 candidates. Attempting direct Jikan emergency fallback...');
+                try {
+                    const emergencyResults = await fetch('https://api.jikan.moe/v4/top/anime?limit=25');
+                    if (emergencyResults.ok) {
+                        const emergencyJson = await emergencyResults.json();
+                        if (emergencyJson.data && emergencyJson.data.length > 0) {
+                            const emergencyCandidates: Media[] = emergencyJson.data.map((item: any) => ({
+                                id: item.mal_id.toString(),
+                                title: item.title_english || item.title,
+                                description: item.synopsis || 'No description available.',
+                                posterPath: item.images?.webp?.large_image_url || item.images?.jpg?.large_image_url,
+                                posterImageMedium: item.images?.webp?.image_url || item.images?.jpg?.image_url,
+                                backdropPath: item.trailer?.images?.maximum_image_url || item.images?.webp?.large_image_url,
+                                rating: item.score || undefined,
+                                releaseYear: item.year,
+                                genres: item.genres?.map((g: any) => g.name) || [],
+                                type: 'anime' as const,
+                                format: item.type,
+                                episodes: item.episodes,
+                                status: item.status,
+                                popularity: item.popularity,
+                                rank: item.rank,
+                                score: item.score,
+                            }));
+                            allCandidates.push(...emergencyCandidates);
+                            console.log('[RecommendationService] Emergency Jikan fallback succeeded:', emergencyCandidates.length, 'candidates recovered');
+                        }
+                    } else {
+                        console.error('[RecommendationService] Emergency Jikan fallback HTTP error:', emergencyResults.status, emergencyResults.statusText);
+                    }
+                } catch (emergencyErr: any) {
+                    console.error('[RecommendationService] Emergency Jikan fallback network error:', emergencyErr?.message || emergencyErr);
+                }
+            }
+
+            if (allCandidates.length === 0) {
+                console.error('[RecommendationService] FATAL: Zero candidates after all fallback attempts. Returning empty.');
+                return [];
+            }
+
             // Deduplicate items
             const seenIds = new Set<string>();
             const uniqueCandidates = allCandidates.filter(c => {
@@ -64,6 +126,8 @@ export const RecommendationService = {
                 seenIds.add(String(c.id));
                 return true;
             });
+
+            console.log('[RecommendationService] Unique candidates after deduplication:', uniqueCandidates.length);
 
             // 2. EXCLUDE UNWANTED MATCHES
             // Exclude whatever the user has already touched or rated
@@ -84,6 +148,8 @@ export const RecommendationService = {
             if (filteredPool.length < 5) {
                 filteredPool = uniqueCandidates.filter(c => !excludedIds.has(String(c.id)));
             }
+
+            console.log('[RecommendationService] Filtered pool size:', filteredPool.length);
 
             if (filteredPool.length === 0) return [];
 
@@ -201,6 +267,14 @@ export const RecommendationService = {
                 .filter(res => res.score >= 60) // High quality bar constraint
                 .sort((a, b) => b.score - a.score);
 
+            // If confidence threshold is too aggressive, relax it
+            if (finalSelection.length < 3) {
+                console.warn('[RecommendationService] Confidence threshold too strict, relaxing to score >= 40');
+                finalSelection = scoredRecommendations
+                    .filter(res => res.score >= 40)
+                    .sort((a, b) => b.score - a.score);
+            }
+
             if (finalSelection.length > count) {
                 // Keep top + moderate candidates, then rotate slightly to ensure fresh feed variations
                 const topPicks = finalSelection.slice(0, count + 8);
@@ -208,9 +282,10 @@ export const RecommendationService = {
                 finalSelection = randomized.slice(0, count);
             }
 
+            console.log('[RecommendationService] Final selection count:', finalSelection.length);
             return finalSelection.sort((a, b) => b.score - a.score);
-        } catch (error) {
-            console.error('Error generating personalized recommendations:', error);
+        } catch (error: any) {
+            console.error('[RecommendationService] FATAL error generating personalized recommendations:', error?.message || error, error?.stack);
             return [];
         }
     },
@@ -229,21 +304,32 @@ export const RecommendationService = {
         mode: 'personalized' | 'community' = 'personalized'
     ): Promise<RecommendationResult | null> => {
         try {
+            console.log('[RecommendationService] getSmartRecommendation called. Mode:', mode, 'Watchlist:', watchlist.length, 'Ratings:', userRatings.length);
             const results = await RecommendationService.getPersonalizedRecommendations(
                 watchlist,
                 userRatings,
                 favoriteGenres,
                 20
             );
+            console.log('[RecommendationService] getPersonalizedRecommendations returned', results.length, 'results');
+
             // Apply notInterested, recommendationHistory, and active watchlist exclusions
             const blacklist = new Set([
                 ...notInterested.map(String),
                 ...recommendationHistory.map(String)
             ]);
             const filtered = results.filter(r => !blacklist.has(String(r.anime.id)));
-            return filtered[0] || results[0] || null;
-        } catch (e) {
-            console.error('getSmartRecommendation backwards-compatible wrapper error:', e);
+            console.log('[RecommendationService] After blacklist filtering:', filtered.length, 'remaining');
+
+            const pick = filtered[0] || results[0] || null;
+            if (pick) {
+                console.log('[RecommendationService] Selected recommendation:', pick.anime.title, '(ID:', pick.anime.id, ', Score:', pick.score, ')');
+            } else {
+                console.warn('[RecommendationService] No recommendation could be selected from', results.length, 'results');
+            }
+            return pick;
+        } catch (e: any) {
+            console.error('[RecommendationService] getSmartRecommendation FATAL error:', e?.message || e, e?.stack);
             return null;
         }
     }

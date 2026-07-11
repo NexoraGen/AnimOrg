@@ -16,9 +16,11 @@ import { useAppStore } from '../../store/useAppStore';
 import { animeApi } from '../../services/animeApi';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { FlashList } from '@shopify/flash-list';
-import { getCurrentlyReleasedEpisodesCount, getEpisodeAiringTime } from '../../utils/releaseHelper';
+import { getCurrentlyReleasedEpisodesCount, getEpisodeAiringTime, resolveAnimeTrackingStatus } from '../../utils/releaseHelper';
+import { getWatchStatusDisplay } from '../../utils/watchStatusDisplay';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { EpisodeCountRegistry } from '../../utils/episodeCountSync';
 
 interface EpisodeListProps {
     animeId: string;
@@ -148,6 +150,10 @@ export const EpisodeList: React.FC<EpisodeListProps> = React.memo(({ animeId, to
                 if (freshResult?.data) {
                     setAllRawEpisodes(freshResult.data);
                     if (freshResult.totalCount) setTotalSeriesEpisodes(freshResult.totalCount);
+                    const maxEp = Math.max(freshResult.totalCount || 0, freshResult.data.length, ...freshResult.data.map(e => e.number || 0));
+                    if (maxEp > 0) {
+                        EpisodeCountRegistry.registerCount(animeId, maxEp);
+                    }
                 }
             }, forceRefresh);
 
@@ -155,6 +161,10 @@ export const EpisodeList: React.FC<EpisodeListProps> = React.memo(({ animeId, to
             if (result?.data) {
                 setAllRawEpisodes(result.data);
                 if (result.totalCount) setTotalSeriesEpisodes(result.totalCount);
+                const maxEp = Math.max(result.totalCount || 0, result.data.length, ...result.data.map(e => e.number || 0));
+                if (maxEp > 0) {
+                    EpisodeCountRegistry.registerCount(animeId, maxEp);
+                }
 
                 // If API succeeds but returns literally 0 episodes for a show that isn't brand new
                 if (result.data.length === 0) {
@@ -223,7 +233,19 @@ export const EpisodeList: React.FC<EpisodeListProps> = React.memo(({ animeId, to
 
     const watchedCount = Object.values(watchedEps).filter(v => v).length;
     // Strict Release-Aware Progress Calculations
-    const totalAvailable = totalSeriesEpisodes || totalEpisodes || (releasedEps.length > watchedCount ? releasedEps.length : watchedCount) || 1;
+    const maxLoadedEpNumber = allRawEpisodes.length > 0
+        ? Math.max(allRawEpisodes.length, ...allRawEpisodes.map(e => e.number || 0))
+        : 0;
+    const knownRegistryCount = EpisodeCountRegistry.getKnownCount(animeId) || 0;
+    const propTotal = (totalEpisodes && totalEpisodes > 0 ? totalEpisodes : totalSeriesEpisodes) || 0;
+    const totalAvailable = Math.max(
+        propTotal,
+        maxLoadedEpNumber,
+        knownRegistryCount,
+        releasedEps.length,
+        watchedCount,
+        1
+    );
     const percentage = totalAvailable > 0 ? Math.min(Math.round((watchedCount / totalAvailable) * 100), 100) : 0;
 
     const handleToggleWatched = React.useCallback((epNumber: number, targetState: boolean) => {
@@ -252,23 +274,14 @@ export const EpisodeList: React.FC<EpisodeListProps> = React.memo(({ animeId, to
     };
 
     const statusInfo = useMemo(() => {
-        const rawStatus = (media?.status || '').toLowerCase();
-        const isFinished = ['finished airing', 'finished', 'completed', 'finished_airing'].includes(rawStatus);
-
-        if (isFinished) {
-            if (totalAvailable > 0 && watchedCount >= totalAvailable) {
-                return { label: 'Completed', color: '#4CD964' }; // Emerald Green
-            } else {
-                return { label: 'Finished Airing', color: '#FF3B30' }; // Red
-            }
-        } else {
-            // Airing show
-            if (releasedEps.length > 0 && watchedCount >= releasedEps.length) {
-                return { label: 'Awaiting', color: '#5AC8FA' }; // Teal blue
-            } else {
-                return { label: 'Watching', color: '#FF9500' }; // Amber/Orange
-            }
-        }
+        const mediaStatus = media?.status || '';
+        const resolvedStatus = resolveAnimeTrackingStatus({
+            mediaStatus,
+            totalEpisodes: totalAvailable,
+            watchedCount,
+            releasedCount: releasedEps.length,
+        });
+        return getWatchStatusDisplay(resolvedStatus);
     }, [media, releasedEps, watchedCount, totalAvailable]);
 
     // ⚠️ ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS (React rule of hooks)
@@ -459,12 +472,6 @@ export const EpisodeList: React.FC<EpisodeListProps> = React.memo(({ animeId, to
                                             } else {
                                                 countdownStr = `Releasing: ${new Date(episode.aired).toLocaleDateString()}`;
                                             }
-                                        } else if (media) {
-                                            const airTime = getEpisodeAiringTime(media, episode.number);
-                                            if (airTime && airTime > now) {
-                                                const days = Math.ceil((airTime - now) / (24 * 60 * 60 * 1000));
-                                                countdownStr = `Releasing in ${days} days (${new Date(airTime).toLocaleDateString()})`;
-                                            }
                                         }
 
                                         return (
@@ -615,8 +622,9 @@ const styles = StyleSheet.create({
     epNumber: {
         fontSize: 16,
         fontWeight: 'bold',
-        width: 30,
+        width: 48,
         marginRight: spacing.sm,
+        textAlign: 'left',
     },
     textContainer: {
         flex: 1,

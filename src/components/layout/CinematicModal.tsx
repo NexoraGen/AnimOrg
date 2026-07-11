@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
     View,
     StyleSheet,
@@ -21,6 +21,8 @@ interface CinematicModalProps {
     maxWidth?: number;
     widthPercentage?: number;
     showBlur?: boolean;
+    /** When true, uses a tall 9:16 phone-style aspect ratio instead of content-driven height */
+    phoneStyle?: boolean;
 }
 
 export const CinematicModal: React.FC<CinematicModalProps> = ({
@@ -28,14 +30,26 @@ export const CinematicModal: React.FC<CinematicModalProps> = ({
     onClose,
     children,
     maxWidth = 440,
-    widthPercentage = 0.88,
+    widthPercentage = 0.92,
     showBlur = true,
+    phoneStyle = false,
 }) => {
     const { width: screenWidth, height: screenHeight } = useWindowDimensions();
     const insets = useSafeAreaInsets();
     const theme = useThemeColors();
 
     if (!visible && Platform.OS !== 'web') return null;
+
+    // Phone-style: compute a tall 9:16 container bounded by screen dimensions
+    const safeHeight = screenHeight - insets.top - insets.bottom;
+    const modalWidth = Math.min(screenWidth * widthPercentage, maxWidth);
+
+    let modalHeight: number | undefined;
+    if (phoneStyle) {
+        // Target 9:16 aspect ratio, but never exceed 90% of safe screen height
+        const targetHeight = modalWidth * (16 / 9);
+        modalHeight = Math.min(targetHeight, safeHeight * 0.92);
+    }
 
     return (
         <Modal
@@ -80,10 +94,13 @@ export const CinematicModal: React.FC<CinematicModalProps> = ({
                         style={[
                             styles.modalContainer,
                             {
-                                width: '92%',
+                                width: modalWidth,
                                 maxWidth: maxWidth,
                                 backgroundColor: theme.surfaceVariant,
-                                maxHeight: screenHeight * 0.95,
+                                ...(phoneStyle && modalHeight
+                                    ? { height: modalHeight }
+                                    : { maxHeight: screenHeight * 0.95 }
+                                ),
                             }
                         ]}
                     >

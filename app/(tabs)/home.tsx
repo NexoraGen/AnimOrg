@@ -98,10 +98,22 @@ export default function HomeScreen() {
       const { user, watchlist, getFavoriteGenres } = useAppStore.getState();
 
       const [trending, top, seasonal, upcoming] = await Promise.all([
-        animeApi.getTrendingAnime(1, setTrendingAnime),
-        animeApi.getTopAnime(1, setTopRated),
-        animeApi.getSeasonalAnime(1, setSeasonalAnime),
-        animeApi.getUpcomingAnime(1, setUpcomingAnime),
+        animeApi.getTrendingAnime(1, setTrendingAnime).catch(err => {
+          console.warn("Failed to fetch trending:", err);
+          return [] as Media[];
+        }),
+        animeApi.getTopAnime(1, setTopRated).catch(err => {
+          console.warn("Failed to fetch top rated:", err);
+          return [] as Media[];
+        }),
+        animeApi.getSeasonalAnime(1, setSeasonalAnime).catch(err => {
+          console.warn("Failed to fetch seasonal:", err);
+          return [] as Media[];
+        }),
+        animeApi.getUpcomingAnime(1, setUpcomingAnime).catch(err => {
+          console.warn("Failed to fetch upcoming:", err);
+          return [] as Media[];
+        }),
       ]);
 
       setTrendingAnime(trending);
@@ -156,11 +168,15 @@ export default function HomeScreen() {
       const premiumData: Record<string, Media[]> = {};
 
       await Promise.all(finalCategories.map(async (category) => {
-        const data = await animeApi.getCuratedList(category, (freshCurated) => {
-          setCuratedAnime(prev => ({ ...prev, [category]: freshCurated }));
-        });
-        if (data && data.length > 0) {
-          premiumData[category] = data;
+        try {
+          const data = await animeApi.getCuratedList(category, (freshCurated) => {
+            setCuratedAnime(prev => ({ ...prev, [category]: freshCurated }));
+          });
+          if (data && data.length > 0) {
+            premiumData[category] = data;
+          }
+        } catch (err) {
+          console.warn(`Failed to fetch curated list for ${category}:`, err);
         }
       }));
 

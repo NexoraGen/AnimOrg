@@ -65,6 +65,23 @@ export default function LoginScreen() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email || !email.includes('@')) {
+      setFeedback({ message: 'Please enter a valid email address first.', type: 'error' });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await firebaseAuthService.sendPasswordResetEmail(email);
+      setFeedback({ message: 'Password reset link sent to your email!', type: 'success' });
+    } catch (error: any) {
+      console.error(error);
+      setFeedback({ message: error.message || 'Failed to send password reset email.', type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
     if (!email || !password) return;
 
@@ -107,6 +124,12 @@ export default function LoginScreen() {
         console.log('[GoogleSignin] Checking hasPlayServices...');
         const playServicesStatus = await GoogleSignin.hasPlayServices();
         console.log('[GoogleSignin] hasPlayServices result:', playServicesStatus);
+
+        try {
+          await GoogleSignin.signOut();
+        } catch (e) {
+          // Ignore
+        }
 
         console.log('[GoogleSignin] Starting signIn()...');
         const response = await GoogleSignin.signIn();
@@ -217,6 +240,14 @@ export default function LoginScreen() {
                   secureTextEntry
                 />
               </View>
+
+              <TouchableOpacity
+                onPress={handleForgotPassword}
+                style={styles.forgotPasswordContainer}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              </TouchableOpacity>
 
               <Button
                 title="Log In"
@@ -361,5 +392,15 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     opacity: 0.7,
     borderColor: 'transparent',
+  },
+  forgotPasswordContainer: {
+    alignSelf: 'flex-end',
+    marginBottom: spacing.lg,
+    marginTop: -spacing.xs,
+  },
+  forgotPasswordText: {
+    color: colors.primary,
+    fontSize: typography.sizes.sm,
+    fontWeight: '600',
   },
 });

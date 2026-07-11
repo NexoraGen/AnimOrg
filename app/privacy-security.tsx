@@ -20,11 +20,16 @@ export default function PrivacySecurityScreen() {
   const { user } = useAppStore();
 
   const [isLoadingPassword, setIsLoadingPassword] = useState(false);
-  const [isLoadingEmail, setIsLoadingEmail] = useState(false);
   const [isLoadingDelete, setIsLoadingDelete] = useState(false);
 
+  const [passwordStep, setPasswordStep] = useState(0); // 0: CTA, 1: Verify, 2: Set New
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [newEmail, setNewEmail] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const isGoogleUser = firebaseAuthService.getCurrentUser()?.providerData?.some(
+    p => p.providerId === 'google.com'
+  ) || false;
 
   const triggerHaptic = (type: 'light' | 'success' | 'error' = 'light') => {
     if (Platform.OS !== 'web') {
@@ -38,10 +43,61 @@ export default function PrivacySecurityScreen() {
     }
   };
 
-  const handleUpdatePassword = async () => {
+  const handleVerifyCurrentPassword = async () => {
+    if (!currentPassword) {
+      triggerHaptic('error');
+      Alert.alert('Error', 'Please enter your current password.');
+      return;
+    }
+
+    setIsLoadingPassword(true);
+    try {
+      await firebaseAuthService.reauthenticate(currentPassword);
+      triggerHaptic('success');
+      setPasswordStep(2);
+    } catch (error) {
+      triggerHaptic('error');
+      Alert.alert('Verification Failed', 'Incorrect current password. Please try again.');
+    } finally {
+      setIsLoadingPassword(false);
+    }
+  };
+
+  const handleForgotCurrentPassword = async () => {
+    if (!user?.email) {
+      triggerHaptic('error');
+      Alert.alert('Error', 'Unable to retrieve your email address.');
+      return;
+    }
+
+    setIsLoadingPassword(true);
+    try {
+      await firebaseAuthService.sendPasswordResetEmail(user.email);
+      triggerHaptic('success');
+      Alert.alert(
+        'Email Sent',
+        `A password reset link has been sent to ${user.email}.`
+      );
+      setPasswordStep(0);
+      setCurrentPassword('');
+    } catch (error: any) {
+      triggerHaptic('error');
+      Alert.alert('Error', error.message || 'Failed to send password reset email.');
+    } finally {
+      setIsLoadingPassword(false);
+    }
+  };
+
+  const handleSaveNewPassword = async () => {
     if (!newPassword || newPassword.length < 6) {
       triggerHaptic('error');
-      Alert.alert('Error', 'Password must be at least 6 characters long.');
+      Alert.alert('Error', 'New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      triggerHaptic('error');
+      Alert.alert('Mismatch', 'Passwords do not match. Please verify your typing.');
       return;
     }
 
@@ -50,7 +106,10 @@ export default function PrivacySecurityScreen() {
       await firebaseAuthService.updatePassword(newPassword);
       triggerHaptic('success');
       Alert.alert('Success', 'Your password has been updated securely.');
+      setPasswordStep(0);
+      setCurrentPassword('');
       setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
       triggerHaptic('error');
       Alert.alert('Error', 'Failed to update password. Please try again.');
@@ -59,26 +118,7 @@ export default function PrivacySecurityScreen() {
     }
   };
 
-  const handleUpdateEmail = async () => {
-    if (!newEmail || !newEmail.includes('@')) {
-      triggerHaptic('error');
-      Alert.alert('Error', 'Please enter a valid email address.');
-      return;
-    }
 
-    setIsLoadingEmail(true);
-    try {
-      await firebaseAuthService.updateEmail(newEmail);
-      triggerHaptic('success');
-      Alert.alert('Success', 'Your email address has been updated.');
-      setNewEmail('');
-    } catch (error) {
-      triggerHaptic('error');
-      Alert.alert('Error', 'Failed to update email. Please try again.');
-    } finally {
-      setIsLoadingEmail(false);
-    }
-  };
 
   const handleLogoutAll = async () => {
     triggerHaptic();
@@ -140,49 +180,120 @@ export default function PrivacySecurityScreen() {
 
         <Text style={[styles.sectionTitle, { color: themeColors.primary }]}>ACCOUNT CREDENTIALS</Text>
 
-        {/* Email Update */}
-        <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-          <Text style={[styles.cardTitle, { color: themeColors.text }]}>Change Email Address</Text>
-          <Text style={[styles.cardDesc, { color: themeColors.textDim }]}>
-            Current Email: {user?.email || 'Not set'}
-          </Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
-            placeholder="New Email Address"
-            placeholderTextColor={themeColors.textDim}
-            value={newEmail}
-            onChangeText={setNewEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <Button
-            title="Update Email"
-            onPress={handleUpdateEmail}
-            isLoading={isLoadingEmail}
-            style={styles.cardButton}
-          />
-        </View>
+
 
         {/* Password Update */}
         <View style={[styles.card, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <Text style={[styles.cardTitle, { color: themeColors.text }]}>Change Password</Text>
-          <Text style={[styles.cardDesc, { color: themeColors.textDim }]}>
-            Ensure your account is using a long, random password to stay secure.
-          </Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
-            placeholder="New Password (min. 6 chars)"
-            placeholderTextColor={themeColors.textDim}
-            value={newPassword}
-            onChangeText={setNewPassword}
-            secureTextEntry
-          />
-          <Button
-            title="Update Password"
-            onPress={handleUpdatePassword}
-            isLoading={isLoadingPassword}
-            style={styles.cardButton}
-          />
+
+          {isGoogleUser ? (
+            <Text style={[styles.cardDesc, { color: themeColors.textDim, marginTop: spacing.xs }]}>
+              Your account is authenticated via Google. Password updates are managed by Google.
+            </Text>
+          ) : (
+            <>
+              {passwordStep === 0 && (
+                <>
+                  <Text style={[styles.cardDesc, { color: themeColors.textDim, marginBottom: spacing.md }]}>
+                    Ensure your account is using a long, random password to stay secure. Current password verification is required.
+                  </Text>
+                  <Button
+                    title="Change Password"
+                    onPress={() => {
+                      triggerHaptic();
+                      setPasswordStep(1);
+                    }}
+                    style={styles.cardButton}
+                  />
+                </>
+              )}
+
+              {passwordStep === 1 && (
+                <>
+                  <Text style={[styles.cardDesc, { color: themeColors.textDim }]}>
+                    Please enter your current password to verify identity.
+                  </Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
+                    placeholder="Current Password"
+                    placeholderTextColor={themeColors.textDim}
+                    value={currentPassword}
+                    onChangeText={setCurrentPassword}
+                    secureTextEntry
+                  />
+                  <TouchableOpacity
+                    onPress={handleForgotCurrentPassword}
+                    style={styles.forgotPasswordInline}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.forgotPasswordInlineText, { color: themeColors.primary }]}>Forgot password?</Text>
+                  </TouchableOpacity>
+                  <View style={styles.buttonGroup}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        triggerHaptic();
+                        setPasswordStep(0);
+                        setCurrentPassword('');
+                      }}
+                      style={[styles.cancelButton, { borderColor: themeColors.border }]}
+                    >
+                      <Text style={{ color: themeColors.textDim, fontWeight: '600' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Button
+                      title="Next"
+                      onPress={handleVerifyCurrentPassword}
+                      isLoading={isLoadingPassword}
+                      style={styles.flexButton}
+                    />
+                  </View>
+                </>
+              )}
+
+              {passwordStep === 2 && (
+                <>
+                  <Text style={[styles.cardDesc, { color: themeColors.textDim }]}>
+                    Enter and confirm your new password below.
+                  </Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
+                    placeholder="New Password (min. 6 chars)"
+                    placeholderTextColor={themeColors.textDim}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    secureTextEntry
+                  />
+                  <TextInput
+                    style={[styles.input, { backgroundColor: themeColors.background, color: themeColors.text, borderColor: themeColors.border }]}
+                    placeholder="Confirm New Password"
+                    placeholderTextColor={themeColors.textDim}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    secureTextEntry
+                  />
+                  <View style={styles.buttonGroup}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        triggerHaptic();
+                        setPasswordStep(0);
+                        setCurrentPassword('');
+                        setNewPassword('');
+                        setConfirmPassword('');
+                      }}
+                      style={[styles.cancelButton, { borderColor: themeColors.border }]}
+                    >
+                      <Text style={{ color: themeColors.textDim, fontWeight: '600' }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <Button
+                      title="Save New Password"
+                      onPress={handleSaveNewPassword}
+                      isLoading={isLoadingPassword}
+                      style={styles.flexButton}
+                    />
+                  </View>
+                </>
+              )}
+            </>
+          )}
         </View>
 
         <Text style={[styles.sectionTitle, { color: themeColors.primary, marginTop: spacing.xl }]}>SESSION MANAGEMENT</Text>
@@ -275,6 +386,31 @@ const styles = StyleSheet.create({
   },
   cardButton: {
     width: '100%',
+  },
+  buttonGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    height: 48,
+    borderWidth: 1,
+    paddingHorizontal: 20,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  flexButton: {
+    flex: 1,
+  },
+  forgotPasswordInline: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  forgotPasswordInlineText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   actionRow: {
     flexDirection: 'row',

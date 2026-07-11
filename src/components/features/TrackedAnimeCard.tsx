@@ -86,8 +86,8 @@ export const TrackedAnimeCard: React.FC<TrackedAnimeCardProps> = React.memo(({
 
                     {/* Bottom Row: Elegant Release Clocks */}
                     <View style={styles.bottomRow}>
-                        {excitingCountdown ? (
-                            <View style={styles.timerPill}>
+                        {excitingCountdown && (
+                            <View style={[styles.timerPill, releaseDate ? { marginRight: 6 } : null]}>
                                 <Feather name="clock" size={10} color={colors.primary} style={styles.clockIcon} />
                                 <Text style={[styles.timerText, { color: themeColors.textDim }]} numberOfLines={1}>
                                     {excitingCountdown.toLowerCase().includes('awaiting') || excitingCountdown.length > 18 ? (
@@ -97,12 +97,11 @@ export const TrackedAnimeCard: React.FC<TrackedAnimeCardProps> = React.memo(({
                                     )}
                                 </Text>
                             </View>
-                        ) : (
-                            releaseDate && (
-                                <Text style={styles.dateText} numberOfLines={1}>
-                                    {releaseDate}
-                                </Text>
-                            )
+                        )}
+                        {releaseDate && (
+                            <Text style={styles.dateText} numberOfLines={1}>
+                                {releaseDate}
+                            </Text>
                         )}
                     </View>
                 </View>

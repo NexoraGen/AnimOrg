@@ -66,6 +66,7 @@ export const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
         onPress={onPress}
         width={width}
         height={height}
+        disableEntryAnimation
       />
     );
   }, [renderItem, variant, onPress, width, height]);
@@ -89,9 +90,8 @@ export const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
           data={[1, 2, 3, 4, 5]}
           horizontal
           // @ts-ignore
-          estimatedItemSize={width}
+          estimatedItemSize={width + spacing.md}
           showsHorizontalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={{ width: spacing.sm }} />}
           renderItem={() => (
             <SkeletonLoader
               width={width}
@@ -106,16 +106,15 @@ export const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
           data={data as any}
           horizontal
           // @ts-ignore
-          estimatedItemSize={width}
+          estimatedItemSize={width + spacing.md}
           showsHorizontalScrollIndicator={false}
-          snapToInterval={itemWidth || (width + spacing.sm)}
+          snapToInterval={itemWidth || (width + spacing.md)}
           decelerationRate="fast"
           snapToAlignment="start"
-          ItemSeparatorComponent={() => <View style={{ width: spacing.sm }} />}
           renderItem={renderItemInternal}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
-          drawDistance={width * 2}
+          drawDistance={width * 3}
           removeClippedSubviews
           // @ts-ignore
           initialNumToRender={5}

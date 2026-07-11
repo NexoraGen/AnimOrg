@@ -239,6 +239,7 @@ export interface CommunityPost {
   episodeNumber?: number;
 
   createdAt: any; // Using Firestore Timestamp
+  updatedAt?: any; // Using Firestore Timestamp
   animeId?: string;
   animeTitle?: string;
 }

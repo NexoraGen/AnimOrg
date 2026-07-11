@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { spacing, borderRadius, typography } from '../../theme';
 import { ANIME_LOGO } from '../../constants/images';
+import { getAvatarSource } from '../../constants/avatars';
 
 type StreamingHeaderProps = {
   avatarUrl?: string;
@@ -41,7 +42,7 @@ export const StreamingHeader: React.FC<StreamingHeaderProps> = ({ avatarUrl, onA
       {showAvatar && (
         <TouchableOpacity onPress={onAvatarPress} style={styles.avatarWrapper}>
           <Image
-            source={avatarUrl ? { uri: avatarUrl } : require('../../../assets/guest-avatar.png')}
+            source={getAvatarSource(avatarUrl)}
             style={[styles.avatar, { borderColor: theme.primary }]}
             contentFit="cover"
             transition={300}

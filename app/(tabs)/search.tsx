@@ -72,6 +72,9 @@ export default function SearchScreen() {
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(true);
   const [isDiscoverMode, setIsDiscoverMode] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchLoadingText, setSearchLoadingText] = useState<string | null>(null);
+  const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
   const [recommendationResult, setRecommendationResult] = useState<RecommendationResult | null>(null);
   const [nextRecommendationMode, setNextRecommendationMode] = useState<'personalized' | 'community'>('personalized');
   const [showRecModal, setShowRecModal] = useState(false);
@@ -186,36 +189,53 @@ export default function SearchScreen() {
         }
         setIsLoading(false);
         setPage(1);
+        setSearchError(null);
+        setSearchLoadingText(null);
+        setSnackbarMessage(null);
         return;
       }
 
-      setIsLoading(true);
+      // Only wipe results & show skeleton if there are NO previous results to preserve
+      const hasPreviousResults = results.length > 0;
+      if (!hasPreviousResults) {
+        setIsLoading(true);
+      }
       setIsDiscoverMode(false);
       setPage(1);
+      setSearchError(null);
+      setSearchLoadingText("Searching...");
+      setSnackbarMessage(null);
+
       try {
-        // Parallel fetch for anime and characters utilizing strict thematic sorting boundaries
+        const onRetryStatus = (info: { attempt: number; maxAttempts: number; fallback: boolean; rawStatusMsg?: string }) => {
+          const msg = info.rawStatusMsg || "Temporary network issue. Retrying...";
+          setSearchLoadingText(msg);
+          if (hasPreviousResults) setSnackbarMessage(msg);
+        };
+
         const [animeResponse, charResponse] = await Promise.all([
-          animeApi.searchAnime(debouncedQuery, 1, selectedGenres, undefined, 'score', 'desc'),
+          animeApi.searchAnime(debouncedQuery, 1, selectedGenres, undefined, 'score', 'desc', onRetryStatus),
           debouncedQuery.trim() !== ''
-            ? animeApi.searchCharacters(debouncedQuery, 1)
+            ? animeApi.searchCharacters(debouncedQuery, 1).catch(err => {
+              console.warn("Character search failed silently:", err);
+              return { data: [], hasNextPage: false };
+            })
             : Promise.resolve({ data: [], hasNextPage: false })
         ]);
 
         setResults(animeResponse.data);
         setHasNextPage(animeResponse.hasNextPage);
+        setSnackbarMessage(null);
 
-        // Enhance character results with parent anime hints if they exist in anime results
-        const enhancedChars = charResponse.data.map(char => {
-          // Smart matching: see if any anime result matches the character's typical context
-          // Since Jikan list doesn't have it, we just provide what we have.
-          return char;
-        });
+        const enhancedChars = charResponse.data.map((char: any) => char);
         setCharacterResults(enhancedChars);
 
-      } catch (error) {
-        console.error('Search error:', error);
+      } catch (error: any) {
+        console.error('Search error (both providers failed):', error);
+        setSearchError(`Error: ${error?.message || error}\nStack: ${error?.stack || 'none'}`);
       } finally {
         setIsLoading(false);
+        setSearchLoadingText(null);
       }
     };
 
@@ -273,7 +293,7 @@ export default function SearchScreen() {
             returnKeyType="search"
           />
           {(query.length > 0 || selectedGenres.length > 0) && (
-            <TouchableOpacity onPress={() => { setQuery(''); setSelectedGenres([]); setResults([]); setCharacterResults([]); }} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => { setQuery(''); setSelectedGenres([]); setResults([]); setCharacterResults([]); setSearchError(null); }} activeOpacity={0.7}>
               <View style={[styles.clearButton, { backgroundColor: themeColors.surfaceVariant }]}>
                 <Feather name="x" color={themeColors.text} size={14} />
               </View>
@@ -297,8 +317,16 @@ export default function SearchScreen() {
           </View>
         )}
 
-        {isLoading ? (
-          <View style={styles.resultsGrid}>
+        {isLoading && results.length === 0 ? (
+          <View style={[styles.resultsGrid, { marginTop: spacing.xl, justifyContent: 'center' }]}>
+            {searchLoadingText && (
+              <View style={{ width: '100%', alignItems: 'center', marginBottom: spacing.xl }}>
+                <ActivityIndicator color={themeColors.primary} size="large" />
+                <Text style={{ color: themeColors.textMuted, marginTop: spacing.md, fontSize: 16 }}>
+                  {searchLoadingText}
+                </Text>
+              </View>
+            )}
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <SkeletonLoader
                 key={i}
@@ -352,9 +380,11 @@ export default function SearchScreen() {
                 {results.length === 0 && characterResults.length === 0 && !isLoading && (
                   <View style={{ alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.xl }}>
                     <Feather name="alert-circle" size={48} color={themeColors.textDim} style={{ marginBottom: spacing.md }} />
-                    <Text style={{ color: themeColors.textDim, fontSize: 16, textAlign: 'center', fontWeight: 'bold' }}>No results found.</Text>
+                    <Text style={{ color: themeColors.textDim, fontSize: 16, textAlign: 'center', fontWeight: 'bold' }}>
+                      {searchError ? "Oops!" : "No results found."}
+                    </Text>
                     <Text style={{ color: themeColors.textMuted, fontSize: 14, textAlign: 'center', marginTop: spacing.xs }}>
-                      (Jikan API may be overloaded. Please try again later or clear filters.)
+                      {searchError || "No anime found matching your search. Please try a different query or clear your filters."}
                     </Text>
                   </View>
                 )}
@@ -487,6 +517,31 @@ export default function SearchScreen() {
           router.push(`/details/${id}`);
         }}
       />
+
+      {/* Snackbar overlay for persistent retry statuses */}
+      {snackbarMessage && (
+        <View style={{
+          position: 'absolute',
+          bottom: insets.bottom + 120, // Sit above the tab bar comfortably
+          alignSelf: 'center',
+          backgroundColor: themeColors.surface,
+          paddingHorizontal: spacing.xl,
+          paddingVertical: spacing.md,
+          borderRadius: borderRadius.full,
+          flexDirection: 'row',
+          alignItems: 'center',
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 5,
+          borderWidth: 1,
+          borderColor: themeColors.border
+        }}>
+          <ActivityIndicator color={themeColors.primary} size="small" style={{ marginRight: spacing.md }} />
+          <Text style={{ color: themeColors.text, fontSize: 14, fontWeight: '600' }}>{snackbarMessage}</Text>
+        </View>
+      )}
     </AnimatedScreen>
   );
 }

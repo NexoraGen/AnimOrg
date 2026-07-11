@@ -20,6 +20,7 @@ import { colors, spacing, borderRadius } from '../../../theme';
 import { useThemeColors } from '../../../hooks/useThemeColors';
 import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
+import { getAvatarSource } from '../../../constants/avatars';
 
 const { width } = Dimensions.get('window');
 
@@ -35,17 +36,30 @@ const CATEGORY_DESCRIPTIONS: Record<PostCategory, string> = {
     Review: 'Reviews, impressions & ratings',
 };
 
+import { CommunityPost } from '../../../types';
+
+const extractHashtags = (text: string): string[] => {
+    const hashtags = text.match(/#[\w\u0590-\u05ff]+/g);
+    return hashtags ? hashtags.map(h => h.slice(1).toLowerCase()) : [];
+};
+
 interface PostComposerProps {
     onClose: () => void;
     onPostCreated?: () => void;
+    postToEdit?: CommunityPost;
+    onPostUpdated?: (updatedPost: CommunityPost) => void;
 }
 
-export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreated }) => {
+export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreated, postToEdit, onPostUpdated }) => {
     const theme = useThemeColors();
     const user = useAppStore(state => state.user);
 
-    const [content, setContent] = useState('');
-    const [category, setCategory] = useState<PostCategory | null>(null);
+    const [content, setContent] = useState(postToEdit?.content || '');
+    const [category, setCategory] = useState<PostCategory | null>(
+        postToEdit?.category
+            ? (postToEdit.category.charAt(0).toUpperCase() + postToEdit.category.slice(1)) as PostCategory
+            : null
+    );
     const [isPosting, setIsPosting] = useState(false);
 
     const handlePost = async () => {
@@ -66,22 +80,41 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
 
         setIsPosting(true);
         try {
-            await firestoreService.createCommunityPost({
-                userId: user.id,
-                username: user.username || 'Anonymous',
-                userAvatar: user.avatarUrl,
-                type: 'discussion',
-                category: category.toLowerCase(),
-                content: content.trim(),
-                hasSpoilers: false,
-            });
+            if (postToEdit) {
+                await firestoreService.updateCommunityPost(postToEdit.id, {
+                    content: content.trim(),
+                    category: category.toLowerCase(),
+                });
 
-            if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            onPostCreated?.();
-            onClose();
+                const updatedPost: CommunityPost = {
+                    ...postToEdit,
+                    content: content.trim(),
+                    category: category.toLowerCase(),
+                    hashtags: extractHashtags(content.trim()),
+                    updatedAt: new Date() as any, // local representation
+                };
+
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                onPostUpdated?.(updatedPost);
+                onClose();
+            } else {
+                await firestoreService.createCommunityPost({
+                    userId: user.id,
+                    username: user.username || 'Anonymous',
+                    userAvatar: user.avatarUrl,
+                    type: 'discussion',
+                    category: category.toLowerCase(),
+                    content: content.trim(),
+                    hasSpoilers: false,
+                });
+
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                onPostCreated?.();
+                onClose();
+            }
         } catch (error) {
             console.error(error);
-            Alert.alert('Error', 'Failed to create post. Please try again.');
+            Alert.alert('Error', postToEdit ? 'Failed to update post. Please try again.' : 'Failed to create post. Please try again.');
         } finally {
             setIsPosting(false);
         }
@@ -99,7 +132,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
                     <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                         <Feather name="x" size={24} color={theme.text} />
                     </TouchableOpacity>
-                    <Text style={[styles.headerTitle, { color: theme.text }]}>Create Post</Text>
+                    <Text style={[styles.headerTitle, { color: theme.text }]}>{postToEdit ? 'Edit Post' : 'Create Post'}</Text>
                     <TouchableOpacity
                         onPress={handlePost}
                         disabled={isPosting || !canPost}
@@ -111,7 +144,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
                         {isPosting ? (
                             <ActivityIndicator size="small" color="#fff" />
                         ) : (
-                            <Text style={[styles.postBtnText, { opacity: canPost ? 1 : 0.5 }]}>Post</Text>
+                            <Text style={[styles.postBtnText, { opacity: canPost ? 1 : 0.5 }]}>{postToEdit ? 'Save' : 'Post'}</Text>
                         )}
                     </TouchableOpacity>
                 </View>
@@ -119,8 +152,8 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
                 <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
                     <View style={styles.userRow}>
                         <Image
-                            source={user?.avatarUrl ? { uri: user.avatarUrl } : require('../../../../assets/guest-avatar.png')}
-                            style={styles.avatar}
+                            source={getAvatarSource(user?.avatarUrl)}
+                            style={styles.avatar as any}
                         />
                         <View>
                             <Text style={[styles.username, { color: theme.text }]}>{user?.username ? `@${user.username}` : '@guest'}</Text>
@@ -199,6 +232,12 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onClose, onPostCreat
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        ...Platform.select({
+            web: {
+                height: '100vh' as any,
+                width: '100vw' as any,
+            }
+        })
     },
     content: {
         flex: 1,

@@ -40,20 +40,20 @@ import { useAppStore } from '../../src/store/useAppStore';
 
 const { width } = Dimensions.get('window');
 
-const TABS = ['For You', 'Friend Activity', 'Latest', 'Discussions', 'Questions', 'Fun', 'News', 'Reviews', 'Recommendations'];
+const TABS = ['For You', 'Friend Activity', 'Discussions', 'Questions', 'Fun', 'News', 'Reviews', 'Recommendations'];
 
 export default function SocialScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const theme = useThemeColors();
     const user = useAppStore(state => state.user);
-
+    const watchlist = useAppStore(state => state.watchlist);
+    const getFavoriteGenres = useAppStore(state => state.getFavoriteGenres);
     const setModalActive = useAppStore(state => state.setModalActive);
 
-    const [activeTab, setActiveTab] = useState('For You');
+    const [activeTab, setActiveTab] = useState<string>('For You');
     const [showSearchView, setShowSearchView] = useState(false);
     const [posts, setPosts] = useState<CommunityPost[]>([]);
-    const [trendingTags, setTrendingTags] = useState<TrendingTag[]>([]);
     const [limitCount] = useState(10);
     const [hasMore, setHasMore] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
@@ -76,8 +76,6 @@ export default function SocialScreen() {
     }, [user]);
 
     useEffect(() => {
-        loadTrending();
-
         if (user) {
             const q = query(
                 collection(db, 'notifications'),
@@ -92,11 +90,6 @@ export default function SocialScreen() {
             return () => unsubscribe();
         }
     }, [user]);
-
-    const loadTrending = async () => {
-        const tags = await firestoreService.getTrendingHashtags();
-        setTrendingTags(tags);
-    };
 
     const fetchFeed = async (isLoadMore = false) => {
         if (showSearchView) return;
@@ -121,9 +114,10 @@ export default function SocialScreen() {
             };
 
             if (activeTab === 'For You') {
-                q = query(postsRef, orderBy('engagementScore', 'desc'), limit(limitCount));
+                // Fetch latest posts to score in-memory so the feed is never empty and personalizes dynamically
+                q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount * 3));
                 if (isLoadMore && lastVisible) {
-                    q = query(postsRef, orderBy('engagementScore', 'desc'), startAfter(lastVisible), limit(limitCount));
+                    q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(limitCount * 3));
                 }
             } else if (activeTab === 'Friend Activity') {
                 const followedIds = await firestoreService.getUserFollowing(user?.id || '');
@@ -137,12 +131,6 @@ export default function SocialScreen() {
                 q = query(activitiesRef, where('userId', 'in', chunkedIds), orderBy('timestamp', 'desc'), limit(limitCount));
                 if (isLoadMore && lastVisible) {
                     q = query(activitiesRef, where('userId', 'in', chunkedIds), orderBy('timestamp', 'desc'), startAfter(lastVisible), limit(limitCount));
-                }
-            } else if (activeTab === 'Latest') {
-                // All categories, newest first
-                q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
-                if (isLoadMore && lastVisible) {
-                    q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(limitCount));
                 }
             } else if (TAB_TO_CATEGORY[activeTab]) {
                 // Category-specific tabs — query only matching posts
@@ -180,10 +168,69 @@ export default function SocialScreen() {
                 fetchedPosts.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
             }
 
+            let finalPosts = fetchedPosts;
+            if (activeTab === 'For You') {
+                const favGenres = getFavoriteGenres() || [];
+                const userWatchlist = watchlist || [];
+
+                const scored = fetchedPosts.map(post => {
+                    let score = 0;
+
+                    // 1. Recency Decay (Max 10 pts, decays over 48 hours)
+                    const createdAt = post.createdAt?.toDate ? post.createdAt.toDate() : new Date(post.createdAt || Date.now());
+                    const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+                    const recencyBoost = Math.max(0, 10 - hoursOld * 0.2);
+                    score += recencyBoost;
+
+                    // 2. Engagement Metrics
+                    const engagement = (post.likes || 0) * 2 + (post.comments || 0) * 3 + (post.shares || 0) * 5;
+                    score += engagement;
+
+                    // 3. User Interest Personalization
+                    if (user) {
+                        // Tagged anime boost
+                        if (post.animeId) {
+                            const watchlistEntry = userWatchlist.find(item => String(item.mediaId) === String(post.animeId));
+                            if (watchlistEntry) {
+                                score += 15;
+                                if (watchlistEntry.status === 'watching') score += 10;
+                                if (watchlistEntry.isFavorite) score += 15;
+                            }
+                        }
+
+                        // Genre affinity match on hashtags
+                        if (post.hashtags && post.hashtags.length > 0) {
+                            const matchingGenres = post.hashtags.filter((tag: string) =>
+                                favGenres.some(fg => fg.toLowerCase() === tag.toLowerCase())
+                            );
+                            score += matchingGenres.length * 5;
+                        }
+
+                        // Tracked anime title mentioned in text
+                        const contentLower = (post.content || '').toLowerCase();
+                        userWatchlist.forEach(item => {
+                            if (item.title && contentLower.includes(item.title.toLowerCase())) {
+                                score += 8;
+                            }
+                        });
+                    }
+
+                    // 4. Randomization / freshness factor (0-5 pts) to prevent empty feel and add variety
+                    score += Math.random() * 5;
+
+                    return { ...post, recommendationScore: score };
+                });
+
+                // Sort by recommendationScore descending
+                scored.sort((a, b) => (b.recommendationScore || 0) - (a.recommendationScore || 0));
+                // Slice back to limitCount for standard page sizing
+                finalPosts = scored.slice(0, limitCount);
+            }
+
             if (isLoadMore) {
-                setPosts(prev => [...prev, ...fetchedPosts]);
+                setPosts(prev => [...prev, ...finalPosts]);
             } else {
-                setPosts(fetchedPosts);
+                setPosts(finalPosts);
             }
 
             if (snapshot.docs.length > 0) {
@@ -228,7 +275,6 @@ export default function SocialScreen() {
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        loadTrending();
         setLastVisible(null);
         fetchFeed(false);
     }, [activeTab, user]);
@@ -250,42 +296,6 @@ export default function SocialScreen() {
     const handleAnimePress = useCallback((id: string) => {
         router.push(`/details/${id}`);
     }, [router]);
-
-    const renderTrendingSection = () => (
-        <View style={styles.trendingSection}>
-            <View style={styles.sectionHeaderRow}>
-                <Feather name="trending-up" size={12} color={theme.primary} />
-                <Text style={[styles.sectionTitle, { color: theme.textDim }]}>TRENDING DISCUSSIONS</Text>
-            </View>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.trendingScroll}
-                style={styles.trendingScrollWrapper}
-            >
-                {trendingTags.map((tag) => (
-                    <TouchableOpacity
-                        key={tag.tag}
-                        style={[styles.trendingTag, { backgroundColor: `${theme.primary}12`, borderColor: `${theme.primary}25` }]}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={[styles.tagText, { color: theme.primary }]}>#{tag.tag}</Text>
-                        <View style={[styles.tagCountBadge, { backgroundColor: `${theme.primary}20` }]}>
-                            <Text style={[styles.tagCount, { color: theme.primary }]}>{tag.count}</Text>
-                        </View>
-                    </TouchableOpacity>
-                ))}
-                {trendingTags.length === 0 && ['Naruto', 'OnePiece', 'JJK', 'Theory', 'AnimeSocial'].map(tag => (
-                    <TouchableOpacity
-                        key={tag}
-                        style={[styles.trendingTag, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.05)' }]}
-                    >
-                        <Text style={[styles.tagText, { color: theme.textDim }]}>#{tag}</Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-        </View>
-    );
 
     return (
         <AnimatedScreen style={[styles.container, { backgroundColor: theme.background }]}>
@@ -376,12 +386,26 @@ export default function SocialScreen() {
                         data={posts}
                         decelerationRate="fast"
                         showsVerticalScrollIndicator={false}
-                        ListHeaderComponent={activeTab === 'For You' ? renderTrendingSection() : null}
+                        ListHeaderComponent={null}
                         renderItem={({ item }) => {
                             if (activeTab === 'Friend Activity' || ('timestamp' in item && 'type' in item && ['rated', 'reviewed', 'favorited', 'added', 'follow', 'watched'].includes(item.type as string))) {
                                 return <ActivityFeedCard activity={item as any} onPressProfile={handleProfilePress} onPressAnime={handleAnimePress} />;
                             }
-                            return <CommunityPostCard post={item as any} onAuthRequired={handleAuthRequired} onPressProfile={handleProfilePress} />;
+                            return (
+                                <CommunityPostCard
+                                    post={item as any}
+                                    onAuthRequired={handleAuthRequired}
+                                    onPressProfile={handleProfilePress}
+                                    onPostUpdated={(updatedPost) => {
+                                        setPosts((prev) =>
+                                            prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+                                        );
+                                    }}
+                                    onPostDeleted={(postId) => {
+                                        setPosts((prev) => prev.filter((p) => p.id !== postId));
+                                    }}
+                                />
+                            );
                         }}
                         keyExtractor={(item) => item.id}
                         contentContainerStyle={[

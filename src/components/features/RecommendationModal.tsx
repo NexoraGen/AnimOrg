@@ -49,7 +49,7 @@ export const RecommendationModal: React.FC<RecommendationModalProps> = ({
     isAdding = false
 }) => {
     const theme = useThemeColors();
-    const { height: screenHeight } = useWindowDimensions();
+    const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
     // Premium Netflix-style cross-fade and translation animation drivers
     const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -94,13 +94,19 @@ export const RecommendationModal: React.FC<RecommendationModalProps> = ({
     // Keep displaying the current recommendation card while loading standard background refreshes to prevent flickering
     const showCard = displayRec !== null;
 
+    // Dynamic image height: ~45% of the modal's computed height for a cinematic feel
+    const modalWidth = Math.min(screenWidth * 0.92, 500);
+    const targetModalHeight = Math.min(modalWidth * (16 / 9), (screenHeight - 80) * 0.92);
+    const imageHeight = Math.round(targetModalHeight * 0.58);
+
     return (
         <CinematicModal
             visible={visible}
             onClose={onClose}
             maxWidth={500}
+            phoneStyle={true}
         >
-            <View style={[styles.container, { maxHeight: screenHeight * 0.95 }]}>
+            <View style={styles.container}>
                 {isLoading && !showCard ? (
                     <View style={styles.loaderContainer}>
                         <ActivityIndicator size="large" color={theme.primary} />
@@ -108,85 +114,79 @@ export const RecommendationModal: React.FC<RecommendationModalProps> = ({
                     </View>
                 ) : displayRec ? (
                     <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], flex: 1 }}>
-                        <ScrollView
-                            showsVerticalScrollIndicator={false}
-                            bounces={false}
-                            style={{ flex: 1 }}
-                            contentContainerStyle={{ paddingBottom: 40, flexGrow: 1 }}
-                        >
-                            {/* Image Section */}
-                            <View style={styles.imageSection}>
-                                <Image
-                                    source={displayRec.anime.posterPath}
-                                    style={styles.poster}
-                                    contentFit="cover"
-                                    transition={400}
-                                />
-                                <LinearGradient
-                                    colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(28, 28, 30, 1)']}
-                                    style={styles.imageOverlay}
-                                />
-                                <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-                                    <View style={styles.closeIconWrapper}>
-                                        <Feather name="x" size={20} color="#FFF" />
-                                    </View>
-                                </TouchableOpacity>
-
-                                <View style={styles.headerBadges}>
-                                    <View style={[
-                                        styles.badge,
-                                        displayRec.mode === 'community' && { backgroundColor: '#E06600' }
-                                    ]}>
-                                        <Feather
-                                            name={displayRec.mode === 'community' ? "activity" : "user"}
-                                            size={10}
-                                            color="#FFF"
-                                            style={{ marginRight: 4 }}
-                                        />
-                                        <Text style={styles.badgeText}>
-                                            {displayRec.mode === 'community' ? '🔥 POPULAR AMONG COMMUNITY' : '✨ RECOMMENDED FOR YOU'}
-                                        </Text>
-                                    </View>
-                                    <View style={[styles.matchBadge, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-                                        <Feather name="target" size={10} color={colors.primary} />
-                                        <Text style={styles.matchBadgeText}>
-                                            {Math.min(98, Math.max(76, Math.floor(displayRec.score || 88)))}% MATCH
-                                        </Text>
-                                    </View>
+                        {/* Image Section — cinematic hero poster (FIXED position at the top) */}
+                        <View style={[styles.imageSection, { height: imageHeight }]}>
+                            <Image
+                                source={displayRec.anime.posterPath}
+                                style={styles.poster}
+                                contentFit="cover"
+                                transition={400}
+                                cachePolicy="memory-disk"
+                            />
+                            <LinearGradient
+                                colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(28, 28, 30, 1)']}
+                                style={styles.imageOverlay}
+                            />
+                            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                                <View style={styles.closeIconWrapper}>
+                                    <Feather name="x" size={20} color="#FFF" />
                                 </View>
+                            </TouchableOpacity>
 
-                                <View style={styles.titleOverlay}>
-                                    <Text style={styles.overlayTitle} numberOfLines={2}>
-                                        {displayRec.anime.title}
+                            <View style={styles.headerBadges}>
+                                <View style={[
+                                    styles.badge,
+                                    displayRec.mode === 'community' && { backgroundColor: '#E06600' }
+                                ]}>
+                                    <Feather
+                                        name={displayRec.mode === 'community' ? "activity" : "user"}
+                                        size={10}
+                                        color="#FFF"
+                                        style={{ marginRight: 4 }}
+                                    />
+                                    <Text style={styles.badgeText}>
+                                        {displayRec.mode === 'community' ? '🔥 POPULAR AMONG COMMUNITY' : '✨ RECOMMENDED FOR YOU'}
                                     </Text>
-                                    <View style={styles.ratingRow}>
-                                        <Feather name="star" size={16} color={colors.primary} fill={colors.primary} />
-                                        <Text style={styles.ratingTextOverlay}>{displayRec.anime.score || 'N/A'}</Text>
-                                        <Text style={styles.ratingLabelOverlay}>MAL Rating</Text>
-
-                                        {isLoading && (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color="#E50914"
-                                                style={{ marginLeft: 15 }}
-                                            />
-                                        )}
-                                    </View>
+                                </View>
+                                <View style={[styles.matchBadge, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                                    <Feather name="target" size={10} color={colors.primary} />
+                                    <Text style={styles.matchBadgeText}>
+                                        {Math.min(98, Math.max(76, Math.floor(displayRec.score || 88)))}% MATCH
+                                    </Text>
                                 </View>
                             </View>
 
-                            {/* Content Section */}
-                            <View style={styles.content}>
-                                <View style={styles.headerRow}>
-                                    <View style={styles.titleInfo}>
-                                        <View style={styles.metadata}>
-                                            <Text style={[styles.genres, { color: theme.textDim }]} numberOfLines={1}>
-                                                {displayRec.anime.genres.slice(0, 3).join(' • ')}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </View>
+                            <View style={styles.titleOverlay}>
+                                <Text style={styles.genresOverlay} numberOfLines={1}>
+                                    {displayRec.anime.genres.slice(0, 3).join(' • ')}
+                                </Text>
+                                <Text style={styles.overlayTitle} numberOfLines={2}>
+                                    {displayRec.anime.title}
+                                </Text>
+                                <View style={styles.ratingRow}>
+                                    <Feather name="star" size={16} color={colors.primary} fill={colors.primary} />
+                                    <Text style={styles.ratingTextOverlay}>{displayRec.anime.score || 'N/A'}</Text>
+                                    <Text style={styles.ratingLabelOverlay}>MAL Rating</Text>
 
+                                    {isLoading && (
+                                        <ActivityIndicator
+                                            size="small"
+                                            color="#E50914"
+                                            style={{ marginLeft: 15 }}
+                                        />
+                                    )}
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Content Section — scrollable text + actions */}
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            bounces={false}
+                            style={styles.scrollView}
+                            contentContainerStyle={styles.scrollContent}
+                        >
+                            <View style={styles.content}>
                                 {/* Reasoning Section */}
                                 <View style={[styles.reasoningCard, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
                                     <View style={styles.reasonHeader}>
@@ -276,11 +276,18 @@ const AnimatedLoadingText = () => {
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
         width: '100%',
-        flexShrink: 1,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        paddingBottom: 30,
     },
     loaderContainer: {
-        height: 380,
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         padding: spacing.xl,
@@ -292,7 +299,6 @@ const styles = StyleSheet.create({
         letterSpacing: 0.5,
     },
     imageSection: {
-        height: 320,
         width: '100%',
         position: 'relative',
     },
@@ -321,7 +327,7 @@ const styles = StyleSheet.create({
     },
     headerBadges: {
         position: 'absolute',
-        bottom: spacing.lg,
+        top: spacing.md,
         left: spacing.md,
         flexDirection: 'row',
         flexWrap: 'wrap',
@@ -359,7 +365,7 @@ const styles = StyleSheet.create({
     },
     titleOverlay: {
         position: 'absolute',
-        bottom: spacing.lg + 45,
+        bottom: spacing.md,
         left: spacing.md,
         right: spacing.md,
     },
@@ -390,12 +396,22 @@ const styles = StyleSheet.create({
         marginLeft: 2,
     },
     content: {
-        padding: spacing.xl,
-        paddingTop: 0,
-        marginTop: -10,
+        flex: 1,
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.xl,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.lg,
+    },
+    genresOverlay: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: 'rgba(255, 255, 255, 0.65)',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+        marginBottom: 6,
     },
     headerRow: {
-        marginBottom: spacing.md,
+        marginBottom: spacing.lg,
     },
     titleInfo: {
         flex: 1,
@@ -410,9 +426,9 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     reasoningCard: {
-        padding: spacing.md,
+        padding: spacing.lg,
         borderRadius: 16,
-        marginBottom: spacing.xl,
+        marginBottom: spacing.lg,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.05)',
     },
@@ -441,7 +457,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     actions: {
-        gap: spacing.md,
+        gap: spacing.lg,
     },
     mainActions: {
         flexDirection: 'row',
@@ -476,6 +492,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
     },
     errorContainer: {
+        flex: 1,
         padding: spacing.xxl,
         alignItems: 'center',
         justifyContent: 'center',

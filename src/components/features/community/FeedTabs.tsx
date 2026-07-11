@@ -14,8 +14,8 @@ export const FeedTabs: React.FC<FeedTabsProps> = ({ tabs, activeTab, onTabPress 
     const theme = useThemeColors();
 
     return (
-        <View style={styles.container}>
-            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={[styles.container, { backgroundColor: theme.background + 'F2' }]}>
+            <BlurView intensity={80} tint={theme.background === '#0B0B0B' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}

@@ -13,6 +13,7 @@ import { AnimatedScreen } from '../src/components/layout/AnimatedScreen';
 import { firestoreService } from '../src/services/firebase/firestore';
 import { useAppStore } from '../src/store/useAppStore';
 import { CommunityNotification } from '../src/types';
+import { getAvatarSource } from '../src/constants/avatars';
 
 export default function NotificationsScreen() {
     const router = useRouter();
@@ -116,7 +117,7 @@ export default function NotificationsScreen() {
                         >
                             <View style={styles.avatarContainer}>
                                 <Image
-                                    source={item.senderAvatar ? { uri: item.senderAvatar } : require('../assets/guest-avatar.png')}
+                                    source={getAvatarSource(item.senderAvatar)}
                                     style={styles.avatar}
                                 />
                                 <View style={[styles.iconBadge, { backgroundColor: icon.color }]}>

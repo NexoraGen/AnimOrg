@@ -15,17 +15,14 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { colors, spacing, borderRadius, typography } from '../src/theme';
 import { Button } from '../src/components/ui';
 import { useAppStore } from '../src/store/useAppStore';
 import { useThemeColors } from '../src/hooks/useThemeColors';
-import { ANIME_AVATARS } from '../src/constants/avatars';
+import { ANIME_AVATARS, getAvatarSource } from '../src/constants/avatars';
 import { CinematicModal } from '../src/components/layout/CinematicModal';
 import { firestoreService } from '../src/services/firebase/firestore';
-import { storage } from '../src/services/firebase/config';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -38,16 +35,15 @@ export default function EditProfileScreen() {
   const [bio, setBio] = useState(user?.bio || '');
 
   // Custom or Preset Selected Avatar
-  const [selectedAvatar, setSelectedAvatar] = useState<string>(user?.avatarUrl || ANIME_AVATARS[0].url);
-  const [localImageUri, setLocalImageUri] = useState<string | null>(null);
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(
+    user?.avatarUrl !== undefined && user?.avatarUrl !== null ? user.avatarUrl : ''
+  );
 
   // Custom Flow States
   const [isSaving, setIsSaving] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [permissionError, setPermissionError] = useState('');
 
   // Modals Visibility
   const [showSourceSheet, setShowSourceSheet] = useState(false);
@@ -56,9 +52,9 @@ export default function EditProfileScreen() {
   // Preset picker extra features state
   const [recentAvatars, setRecentAvatars] = useState<string[]>([]);
   const [recommendedAvatars] = useState<string[]>([
-    'https://cdn.myanimelist.net/images/characters/15/422168.jpg', // Gojo
-    'https://cdn.myanimelist.net/images/characters/13/283626.jpg', // Zoro
-    'https://cdn.myanimelist.net/images/characters/4/521360.jpg'   // Kaneki
+    'preset_1',
+    'preset_2',
+    'preset_3'
   ]);
 
   // Load recently used avatars on modal open
@@ -129,112 +125,15 @@ export default function EditProfileScreen() {
     return () => clearTimeout(timer);
   }, [username, user]);
 
-  // Gallery Picker Functionality
-  const handleChooseFromGallery = async () => {
-    setShowSourceSheet(false);
-    setPermissionError('');
-    setSaveError('');
-
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        setPermissionError('Allow Photo Library access to personalize your anime identity.');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1], // Perfect round square constraint
-        quality: 0.4,   // High optimization compression
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const pickedUri = result.assets[0].uri;
-        setLocalImageUri(pickedUri);
-        setSelectedAvatar(pickedUri); // Instant UX preview
-      }
-    } catch (err) {
-      console.error('Gallery pick failed:', err);
-      setSaveError('Failed to select image from your gallery.');
-    }
-  };
-
-  // Camera Capture Functionality
-  const handleTakePhoto = async () => {
-    setShowSourceSheet(false);
-    setPermissionError('');
-    setSaveError('');
-
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        setPermissionError('Allow camera access to personalize your anime identity.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.4,
-        cameraType: ImagePicker.CameraType.front // front camera focus
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const capturedUri = result.assets[0].uri;
-        setLocalImageUri(capturedUri);
-        setSelectedAvatar(capturedUri); // Instant preview
-      }
-    } catch (err) {
-      console.error('Camera capture failed:', err);
-      setSaveError('Failed to capture photo with your camera.');
-    }
-  };
-
-  // Overseeded Bucket Free-Tier Upload Logic
-  const uploadCustomAvatar = async (userId: string, localUri: string): Promise<string> => {
-    try {
-      const response = await Platform.select({
-        web: () => fetch(localUri),
-        default: () => fetch(localUri),
-      })();
-      const blob = await response.blob();
-
-      // Static filename guarantees self-overwrites on the bucket, saving free quota from leakages
-      const storageRef = ref(storage, `avatars/${userId}/avatar.jpg`);
-      await uploadBytes(storageRef, blob);
-      return await getDownloadURL(storageRef);
-    } catch (storageError) {
-      console.warn('[Storage] Upload failed, executing fallback:', storageError);
-      throw storageError;
-    }
-  };
-
   const handleSave = async () => {
     const cleanedUsername = username.trim().toLowerCase();
     if (!cleanedUsername || !!usernameError || isCheckingUsername) return;
 
     setIsSaving(true);
     setSaveError('');
-    setPermissionError('');
 
     try {
       let finalAvatarUrl = selectedAvatar;
-
-      // Check if user specified a new local custom image to upload
-      if (localImageUri && user?.id) {
-        setIsUploading(true);
-        try {
-          finalAvatarUrl = await uploadCustomAvatar(user.id, localImageUri);
-        } catch (uploadErr) {
-          console.error('[Upload] Custom photo upload error:', uploadErr);
-          setSaveError('Storage upload failed. Reverted to previous profile values safely.');
-          setIsSaving(false);
-          setIsUploading(false);
-          return; // Stop profile write to shield user values
-        }
-      }
 
       await updateProfile({
         username: cleanedUsername,
@@ -247,12 +146,10 @@ export default function EditProfileScreen() {
       setSaveError(error?.message || 'Failed to update profile. Please try again.');
     } finally {
       setIsSaving(false);
-      setIsUploading(false);
     }
   };
 
   const handleSelectPreset = async (url: string) => {
-    setLocalImageUri(null); // clears custom uploads
     setSelectedAvatar(url);
 
     // Save to AsyncStorage recently used
@@ -269,8 +166,7 @@ export default function EditProfileScreen() {
 
   const handleRemovePhoto = () => {
     setShowSourceSheet(false);
-    setLocalImageUri(null);
-    setSelectedAvatar(ANIME_AVATARS[0].url); // Saitama Preset Fallback
+    setSelectedAvatar('');
   };
 
   // Load all presets natively
@@ -325,7 +221,7 @@ export default function EditProfileScreen() {
               style={[styles.avatarInteractiveBox, { shadowColor: themeColors.primary }]}
             >
               <Image
-                source={selectedAvatar?.trim() ? { uri: selectedAvatar } : require('../assets/guest-avatar.png')}
+                source={getAvatarSource(selectedAvatar)}
                 style={[styles.mainAvatar, { borderColor: themeColors.primary }]}
                 contentFit="cover"
                 transition={300}
@@ -343,13 +239,6 @@ export default function EditProfileScreen() {
           </View>
 
           {/* User Feedback Alerts */}
-          {permissionError ? (
-            <View style={[styles.permissionToast, { backgroundColor: 'rgba(229, 9, 20, 0.12)', borderColor: themeColors.error }]}>
-              <Feather name="shield" size={16} color={themeColors.error} />
-              <Text style={[styles.permissionToastText, { color: themeColors.error }]}>{permissionError}</Text>
-            </View>
-          ) : null}
-
           {saveError ? (
             <View style={[styles.permissionToast, { backgroundColor: 'rgba(229, 9, 20, 0.12)', borderColor: themeColors.error }]}>
               <Feather name="alert-triangle" size={16} color={themeColors.error} />
@@ -450,16 +339,6 @@ export default function EditProfileScreen() {
             </View>
 
             <View style={styles.sourceSheetOptions}>
-              <TouchableOpacity style={styles.sourceOptionBtn} onPress={handleTakePhoto}>
-                <Feather name="camera" size={18} color={colors.primary} />
-                <Text style={styles.sourceOptionText}>Take Photo</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.sourceOptionBtn} onPress={handleChooseFromGallery}>
-                <Feather name="image" size={18} color={colors.primary} />
-                <Text style={styles.sourceOptionText}>Choose From Gallery</Text>
-              </TouchableOpacity>
-
               <TouchableOpacity
                 style={styles.sourceOptionBtn}
                 onPress={() => {
@@ -515,7 +394,7 @@ export default function EditProfileScreen() {
                       ]}
                       onPress={() => handleSelectPreset(url)}
                     >
-                      <Image source={{ uri: url }} style={styles.presetThumb} contentFit="cover" />
+                      <Image source={getAvatarSource(url)} style={styles.presetThumb} contentFit="cover" />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -535,7 +414,7 @@ export default function EditProfileScreen() {
                     ]}
                     onPress={() => handleSelectPreset(url)}
                   >
-                    <Image source={{ uri: url }} style={styles.presetThumb} contentFit="cover" />
+                    <Image source={getAvatarSource(url)} style={styles.presetThumb} contentFit="cover" />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -557,7 +436,7 @@ export default function EditProfileScreen() {
                   ]}
                 >
                   <Image
-                    source={{ uri: preset.url }}
+                    source={getAvatarSource(preset.url)}
                     style={styles.presetThumb}
                     contentFit="cover"
                   />
@@ -753,7 +632,7 @@ const styles = StyleSheet.create({
   // Custom Preset Modal Styles
   presetModalContainer: {
     padding: spacing.xl,
-    maxHeight: 580,
+    maxHeight: 640,
   },
   presetHeader: {
     alignItems: 'center',
@@ -807,7 +686,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   presetScrollView: {
-    maxHeight: 220,
+    maxHeight: 320,
     marginBottom: spacing.md,
   },
   presetGrid: {

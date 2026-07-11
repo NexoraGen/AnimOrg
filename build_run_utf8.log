@@ -1,0 +1,31 @@
+﻿node.exe : Γÿà 
+eas-cli@20.5.1 is now 
+available.
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Γÿà eas-cli@2   
+ 0.5.1 is now avail    
+able.:String) [],     
+RemoteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+To upgrade, run:
+npm install -g eas-cli
+Proceeding with 
+outdated version.
+
+Unsupported platform, macOS or Linux is required to build apps for Android
+    Error: build 
+command failed.

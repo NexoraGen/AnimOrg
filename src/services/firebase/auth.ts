@@ -10,9 +10,12 @@ import {
   User as FirebaseUser,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithCredential
+  signInWithCredential,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from 'firebase/auth';
 import { Platform } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { auth } from './config';
 import { firestoreService } from './firestore';
 import { getRandomAnimeAvatar } from '../../constants/avatars';
@@ -82,6 +85,13 @@ export const firebaseAuthService = {
 
   // Logout
   logout: async () => {
+    try {
+      if (Platform.OS !== 'web') {
+        await GoogleSignin.signOut();
+      }
+    } catch (e) {
+      console.warn('[AuthService] Google Sign-Out error during logout:', e);
+    }
     await signOut(auth);
   },
 
@@ -102,6 +112,14 @@ export const firebaseAuthService = {
     return true;
   },
 
+  reauthenticate: async (password: string) => {
+    const user = auth.currentUser;
+    if (!user || !user.email) throw new Error('No user logged in');
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+    return true;
+  },
+
   updateEmail: async (newEmail: string) => {
     if (!auth.currentUser) throw new Error('No user logged in');
     await fbUpdateEmail(auth.currentUser, newEmail);
@@ -119,6 +137,13 @@ export const firebaseAuthService = {
       // In a real production app we'd use a Cloud Function for deep cleanup
     } catch (e) {
       console.warn('Failed to mark profile as deleted:', e);
+    }
+    try {
+      if (Platform.OS !== 'web') {
+        await GoogleSignin.signOut();
+      }
+    } catch (e) {
+      console.warn('[AuthService] Google Sign-Out error during account deletion:', e);
     }
     await deleteUser(user);
     return true;
@@ -175,6 +200,13 @@ export const firebaseAuthService = {
     // For this pass, we'll just sign out the current user and 
     // maybe set a 'reauthRequired' flag in Firestore if we wanted to be fancy.
     // Let's stick to local logout for now but keep the method name for the UI.
+    try {
+      if (Platform.OS !== 'web') {
+        await GoogleSignin.signOut();
+      }
+    } catch (e) {
+      console.warn('[AuthService] Google Sign-Out error during logoutAllDevices:', e);
+    }
     await signOut(auth);
   },
 };

@@ -29,11 +29,24 @@ if (Platform.OS === 'web') {
 }
 
 // Ensure offline persistence is heavily enforced for Resilience & Reliability mode
-const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager() // Native/Web-safe resilient offline local caching
-    })
-});
+// Fallback gracefully to memory-only database connection if IndexedDB/Quota limits prevent persistence initialization
+let dbInstance;
+try {
+    dbInstance = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager() // Native/Web-safe resilient offline local caching
+        })
+    });
+} catch (e) {
+    console.warn("Firestore offline persistence failed to initialize (Quota or Environment issue), falling back to standard memory cache:", e);
+    try {
+        const { getFirestore } = require('firebase/firestore');
+        dbInstance = getFirestore(app);
+    } catch (innerErr) {
+        dbInstance = initializeFirestore(app, {});
+    }
+}
+const db = dbInstance;
 
 const storage = getStorage(app);
 

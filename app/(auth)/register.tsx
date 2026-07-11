@@ -114,6 +114,12 @@ export default function RegisterScreen() {
         const playServicesStatus = await GoogleSignin.hasPlayServices();
         console.log('[GoogleSignin] hasPlayServices result:', playServicesStatus);
 
+        try {
+          await GoogleSignin.signOut();
+        } catch (e) {
+          // Ignore
+        }
+
         console.log('[GoogleSignin] Starting signIn()...');
         const response = await GoogleSignin.signIn();
         console.log('[GoogleSignin] signIn() response:', JSON.stringify({

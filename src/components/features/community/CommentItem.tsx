@@ -7,6 +7,7 @@ import { useThemeColors } from '../../../hooks/useThemeColors';
 import { PostComment } from '../../../types';
 import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
+import { getAvatarSource } from '../../../constants/avatars';
 import { formatDistanceToNow } from 'date-fns';
 
 interface CommentItemProps {
@@ -47,7 +48,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, onReply, post
 
     const indent = (comment.depth || 0) * 20;
 
-    const commentAvatar = comment.userId === user?.id && user?.avatarUrl ? { uri: user.avatarUrl } : (comment.userAvatar ? { uri: comment.userAvatar } : require('../../../../assets/guest-avatar.png'));
+    const commentAvatar = getAvatarSource(comment.userId === user?.id && user?.avatarUrl ? user.avatarUrl : comment.userAvatar);
     const commentUsername = comment.userId === user?.id && user?.username ? user.username : comment.username;
 
     return (

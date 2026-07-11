@@ -6,6 +6,7 @@ import { useThemeColors } from '../../../hooks/useThemeColors';
 import { spacing, borderRadius } from '../../../theme';
 import { User } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
+import { getAvatarSource } from '../../../constants/avatars';
 
 interface UserSearchCardProps {
     user: User;
@@ -41,7 +42,7 @@ export const UserSearchCard: React.FC<UserSearchCardProps> = React.memo(({ user,
             onPress={() => router.push(`/user/${user.id}`)}
         >
             <Image
-                source={isMe && currentUser?.avatarUrl ? { uri: currentUser.avatarUrl } : (user.avatarUrl?.trim() ? { uri: user.avatarUrl } : require('../../../../assets/guest-avatar.png'))}
+                source={getAvatarSource(isMe ? currentUser?.avatarUrl : user.avatarUrl)}
                 style={styles.avatar}
                 contentFit="cover"
             />

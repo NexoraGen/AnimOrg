@@ -8,6 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
+import { getAvatarSource } from '../../../constants/avatars';
 
 interface PostHeaderProps {
     username: string;
@@ -16,6 +17,7 @@ interface PostHeaderProps {
     type?: string;
     userId: string;
     onPressProfile?: () => void;
+    onPressMenu?: () => void;
 }
 
 export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
@@ -24,7 +26,8 @@ export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
     timestamp,
     type,
     userId,
-    onPressProfile
+    onPressProfile,
+    onPressMenu
 }) => {
     const theme = useThemeColors();
     const currentUser = useAppStore(state => state.user);
@@ -65,7 +68,7 @@ export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
             <View style={styles.left}>
                 <TouchableOpacity onPress={onPressProfile} activeOpacity={0.8} delayPressIn={150}>
                     <Image
-                        source={avatarUrl ? { uri: avatarUrl } : require('../../../../assets/guest-avatar.png')}
+                        source={getAvatarSource(avatarUrl)}
                         style={styles.avatar}
                         contentFit="cover"
                         cachePolicy="memory-disk"
@@ -105,9 +108,11 @@ export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
                     </View>
                 </View>
             </View>
-            <TouchableOpacity>
-                <Feather name="more-horizontal" size={20} color={theme.textDim} />
-            </TouchableOpacity>
+            {currentUser?.id === userId && (
+                <TouchableOpacity onPress={onPressMenu}>
+                    <Feather name="more-horizontal" size={20} color={theme.textDim} />
+                </TouchableOpacity>
+            )}
         </View>
     );
 });

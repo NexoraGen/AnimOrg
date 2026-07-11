@@ -12,7 +12,8 @@ import {
   Animated,
   Platform,
   useWindowDimensions,
-  Alert
+  Alert,
+  TextInput
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -42,13 +43,13 @@ import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { CinematicModal } from '../../src/components/layout/CinematicModal';
 import { CharacterCard } from '../../src/components/features/CharacterCard';
 import { animeApi } from '../../src/services/animeApi';
-import { jikanApi } from '../../src/services/api/jikan';
 import { firestoreService } from '../../src/services/firebase/firestore';
 import { Media, Character, WatchStatus, Review } from '../../src/types';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { formatRating, hasValidRating } from '../../src/utils/formatters';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_BACKDROP } from '../../src/constants/images';
+import { EpisodeCountRegistry } from '../../src/utils/episodeCountSync';
 
 // ─── PAGE-LEVEL SAFETY NET ─────────────────────────────────────────────────
 // Wraps the entire screen so crashes never bubble up to the global layout boundary.
@@ -183,6 +184,7 @@ function DetailsScreenInner() {
   const setModalActive = useAppStore(state => state.setModalActive);
 
   const shareScale = useRef(new Animated.Value(1)).current;
+  const isInputFocused = useRef(false);
 
   const [media, setMedia] = useState<Media | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -194,10 +196,27 @@ function DetailsScreenInner() {
   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
   const [isPostingReview, setIsPostingReview] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [inputValue, setInputValue] = useState('');
 
   useEffect(() => {
     setModalActive(isStatusModalVisible);
   }, [isStatusModalVisible]);
+
+  // Reactive subscription: when EpisodeCountRegistry discovers a higher count
+  // (e.g. via EpisodeList fetching episode 1168), update this page's media state.
+  useEffect(() => {
+    const unsubscribe = EpisodeCountRegistry.subscribe((animeId, count) => {
+      if (String(animeId) === String(id)) {
+        setMedia(prev => {
+          if (prev && (!prev.episodes || prev.episodes < count)) {
+            return { ...prev, episodes: count };
+          }
+          return prev;
+        });
+      }
+    });
+    return unsubscribe;
+  }, [id]);
 
   const fetchDetails = React.useCallback(async () => {
     if (!id) {
@@ -208,7 +227,26 @@ function DetailsScreenInner() {
     setIsLoading(true);
     try {
       // 1. MUST FETCH METADATA FIRST
-      const data = await animeApi.getAnimeDetails(id);
+      const data = await animeApi.getAnimeDetails(id, (updatedData) => {
+        if (updatedData) {
+          setMedia(prev => {
+            if (!prev) return updatedData;
+            const maxEpisodes = Math.max(prev.episodes || 0, updatedData.episodes || 0);
+            return {
+              ...prev,
+              ...updatedData,
+              episodes: maxEpisodes
+            };
+          });
+          if (updatedData.trailerData) {
+            trailerService.resolveTrailerUrl(updatedData.id, updatedData.title, updatedData.trailerData).then(url => {
+              if (url) {
+                setMedia(curr => curr ? { ...curr, trailerUrl: url } : null);
+              }
+            }).catch(() => { });
+          }
+        }
+      });
 
       if (!data) {
         console.warn(`Detail data was null for ID: ${id}`);
@@ -216,9 +254,45 @@ function DetailsScreenInner() {
         return;
       }
 
+      try {
+        await EpisodeCountRegistry.init();
+        const knownCount = EpisodeCountRegistry.getKnownCount(id);
+        if (knownCount && (!data.episodes || data.episodes < knownCount)) {
+          data.episodes = knownCount;
+        }
+      } catch (e) {
+        console.warn('Failed to parse EpisodeCountRegistry in details:', e);
+      }
+
       // Set initial media data so user sees content quickly
       setMedia(data);
       addToRecentlyViewed(data);
+
+      // Self-healing: Correct corrupted watchlist item episodes (e.g. 100) back to actual API metadata value
+      const tracked = watchlist.find(item => String(item.mediaId) === String(id));
+      if (tracked && data.episodes && data.episodes > 0 && tracked.episodes !== data.episodes) {
+        console.log(`[Self-Healing] Correcting episode count for ${data.title} from ${tracked.episodes} to ${data.episodes}`);
+
+        // Update local store state
+        useAppStore.setState({
+          watchlist: watchlist.map(item =>
+            String(item.mediaId) === String(id) ? { ...item, episodes: data.episodes } : item
+          )
+        });
+
+        // Sync back to Firestore if user is logged in
+        if (user?.id) {
+          const updatedTracked = useAppStore.getState().watchlist.find(item => String(item.mediaId) === String(id));
+          if (updatedTracked) {
+            firestoreService.addToWatchlist(user.id, updatedTracked).catch(err => {
+              console.warn('[Self-Healing] Firestore sync failed:', err);
+            });
+            firestoreService.syncTrackedAnime(user.id, updatedTracked).catch(err => {
+              console.warn('[Self-Healing] Firestore sync status failed:', err);
+            });
+          }
+        }
+      }
 
       // 2. FETCH SUPPLEMENTAL DATA ASYNCHRONOUSLY (social/tracking)
       Promise.allSettled([
@@ -230,7 +304,7 @@ function DetailsScreenInner() {
         animeApi.getAnimeRecommendations(id),
         // Phase 17: Proactive fetch for global episode total count (critical for ongoing shows like One Piece)
         data.status === 'Currently Airing' || data.episodes === null
-          ? jikanApi.getAnimeEpisodes(id, 1)
+          ? animeApi.getAnimeEpisodes(id)
           : Promise.resolve(null)
       ]).then((results) => {
         if (results[0].status === 'fulfilled') setReviews(results[0].value as Review[]);
@@ -249,7 +323,11 @@ function DetailsScreenInner() {
         if (results[6].status === 'fulfilled' && results[6].value) {
           const epData = results[6].value as any;
           if (epData.totalCount) {
-            setMedia(curr => curr ? { ...curr, episodes: epData.totalCount } : null);
+            setMedia(curr => {
+              if (!curr) return null;
+              const maxVal = Math.max(curr.episodes || 0, epData.totalCount);
+              return { ...curr, episodes: maxVal };
+            });
           }
         }
       }).catch(err => {
@@ -272,6 +350,15 @@ function DetailsScreenInner() {
       }
     }
   }, [id, userRatings]);
+
+  useEffect(() => {
+    if (isInputFocused.current) return;
+    if (userRating !== null) {
+      setInputValue(userRating.toFixed(1));
+    } else {
+      setInputValue('');
+    }
+  }, [userRating]);
 
   useEffect(() => {
     fetchDetails();
@@ -326,6 +413,43 @@ function DetailsScreenInner() {
     rateAnime(id, score, media);
     showToast(`Rating saved: ${score}/10`);
     triggerHaptic('success');
+  };
+
+  const handleInputValueChange = (text: string) => {
+    if (!user || !media) return;
+    // Allow numbers and a single decimal point
+    const formatted = text.replace(/[^0-9.]/g, '');
+
+    // Handle multiple decimal points
+    const parts = formatted.split('.');
+    if (parts.length > 2) return;
+
+    setInputValue(formatted);
+
+    const parsed = parseFloat(formatted);
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 10) {
+      setUserRating(parsed);
+      rateAnime(id, parsed, media);
+    }
+  };
+
+  const handleInputBlur = () => {
+    if (!user || !media) return;
+    const parsed = parseFloat(inputValue);
+    if (isNaN(parsed) || parsed < 0 || parsed > 10) {
+      if (userRating !== null) {
+        setInputValue(userRating.toFixed(1));
+      } else {
+        setInputValue('');
+      }
+    } else {
+      const formattedValue = parsed.toFixed(1);
+      setInputValue(formattedValue);
+      setUserRating(parsed);
+      rateAnime(id, parsed, media);
+      showToast(`Rating saved: ${formattedValue}/10`);
+      triggerHaptic('success');
+    }
   };
 
   const handlePostReview = async (text: string, rating: number, isSpoiler: boolean) => {
@@ -516,12 +640,33 @@ function DetailsScreenInner() {
             {/* Rating Section (Phase 4.6) */}
             <View style={[styles.ratingSection, { backgroundColor: themeColors.surfaceVariant }]}>
               <Text style={[styles.ratingLabel, { color: themeColors.text }]}>Your Rating</Text>
-              <StarRating
-                rating={userRating || 0}
-                interactive
-                size={28}
-                onChange={handleRatingChange}
-              />
+              <View style={styles.starsRow}>
+                <StarRating
+                  rating={userRating || 0}
+                  interactive
+                  size={28}
+                  onChange={handleRatingChange}
+                />
+              </View>
+              <View style={styles.decimalInputContainer}>
+                <TextInput
+                  style={[styles.decimalInput, { color: themeColors.text, borderColor: themeColors.border, backgroundColor: themeColors.background }]}
+                  value={inputValue}
+                  onChangeText={handleInputValueChange}
+                  onFocus={() => {
+                    isInputFocused.current = true;
+                  }}
+                  onBlur={() => {
+                    isInputFocused.current = false;
+                    handleInputBlur();
+                  }}
+                  keyboardType="numeric"
+                  placeholder="0.0"
+                  placeholderTextColor={themeColors.textDim}
+                  maxLength={4}
+                />
+                <Text style={[styles.slashTen, { color: themeColors.textMuted }]}>/ 10</Text>
+              </View>
               <Text style={[styles.ratingSubtext, { color: themeColors.textMuted }]}>
                 {userRating ? `You rated this ${userRating}/10` : 'Tap to rate'}
               </Text>
@@ -618,6 +763,13 @@ function DetailsScreenInner() {
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => <CharacterCard character={item} />}
                     contentContainerStyle={{ paddingHorizontal: spacing.md }}
+                    initialNumToRender={5}
+                    maxToRenderPerBatch={10}
+                    windowSize={5}
+                    removeClippedSubviews={true}
+                    scrollEventThrottle={16}
+                    keyboardShouldPersistTaps="handled"
+                    getItemLayout={(data, index) => ({ length: 156, offset: 156 * index, index })}
                   />
                 </View>
               )}
@@ -1042,5 +1194,29 @@ const styles = StyleSheet.create({
   },
   reviewsList: {
     marginTop: spacing.md,
+  },
+  starsRow: {
+    marginBottom: spacing.md,
+  },
+  decimalInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  decimalInput: {
+    width: 64,
+    height: 40,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    textAlign: 'center',
+    fontSize: typography.sizes.md,
+    fontWeight: 'bold',
+    paddingVertical: 0, // prevents vertical shift in android
+  },
+  slashTen: {
+    fontSize: typography.sizes.md,
+    fontWeight: 'bold',
+    marginLeft: spacing.sm,
   }
 });

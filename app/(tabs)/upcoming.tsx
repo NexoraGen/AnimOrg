@@ -86,18 +86,10 @@ export default function UpcomingScreen() {
     // ═══════════════════════════════════════════════════════
     const syncTrackedReleases = async (fullSchedule: Media[], upcomingSeasonList: Media[] = []) => {
         if (isAuthenticated && watchlist.length > 0) {
-            const relevantStatuses = ['watching', 'plan-to-watch', 'completed'];
-            const tracked = watchlist.filter(item => relevantStatuses.includes(item.status));
-            const soon: any[] = [], weekly: any[] = [], upcoming: any[] = [], awaiting: any[] = [];
+            // Strictly track anime in the user's "Watching" list
+            const tracked = watchlist.filter(item => item.status === 'watching');
+            const soon: any[] = [], weekly: any[] = [];
             const now = Date.now();
-
-            let sequalSourceList = upcomingSeasonList;
-            if (sequalSourceList.length === 0) {
-                try {
-                    const cachedUp = await AsyncStorage.getItem('animorg_upcoming_seasons_cache');
-                    if (cachedUp) sequalSourceList = JSON.parse(cachedUp).anime || [];
-                } catch (e) { console.warn('[ReleaseHub] cache error:', e); }
-            }
 
             tracked.forEach(w => {
                 const wId = String(w.mediaId);
@@ -107,89 +99,74 @@ export default function UpcomingScreen() {
                 const progress = animeProgress[wId] || { lastWatchedEpisode: 0 };
                 const lastWatched = progress.lastWatchedEpisode || 0;
 
-                if (w.status === 'completed') {
-                    const matchTitle = w.title.toLowerCase().trim();
-                    const sequel = sequalSourceList.find(up => {
-                        const upTitle = up.title.toLowerCase().trim();
-                        return upTitle.includes(matchTitle) && up.id !== wId;
-                    });
-                    if (sequel?.airing_start) {
-                        const premTime = new Date(sequel.airing_start).getTime();
-                        const diffDays = Math.ceil((premTime - now) / (24 * 60 * 60 * 1000));
-                        if (diffDays > 0) {
-                            upcoming.push({
-                                id: sequel.id, title: sequel.title,
-                                posterPath: sequel.posterPath || w.posterPath,
-                                statusText: `Premiering: ${new Date(sequel.airing_start).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`,
-                                nextEp: 'New Season', countdown: `${diffDays} days`,
-                                broadcast: sequel.broadcast, badge: 'NEW SEASON', badgeColor: '#FFD700',
-                            });
-                            return;
-                        }
-                    }
-                    if (w.mediaStatus?.toLowerCase() !== 'finished airing') {
-                        awaiting.push({
-                            id: wId, title: w.title, posterPath: w.posterPath,
-                            statusText: 'Release date not announced yet', nextEp: 'Completed',
-                            countdown: 'No announced sequels', badge: 'AWAITING', badgeColor: themeColors.textDim
-                        });
-                    }
+                // Do not show completed or finished airing anime
+                if (w.status === 'completed' || w.mediaStatus?.toLowerCase() === 'finished airing' || w.mediaStatus?.toLowerCase() === 'finished') {
                     return;
                 }
 
-                if (airingNow?.airing_start && airingNow?.broadcast?.day) {
-                    const jstStart = new Date(airingNow.airing_start);
-                    let targetEp = lastWatched + 1;
-                    let targetTime = jstStart.getTime() + (targetEp - 1) * 7 * 24 * 60 * 60 * 1000;
+                const source = (airingNow || w) as Media;
+                let targetEp = 0;
+                let targetTime = 0;
+
+                if (source?.nextAiringEpisode?.airingAt) {
+                    targetEp = source.nextAiringEpisode.episode;
+                    targetTime = source.nextAiringEpisode.airingAt * 1000;
+                } else if (source?.airing_start && source?.broadcast?.day) {
+                    const jstStart = new Date(source.airing_start);
+                    targetEp = lastWatched + 1;
+                    targetTime = jstStart.getTime() + (targetEp - 1) * 7 * 24 * 60 * 60 * 1000;
                     let loopCount = 0;
                     while (targetTime < now && loopCount < 1000) {
                         targetEp++;
                         targetTime = jstStart.getTime() + (targetEp - 1) * 7 * 24 * 60 * 60 * 1000;
                         loopCount++;
                     }
+                }
+
+                if (targetTime > 0) {
                     const diffMs = targetTime - now;
-                    if (diffMs > 0) {
-                        const diffMinutes = Math.floor(diffMs / 60000);
+                    // Allow up to a 2 hour window post-release
+                    if (diffMs > -2 * 60 * 60 * 1000) {
+                        const diffMinutes = Math.floor(Math.abs(diffMs) / 60000);
                         const diffHours = Math.floor(diffMinutes / 60);
                         const diffDays = Math.floor(diffHours / 24);
-                        let countdownStr = diffDays > 0 ? `${diffDays}d ${diffHours % 24}h`
-                            : diffHours > 0 ? `${diffHours}h ${diffMinutes % 60}m` : `${diffMinutes}m`;
+
+                        let countdownStr = '';
+                        if (diffMs <= 0) {
+                            countdownStr = diffMs > -2 * 60 * 60 * 1000 ? 'Airing Now' : 'Released';
+                        } else {
+                            countdownStr = diffDays > 0 ? `${diffDays}d ${diffHours % 24}h`
+                                : diffHours > 0 ? `${diffHours}h ${diffMinutes % 60}m` : `${diffMinutes}m`;
+                        }
 
                         const targetDate = new Date(targetTime);
+                        const formattedDateStr = targetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
                         const formattedTime = targetDate.toLocaleTimeString(undefined, {
                             weekday: 'short', hour: '2-digit', minute: '2-digit'
                         });
 
                         let badge = 'THIS WEEK', badgeColor = '#4CD964';
-                        if (diffMs <= 24 * 60 * 60 * 1000) { badge = 'TODAY'; badgeColor = colors.primary; }
+                        if (diffMs <= 0) { badge = 'NOW'; badgeColor = colors.primary; }
+                        else if (diffMs <= 24 * 60 * 60 * 1000) { badge = 'TODAY'; badgeColor = colors.primary; }
                         else if (diffMs <= 48 * 60 * 60 * 1000) { badge = 'TOMORROW'; badgeColor = '#FF9500'; }
 
                         const enrichedItem = {
                             id: wId, title: w.title, posterPath: w.posterPath,
                             nextEp: `Episode ${targetEp}`, countdown: countdownStr,
-                            releaseTime: formattedTime, timestamp: targetTime,
-                            broadcast: airingNow.broadcast, badge, badgeColor,
-                            genres: airingNow.genres || [],
+                            releaseTime: `${formattedDateStr} • ${formattedTime}`, timestamp: targetTime,
+                            broadcast: source.broadcast, badge, badgeColor,
+                            genres: source.genres || w.genres || [],
                         };
                         if (diffMs <= 72 * 60 * 60 * 1000) soon.push(enrichedItem);
                         else weekly.push(enrichedItem);
-                        return;
                     }
-                }
-
-                if (w.mediaStatus?.toLowerCase() !== 'finished airing') {
-                    awaiting.push({
-                        id: wId, title: w.title, posterPath: w.posterPath,
-                        statusText: 'Release date not announced yet', nextEp: 'Awaiting Schedule',
-                        countdown: 'Awaiting official release schedule', badge: 'AWAITING', badgeColor: themeColors.textDim
-                    });
                 }
             });
 
             soon.sort((a, b) => a.timestamp - b.timestamp);
             weekly.sort((a, b) => a.timestamp - b.timestamp);
             setReleasingSoon(soon); setThisWeek(weekly);
-            setUpcomingSeasons(upcoming); setAwaitingSchedule(awaiting);
+            setUpcomingSeasons([]); setAwaitingSchedule([]);
         } else {
             setReleasingSoon([]); setThisWeek([]);
             setUpcomingSeasons([]); setAwaitingSchedule([]);
@@ -237,13 +214,15 @@ export default function UpcomingScreen() {
 
             if (!isCacheFresh || isBackground) {
                 const freshSchedule = await animeApi.getAiringSchedule(undefined, (freshList) => {
-                    const currentlyAiring = freshList.filter(item => item.status?.toLowerCase() === 'currently airing');
+                    const currentlyAiring = freshList.filter(item => item.status?.toLowerCase() !== 'finished airing' && item.status?.toLowerCase() !== 'finished');
+                    console.log(`[ReleaseHub Debug] callback: loaded ${freshList.length} total, filtered currentlyAiring count: ${currentlyAiring.length}`);
                     AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
                     setAllAnime(currentlyAiring);
                     syncTrackedReleases(currentlyAiring, upcomingList);
                 });
 
-                const currentlyAiring = freshSchedule.filter(item => item.status?.toLowerCase() === 'currently airing');
+                const currentlyAiring = freshSchedule.filter(item => item.status?.toLowerCase() !== 'finished airing' && item.status?.toLowerCase() !== 'finished');
+                console.log(`[ReleaseHub Debug] loaded ${freshSchedule.length} total, filtered currentlyAiring count: ${currentlyAiring.length}`);
                 await AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
                 setAllAnime(currentlyAiring);
                 await syncTrackedReleases(currentlyAiring, upcomingList);
@@ -256,20 +235,24 @@ export default function UpcomingScreen() {
     //  COMPUTED DATA
     // ═══════════════════════════════════════════════════════
     const enrichedAnimeList = useMemo(() => {
-        return allAnime.map(anime => {
-            const localInfo = getLocalAiringInfo(anime.broadcast, user?.timezone, 'en-US', use24Hour);
+        console.log(`[ReleaseHub Debug] Total before normalization/enrichment: ${allAnime.length}`);
+        const result = allAnime.map(anime => {
+            const localInfo = getLocalAiringInfo(anime.broadcast, user?.timezone, 'en-US', use24Hour, anime.nextAiringEpisode);
             return {
                 ...anime, localDay: localInfo?.localDay || 'Unknown Schedule',
                 localTime: localInfo?.localTime || '', countdown: localInfo?.countdown || 'TBD',
                 airingDate: localInfo?.airingDate || null
             };
         }).filter(anime => anime.localDay !== 'Unknown Schedule');
+        console.log(`[ReleaseHub Debug] Total after filtering (unknown schedules): ${result.length}`);
+        return result;
     }, [allAnime, user?.timezone, use24Hour]);
 
     const dayCounts = useMemo(() => {
         const c: Record<string, number> = {};
         DAYS.forEach(d => { c[d] = 0; });
         enrichedAnimeList.forEach(a => { if (c[a.localDay] !== undefined) c[a.localDay]++; });
+        console.log('[ReleaseHub Debug] Weekly Day Grouping Counts:', JSON.stringify(c));
         return c;
     }, [enrichedAnimeList]);
 
@@ -305,8 +288,16 @@ export default function UpcomingScreen() {
                         <Text style={[styles.trackedGroupCountText, { color: iconColor }]}>{items.length}</Text>
                     </View>
                 </View>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.trackedScroll}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.trackedScroll}
+                    snapToInterval={336}
+                    snapToAlignment="start"
+                    decelerationRate="fast"
+                    scrollEventThrottle={16}
+                    keyboardShouldPersistTaps="handled"
+                >
                     {items.map(item => (
                         <TrackedAnimeCard key={`${tickKey}-${item.id}`} media={item}
                             nextEpisode={item.nextEp} releaseDate={item.releaseTime || item.statusText}
@@ -352,8 +343,14 @@ export default function UpcomingScreen() {
                         <SectionHeader title="Airing Schedule" icon="tv" />
 
                         {/* Day Tabs — matching Search page chip style */}
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.dayTabsScroll}>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.dayTabsScroll}
+                            scrollEventThrottle={16}
+                            keyboardShouldPersistTaps="handled"
+                            decelerationRate="normal"
+                        >
                             {DAYS.map(day => {
                                 const sel = selectedDay === day;
                                 const isToday = todayName === day;

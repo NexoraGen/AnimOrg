@@ -71,6 +71,33 @@ export const firestoreService = {
     }
   },
 
+  updateCommunityPost: async (postId: string, postData: { content: string; category: string }) => {
+    try {
+      const postRef = doc(db, 'posts', postId);
+      const hashtags = extractHashtags(postData.content || '');
+
+      await updateDoc(postRef, {
+        content: postData.content,
+        category: postData.category,
+        hashtags,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('[FirestoreService] Error updating post:', error);
+      throw error;
+    }
+  },
+
+  deleteCommunityPost: async (postId: string) => {
+    try {
+      const postRef = doc(db, 'posts', postId);
+      await deleteDoc(postRef);
+    } catch (error) {
+      console.error('[FirestoreService] Error deleting post:', error);
+      throw error;
+    }
+  },
+
   getCommunityFeed: async (options: {
     category?: string,
     userId?: string,

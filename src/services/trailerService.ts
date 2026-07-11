@@ -20,11 +20,31 @@ export const trailerService = {
     title: string,
     jikanTrailer?: JikanTrailer
   ): Promise<string | null> => {
+    // 1. Try Jikan/AniList metadata first (API metadata is always more reliable than custom cache/scrape)
+    let trailerUrl: string | null = null;
+
+    if (jikanTrailer) {
+      if (jikanTrailer.url) {
+        trailerUrl = jikanTrailer.url;
+      } else if (jikanTrailer.youtubeId) {
+        trailerUrl = `https://www.youtube.com/watch?v=${jikanTrailer.youtubeId}`;
+      } else if (jikanTrailer.embedUrl) {
+        const match = jikanTrailer.embedUrl.match(/embed\/([^?]+)/);
+        trailerUrl = match ? `https://www.youtube.com/watch?v=${match[1]}` : jikanTrailer.embedUrl;
+      }
+    }
+
+    if (trailerUrl && trailerService.isValidUrl(trailerUrl)) {
+      const { setTrailerCache } = useAppStore.getState();
+      setTrailerCache(animeId, trailerUrl);
+      return trailerUrl;
+    }
+
+    // 2. Check cache (useful for slow YouTube fallbacks)
     const { getTrailerCache, setTrailerCache } = useAppStore.getState();
     const cache = getTrailerCache();
     const cachedEntry = cache[animeId];
 
-    // Check cache
     if (cachedEntry) {
       const isNegativeCache = cachedEntry.url === '';
       const ttl = isNegativeCache ? NEGATIVE_CACHE_TTL : TRAILER_CACHE_TTL;
@@ -34,28 +54,7 @@ export const trailerService = {
       }
     }
 
-    // Try Jikan data
-    let trailerUrl: string | null = null;
-
-    if (jikanTrailer) {
-      if (jikanTrailer.url) {
-        trailerUrl = jikanTrailer.url;
-      } else if (jikanTrailer.youtubeId) {
-        trailerUrl = `https://www.youtube.com/watch?v=${jikanTrailer.youtubeId}`;
-      } else if (jikanTrailer.embedUrl) {
-        // Extract from embed URL if possible, otherwise use as is
-        const match = jikanTrailer.embedUrl.match(/embed\/([^?]+)/);
-        trailerUrl = match ? `https://www.youtube.com/watch?v=${match[1]}` : jikanTrailer.embedUrl;
-      }
-    }
-
-    // Validate and clean Jikan URL
-    if (trailerUrl && trailerService.isValidUrl(trailerUrl)) {
-      setTrailerCache(animeId, trailerUrl);
-      return trailerUrl;
-    }
-
-    // Fallback: YouTube Search
+    // 3. Fallback: YouTube Search
     trailerUrl = await trailerService.searchYoutubeTrailer(title);
 
     // Cache result (even if null, to prevent repeated failing searches)

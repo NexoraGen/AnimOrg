@@ -11,8 +11,67 @@ export const getLocalAiringInfo = (
     broadcast?: Media['broadcast'],
     userTimezone?: string,
     userLocale: string = 'en-US',
-    use24Hour: boolean = false
+    use24Hour: boolean = false,
+    nextAiringEpisode?: Media['nextAiringEpisode']
 ): LocalAiringInfo | null => {
+    if (nextAiringEpisode && nextAiringEpisode.airingAt) {
+        const absoluteBroadcastTime = new Date(nextAiringEpisode.airingAt * 1000);
+
+        let localDay = '';
+        let localTime = '';
+        try {
+            const defaultTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const targetTz = userTimezone && userTimezone.includes('/') ? userTimezone : defaultTz;
+
+            localDay = new Intl.DateTimeFormat(userLocale, {
+                weekday: 'long',
+                timeZone: targetTz
+            }).format(absoluteBroadcastTime);
+
+            localTime = new Intl.DateTimeFormat(userLocale, {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: !use24Hour,
+                timeZone: targetTz
+            }).format(absoluteBroadcastTime);
+        } catch (e) {
+            const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            localDay = DAYS_OF_WEEK[absoluteBroadcastTime.getDay()];
+            const localHours = String(absoluteBroadcastTime.getHours()).padStart(2, '0');
+            const localMinutes = String(absoluteBroadcastTime.getMinutes()).padStart(2, '0');
+            localTime = use24Hour ? `${localHours}:${localMinutes}` : `${Number(localHours) % 12 || 12}:${localMinutes} ${Number(localHours) >= 12 ? 'PM' : 'AM'}`;
+        }
+
+        const diffMs = absoluteBroadcastTime.getTime() - Date.now();
+        let countdown = '';
+        if (diffMs <= 0) {
+            if (diffMs > -2 * 60 * 60 * 1000) {
+                countdown = 'Airing Now';
+            } else {
+                countdown = 'Aired Today';
+            }
+        } else {
+            const diffMinutes = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMinutes / 60);
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffDays > 0) {
+                countdown = `${diffDays}d ${diffHours % 24}h`;
+            } else if (diffHours > 0) {
+                countdown = `${diffHours}h ${diffMinutes % 60}m`;
+            } else {
+                countdown = `${diffMinutes}m`;
+            }
+        }
+
+        return {
+            localDay,
+            localTime,
+            countdown,
+            airingDate: absoluteBroadcastTime
+        };
+    }
+
     if (!broadcast || !broadcast.day || !broadcast.time) return null;
 
     const DAYS_MAP: Record<string, number> = {
@@ -194,7 +253,8 @@ export const resolveAnimeTrackingStatus = (opts: {
     }
 
     // Finished airing
-    if (isFinished && totalEpisodes > 0 && watchedCount >= totalEpisodes) {
+    const effectiveTotal = totalEpisodes > 0 ? totalEpisodes : (releasedCount > 0 ? releasedCount : 0);
+    if (isFinished && effectiveTotal > 0 && watchedCount >= effectiveTotal) {
         return 'completed';
     }
 

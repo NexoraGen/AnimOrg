@@ -22,6 +22,7 @@ interface PosterCardProps {
   rank?: number;
   badge?: string;
   variant?: 'default' | 'list';
+  disableEntryAnimation?: boolean;
 }
 
 export const PosterCard: React.FC<PosterCardProps> = React.memo(({
@@ -33,7 +34,8 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({
   progress = 0,
   rank,
   badge,
-  variant = 'default'
+  variant = 'default',
+  disableEntryAnimation = false
 }) => {
   const themeColors = useThemeColors();
   const scale = useSharedValue(1);
@@ -92,7 +94,7 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({
       style={{ marginHorizontal: spacing.sm }}
     >
       <Animated.View
-        entering={FadeIn.duration(motion.durations.epic).easing(motion.curves.cinematic)}
+        entering={disableEntryAnimation ? undefined : FadeIn.duration(motion.durations.epic).easing(motion.curves.cinematic)}
         style={[
           styles.container,
           {

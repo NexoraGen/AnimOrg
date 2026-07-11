@@ -25,6 +25,7 @@ import { firestoreService } from '../../src/services/firebase/firestore';
 import { CommunityPost } from '../../src/types';
 import { CommunityPostCard } from '../../src/components/features/community/CommunityPostCard';
 import { FeedTabs } from '../../src/components/features/community/FeedTabs';
+import { getAvatarSource } from '../../src/constants/avatars';
 
 const { width } = Dimensions.get('window');
 
@@ -109,7 +110,7 @@ export default function UserProfileScreen() {
         <View style={styles.headerWrapper}>
             <View style={styles.bannerContainer}>
                 <Image
-                    source={profile.avatarUrl?.trim() ? { uri: profile.avatarUrl } : require('../../assets/guest-avatar.png')}
+                    source={getAvatarSource(profile.avatarUrl)}
                     style={styles.bannerImage}
                     blurRadius={40}
                     contentFit="cover"
@@ -124,7 +125,7 @@ export default function UserProfileScreen() {
                 <View style={styles.topProfileBar}>
                     <View style={styles.avatarContainer}>
                         <Image
-                            source={profile.avatarUrl?.trim() ? { uri: profile.avatarUrl } : require('../../assets/guest-avatar.png')}
+                            source={getAvatarSource(profile.avatarUrl)}
                             style={[styles.avatar, { borderColor: theme.surface }]}
                             contentFit="cover"
                         />
@@ -221,7 +222,18 @@ export default function UserProfileScreen() {
                 data={activeTab === 'Posts' ? userPosts : []}
                 ListHeaderComponent={renderHeader()}
                 renderItem={({ item }) => (
-                    <CommunityPostCard post={item} onAuthRequired={() => setAuthModalVisible(true)} />
+                    <CommunityPostCard
+                        post={item}
+                        onAuthRequired={() => setAuthModalVisible(true)}
+                        onPostUpdated={(updatedPost) => {
+                            setUserPosts((prev) =>
+                                prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+                            );
+                        }}
+                        onPostDeleted={(postId) => {
+                            setUserPosts((prev) => prev.filter((p) => p.id !== postId));
+                        }}
+                    />
                 )}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={[styles.listContent, { paddingTop: insets.top + HEADER_HEIGHT, paddingBottom: insets.bottom + 40 }]}

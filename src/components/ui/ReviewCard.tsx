@@ -8,6 +8,7 @@ import { ExpandableText } from './ExpandableText';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { colors, spacing, borderRadius, typography } from '../../theme';
 import { getSafeRelativeTime } from '../../utils/date';
+import { getAvatarSource } from '../../constants/avatars';
 
 interface ReviewCardProps {
   review: Review;
@@ -27,7 +28,7 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({
     <View style={[styles.container, { backgroundColor: themeColors.surfaceVariant, borderColor: themeColors.border }]}>
       <View style={styles.header}>
         <Image
-          source={review.avatarUrl ? { uri: review.avatarUrl } : { uri: 'https://cdn.myanimelist.net/images/characters/11/294371.jpg' }}
+          source={getAvatarSource(review.avatarUrl)}
           style={styles.avatar}
           transition={300}
         />

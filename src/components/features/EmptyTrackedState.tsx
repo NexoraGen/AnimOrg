@@ -27,7 +27,7 @@ export const EmptyTrackedState = () => {
                     Track Anime to Build Your Calendar
                 </Text>
                 <Text style={[styles.subtitle, { color: themeColors.textDim }]}>
-                    Save your seasonal shows to compile episode counters, live release countdowns, and specialized weekly schedule cards here.
+                    Track your favorite seasonal shows for live countdowns and weekly release schedules.
                 </Text>
 
                 <TouchableOpacity

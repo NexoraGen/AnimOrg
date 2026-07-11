@@ -360,6 +360,10 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         removeClippedSubviews={true}
                         // @ts-ignore
                         initialNumToRender={4}
+                        snapToInterval={296}
+                        snapToAlignment="start"
+                        decelerationRate="fast"
+                        scrollEventThrottle={16}
                         renderItem={({ item: progress }) => (
                             <TouchableOpacity
                                 style={[styles.card, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.03)' }]}
@@ -426,6 +430,10 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         removeClippedSubviews={true}
                         // @ts-ignore
                         initialNumToRender={3}
+                        snapToInterval={296}
+                        snapToAlignment="start"
+                        decelerationRate="fast"
+                        scrollEventThrottle={16}
                         renderItem={({ item: progress }) => (
                             <AwaitingAnimeCard
                                 progress={progress}
@@ -457,6 +465,10 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         removeClippedSubviews={true}
                         // @ts-ignore
                         initialNumToRender={3}
+                        snapToInterval={296}
+                        snapToAlignment="start"
+                        decelerationRate="fast"
+                        scrollEventThrottle={16}
                         renderItem={({ item: progress }) => (
                             <TouchableOpacity
                                 style={[styles.card, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.03)' }]}
