@@ -131,6 +131,56 @@ app.get("/debug/jikan", async (_req, res) => {
     res.json(results);
 });
 
+app.get("/debug/network", async (_req, res) => {
+    const urls = {
+        jikan: "https://api.jikan.moe/v4/random/anime",
+        github: "https://api.github.com",
+        jsonplaceholder: "https://jsonplaceholder.typicode.com/todos/1",
+        google: "https://www.google.com"
+    };
+
+    const runTest = async (url: string) => {
+        try {
+            const response = await axios.get(url, {
+                timeout: 10000,
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+            });
+            return {
+                success: true,
+                statusCode: response.status,
+                errorMessage: null,
+                errorCode: null,
+                errorCause: null,
+                errorErrno: null,
+                errorAddress: null,
+                errorPort: null
+            };
+        } catch (error: any) {
+            return {
+                success: false,
+                statusCode: error.response?.status || null,
+                errorMessage: error.message || null,
+                errorCode: error.code || null,
+                errorCause: error.cause ? String(error.cause) : null,
+                errorErrno: error.errno || null,
+                errorAddress: error.address || null,
+                errorPort: error.port || null
+            };
+        }
+    };
+
+    const results = {
+        jikan: await runTest(urls.jikan),
+        github: await runTest(urls.github),
+        jsonplaceholder: await runTest(urls.jsonplaceholder),
+        google: await runTest(urls.google)
+    };
+
+    res.json(results);
+});
+
 // Register route handlers
 app.use("/api/anime", animeRoutes);
 app.use("/api/home", homeRoutes);
