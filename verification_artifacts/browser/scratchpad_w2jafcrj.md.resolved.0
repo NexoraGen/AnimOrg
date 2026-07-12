@@ -1,0 +1,9 @@
+# Task: Debug Search Page
+
+- [ ] Open http://localhost:8081/search (or http://localhost:8081/ if search fails)
+- [ ] Verify page loads
+- [ ] Click search input and type 'Naruto'
+- [ ] Wait for results
+- [ ] Capture screenshot
+- [ ] Get console logs
+- [ ] Analyze errors

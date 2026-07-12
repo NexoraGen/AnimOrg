@@ -1,0 +1,50 @@
+# AnimOrg Backend Proxy & Caching Layer Production Audit
+
+We performed a comprehensive production-grade health and safety audit on the backend proxy server and caching architecture.
+
+## Audit Summary
+
+| Component | Status | Details / Evaluation |
+| :--- | :--- | :--- |
+| **Server Configuration** | 🟢 **SECURE & READY** | `helmet` (security headers), `compression` (gzip compression), `cors` (cross-origin), and `express.json` registered correctly. |
+| **Input Validation** | 🟢 **SECURE & READY** | Parameter regex validation ([id](file:///m:/NEXORA%20GEN/AnimOrg2/src/services/trailerService.ts#143-151) regex `^\d+$`) and pagination constraints (`page` >= 1, `limit` 1-100) protect all endpoint boundaries. |
+| **Error Handling** | 🟢 **SECURE & READY** | Global [errorHandler](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/middleware/errorHandler.ts#5-27) catches all exceptions, prevents raw stack leaks, and formats responses consistently. |
+| **Cache Store** | 🟢 **OPTIMIZED** | Reference-based memory caching (`useClones: false`) configured via `node-cache` to avoid garbage collection/CPU overhead. |
+| **Request Lifecycles** | 🟢 **STABLE** | [RequestManager](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/RequestManager.ts#1-32) deduplicates parallel outbound API calls to shield cache stampedes. |
+| **Upstream Resilience** | 🟢 **ROBUST** | Exponential backoff retry policy with jitter + upstream `Retry-After` header parsing prevents Jikan throttling blips. |
+| **Rate Limit Stagger** | 🟢 **STABLE** | [HomeService](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/services/HomeService.ts#7-71) uses `Promise.allSettled` and `600ms` staggers to prevent 429 requests spikes on cold start. |
+
+---
+
+## Detailed Component Analysis
+
+### 1. Server Security ([server.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/server.ts))
+*   **Verdict**: Production-ready.
+*   **Security Middlewares**: Uses standard `helmet()` to set secure HTTP headers (e.g., preventing MIME type sniffing, XSS filtering, clickjacking).
+*   **Performance**: `compression()` reduces JSON payload bandwidth.
+*   **Error Delegation**: `app.use(errorHandler)` is placed last to catch all middleware exceptions properly.
+
+### 2. Request & Query Validation ([middleware/validator.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/middleware/validator.ts))
+*   **Verdict**: Production-ready.
+*   **Input Sanitization**: Path and query parameters are audited. The regex constraint `^\d+$` on parameter ID blocks any SQL/NoSQL injection formats.
+*   **Boundary Checking**: Pagination `limit` is bound to `1-100` and `page` to `>=1`, preventing server resource starvation from giant queries.
+
+### 3. Caching Strategy ([cache/cache.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/cache/cache.ts))
+*   **Verdict**: Optimized.
+*   **Memory Efficiency**: By setting `useClones: false`, the in-memory cache stores pointers. Under heavy object volumes, this drastically reduces RAM allocation and GC pause times compared to clone-deep caching.
+*   **Eviction Period**: `checkperiod: 120` runs background sweeps to free dead keys every 2 minutes.
+*   **TTL Configuration**:
+    *   `HOME_PAGE` (10 minutes) & `SEARCH_QUERY` (15 minutes) represent fast, volatile queries.
+    *   [EPISODES](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/config/constants.ts#45-46) & [CHARACTERS](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/config/constants.ts#42-43) (12 hours) and `SEASONAL` & [ANIME_DETAILS](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/config/constants.ts#41-42) (24 hours) map to static metadata, maximizing local HIT rates.
+
+### 4. Stampede & Resilience Layer ([RequestManager.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/RequestManager.ts) & [axiosClient.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/axiosClient.ts))
+*   **Verdict**: Production-ready.
+*   **Deduplication**: When parallel queries target the same cache key, [RequestManager](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/RequestManager.ts#1-32) captures the same outbound Axios promise and resolves it to all waiters simultaneously, rather than firing multiple duplicate HTTP requests.
+*   **Upstream Retry Policy**: If Jikan returns `429 Too Many Requests`, `axiosClient` parses the HTTP response header `Retry-After` and delays according to upstream request limits. Non-rate-limit errors default to exponential backoff with random millisecond jitter.
+
+---
+
+## Recommendations / Observability Note
+
+> [!NOTE]
+> The [cacheWarmJob.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/jobs/cacheWarmJob.ts) background scheduler file is intentionally left empty. Because [RequestManager.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/RequestManager.ts) successfully prevents cache stampedes on cold starts, background scheduled queries are not necessary. Leaving it inactive prevents unnecessary hourly Jikan API consumption when the application is idle.

@@ -232,7 +232,7 @@ export default function SearchScreen() {
 
       } catch (error: any) {
         console.error('Search error (both providers failed):', error);
-        setSearchError(`Error: ${error?.message || error}\nStack: ${error?.stack || 'none'}`);
+        setSearchError("We had trouble reaching the search service. Please try again in a moment.");
       } finally {
         setIsLoading(false);
         setSearchLoadingText(null);

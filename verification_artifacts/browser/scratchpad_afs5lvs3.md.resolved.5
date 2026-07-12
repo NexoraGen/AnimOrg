@@ -1,0 +1,15 @@
+# Verification Task
+
+- [x] Open browser URL: http://localhost:8081/search
+- [x] Wait 2 seconds for page load.
+- [x] Click on the search input field and type 'Naruto'.
+- [ ] Wait 3 seconds for the search results to populate. (Stuck at "Searching...")
+- [ ] Capture a screenshot of the search results page.
+- [ ] Open the browser console logs and verify there are no 400 Bad Request error or 504 errors. (504 detected)
+- [ ] Confirm results are displayed successfully.
+
+## Findings
+- Typed 'Naruto', page shows 'Searching...' spinner.
+- Console logs show `504` error for `http://127.0.0.1:5000/api/anime/characters?q=Naruto&page=1`.
+- RetryManager is attempting retries (Attempt 2/3 seen in logs).
+- Waiting to see if retries succeed or fail.

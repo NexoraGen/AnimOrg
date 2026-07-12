@@ -1,5 +1,6 @@
 import { animeApi } from './animeApi';
 import { Media, WatchlistItem, UserRating } from '../types';
+import { BACKEND_BASE } from './api/apiClient';
 
 export interface RecommendationResult {
     anime: Media;
@@ -81,7 +82,7 @@ export const RecommendationService = {
             if (allCandidates.length === 0) {
                 console.warn('[RecommendationService] CRITICAL: All primary sources returned 0 candidates. Attempting direct Jikan emergency fallback...');
                 try {
-                    const emergencyResults = await fetch('https://api.jikan.moe/v4/top/anime?limit=25');
+                    const emergencyResults = await fetch(`${BACKEND_BASE}/api/anime/top?limit=25`);
                     if (emergencyResults.ok) {
                         const emergencyJson = await emergencyResults.json();
                         if (emergencyJson.data && emergencyJson.data.length > 0) {

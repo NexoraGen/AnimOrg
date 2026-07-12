@@ -1,0 +1,69 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+[0] (500,500)<div  />
+	Anim
+	Org
+	
+	[1] (504,138)<input class='css-textinput-11aywtz r-placeholderTextColor-6taxm2 r-flex-13awgt0 r-fontSize-ubezar r-fontWeight-1kfrs79 r-marginLeft-1ow6zhx' placeholder='Search anime, characters...' />
+	[2] (971,138)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73' />
+		[3] (971,138)<div  />
+			[4] (971,138)<div > />
+	[5] (500,236)<div class='css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-lltvgl r-overflowY-buy8e9 r-transform-agouwx r-scrollbarWidth-2eszeu' scrollable='true' />
+		[6] (40,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[7] (40,231)<div >Action />
+		[8] (102,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[9] (102,231)<div >Adventure />
+		[10] (168,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[11] (168,231)<div >Comedy />
+		[12] (231,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[13] (231,231)<div >Romance />
+		[14] (305,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[15] (305,231)<div >Psychological />
+		[16] (376,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[17] (376,231)<div >Fantasy />
+		[18] (433,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[19] (433,231)<div >Thriller />
+		[20] (490,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[21] (490,231)<div >Shonen />
+		[22] (546,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[23] (546,231)<div >Seinen />
+		[24] (601,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[25] (601,231)<div >Sports />
+		[26] (652,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[27] (652,231)<div >Sci-Fi />
+		[28] (707,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[29] (707,231)<div >Mystery />
+		[30] (775,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[31] (775,231)<div >Slice of Life />
+		[32] (842,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[33] (842,231)<div >Samurai />
+		[34] (899,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[35] (899,231)<div >Magic />
+		[36] (952,231)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+			[37] (952,231)<div >Mecha />
+		Survival
+	
+	Oops!
+	We had trouble reaching the search service. Please try again in a moment.
+	[38] (83,959)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[39] (83,959)<div  />
+			[40] (83,959)<div > />
+	[41] (250,959)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[42] (250,959)<div  />
+			[43] (250,959)<div > />
+	[44] (417,959)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[45] (417,959)<div  />
+			[46] (417,959)<div > />
+	[47] (583,959)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[48] (583,959)<div  />
+			[49] (583,959)<div > />
+	[50] (750,959)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[51] (750,959)<div  />
+			[52] (750,959)<div > />
+	[53] (917,959)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[54] (917,959)<div  />
+			[55] (917,959)<div > />
+
+</current_dom>

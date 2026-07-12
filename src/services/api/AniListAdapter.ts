@@ -339,15 +339,18 @@ export const AniListAdapter = {
   searchAnime: async (queryStr: string, page = 1, genres: string[] = [], minScore?: number, orderBy?: string, sort?: string): Promise<{ data: Media[], hasNextPage: boolean }> => {
     let variables: any = { page, perPage: 20 };
     let matchStrings: string[] = ['type: ANIME'];
+    let valHeaders: string[] = ['$page: Int', '$perPage: Int'];
 
     if (queryStr && queryStr.trim() !== '') {
       variables.search = queryStr;
       matchStrings.push('search: $search');
+      valHeaders.push('$search: String');
     }
 
     if (genres && genres.length > 0) {
       variables.genres = genres;
       matchStrings.push('genre_in: $genres');
+      valHeaders.push('$genres: [String]');
     }
 
     let aniListSort = 'POPULARITY_DESC';
@@ -360,9 +363,10 @@ export const AniListAdapter = {
 
     variables.sort = aniListSort;
     matchStrings.push('sort: $sort');
+    valHeaders.push('$sort: [MediaSort]');
 
     const query = `
-      query ($page: Int, $perPage: Int, $search: String, $genres: [String], $sort: [MediaSort]) {
+      query (${valHeaders.join(', ')}) {
         Page (page: $page, perPage: $perPage) {
           pageInfo {
             hasNextPage

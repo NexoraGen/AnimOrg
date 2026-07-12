@@ -20,6 +20,11 @@ class JikanProvider {
         if (cleaned.limit !== undefined && cleaned.limit <= 25) {
             delete cleaned.limit;
         }
+        // Omit unindexed order_by options that cause Jikan gateway timeouts (504)
+        if (cleaned.order_by === "score" || cleaned.order_by === "rank") {
+            delete cleaned.order_by;
+            delete cleaned.sort;
+        }
         return cleaned;
     }
 

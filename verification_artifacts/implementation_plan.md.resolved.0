@@ -1,0 +1,60 @@
+# AnimOrg Backend Stabilization Implementation Plan
+
+This plan outlines the diagnosis and fixing of the stability issues in the AnimOrg backend.
+
+## User Review Required
+
+> [!IMPORTANT]
+> - We will run the backend locally using `npm run dev` and perform verification using standard `curl` or automated testing script requests.
+> - No new endpoints or architectural changes are planned.
+> - We will replace Jikan API concurrent storm (`Promise.all`) inside [HomeService](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/services/HomeService.ts#6-43) with sequential or controlled parallelization (`Promise.allSettled`), and improve retry-backoff algorithms.
+
+## Proposed Changes
+
+---
+
+### Http & Retry Layer (axiosClient)
+
+#### [MODIFY] [axiosClient.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/axiosClient.ts)
+- Temporarily replace with a minimal axios instance to isolate issues (Step 1).
+- Improve retry policy:
+  - Do not retry on `400`, `401`, `403`, `404` errors.
+  - Implement full exponential backoff with jitter.
+  - Parse and respect the `Retry-After` header for rate-limit response `429`.
+
+---
+
+### Request Manager
+
+#### [MODIFY] [RequestManager.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/RequestManager.ts)
+- Verify pending requests are properly cleared.
+- Ensure rejected promises are not reused or stored, preventing future requests from being poisoned.
+
+---
+
+### Services & Controllers
+
+#### [MODIFY] [HomeService.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/services/HomeService.ts)
+- Replace `Promise.all` with `Promise.allSettled`.
+- Return remaining successful datasets if any upstream requests fail (non-blocking).
+
+---
+
+### Cleanups
+
+#### [DELETE] Obsolete and duplicated code
+- Scan the directory and cleanup any dead/obsolete files (such as `jikanService.ts` if it exists).
+
+## Verification Plan
+
+### Automated / Diagnostic Script
+We will write a temporary diagnostic script `verify_endpoints.ts` (stored in `/tmp/` to keep the workspace clean) that will make requests to our running local backend on `http://localhost:5000` to verify:
+1. `GET /api/anime/21` (Anime details)
+2. `GET /api/anime/search?q=naruto` (Search)
+3. `GET /api/home` (Home aggregator)
+4. Other endpoints: Top, Season, Upcoming, Schedule, Characters, Recommendations, Episodes.
+
+### Manual Verification
+1. Run the server using `npm run dev`.
+2. Inspect log outputs to ensure retries, retry delay times, and cache hit/miss statuses are logged cleanly and not spammed.
+3. Validate compilation of TypeScript via `npm run build`.

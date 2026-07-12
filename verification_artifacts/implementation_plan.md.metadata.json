@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
+  "summary": "Technical plan to resolve frontend AniList 400 Bad Request variable signature mismatch and backend Jikan 504 query sorting timeouts.",
+  "updatedAt": "2026-07-12T02:54:26.156296Z",
+  "version": "2"
+}

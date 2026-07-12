@@ -1,0 +1,55 @@
+﻿=== STARTING ENDPOINT VERIFICATION ===
+
+Endpoint: /api/anime/21
+Status: 200 OK
+Result: Success! Keys: [mal_id, url, images, trailer, approved] (wrapped in .data)
+
+Endpoint: /api/anime/search?q=naruto
+Status: 500 Internal Server Error
+Result: Failed! Data: {"success":false,"message":"Request failed with status code 504","code":"INTERNAL_SERVER_ERROR"}
+
+Endpoint: /api/anime/top
+Status: 500 Internal Server Error
+Result: Failed! Data: {"success":false,"message":"Request failed with status code 504","code":"INTERNAL_SERVER_ERROR"}
+
+Endpoint: /api/anime/season
+Status: 200 OK
+Result: Success! Keys: [0, 1, 2, 3, 4] (wrapped in .data)
+
+Endpoint: /api/anime/schedule
+Status: 500 Internal Server Error
+Result: Failed! Data: {"success":false,"message":"Request failed with status code 504","code":"INTERNAL_SERVER_ERROR"}
+
+Endpoint: /api/home
+Status: 500 Internal Server Error
+Result: Failed! Data: {"success":false,"message":"Request failed with status code 504","code":"INTERNAL_SERVER_ERROR"}
+
+Endpoint: /api/anime/upcoming
+Status: 200 OK
+Result: Success! Keys: [0, 1, 2, 3, 4] (wrapped in .data)
+
+Endpoint: /api/anime/genres
+Status: 200 OK
+Result: Success! Keys: [0, 1, 2, 3, 4] (wrapped in .data)
+
+Endpoint: /api/anime/characters?q=luffy
+Status: 500 Internal Server Error
+Result: Failed! Data: {"success":false,"message":"Request failed with status code 504","code":"INTERNAL_SERVER_ERROR"}
+
+Endpoint: /api/anime/21/episodes
+Status: 200 OK
+Result: Success! Keys: [0, 1, 2, 3, 4] (wrapped in .data)
+
+Endpoint: /api/anime/21/characters
+Status: 200 OK
+Result: Success! Keys: [0, 1, 2, 3, 4] (wrapped in .data)
+
+Endpoint: /api/anime/21/recommendations
+Status: 200 OK
+Result: Success! Keys: [0, 1, 2, 3, 4] (wrapped in .data)
+
+Endpoint: /api/anime/21/relations
+Status: 200 OK
+Result: Success! Keys: [0, 1, 2, 3, 4] (wrapped in .data)
+
+=== ENDPOINT VERIFICATION COMPLETE ===

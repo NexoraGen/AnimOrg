@@ -1,0 +1,10 @@
+# Task: Verify search functionality and error handling
+
+## Plan
+- [ ] Open `http://localhost:8081/search`
+- [ ] Verify search input is present.
+- [ ] Type 'Solo Leveling' into the search input.
+- [ ] Verify execution and check results:
+  - If success: verify search results are displayed properly.
+  - If failure: verify that the error message is clean and friendly (no stack trace).
+- [ ] Capture screenshot of findings.

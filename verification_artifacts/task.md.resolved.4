@@ -1,0 +1,17 @@
+# Stabilize AnimOrg Backend and Migrate Frontend Task List
+
+- [x] Phase 1: Backend Stabilization
+  - [x] Investigate and fix sfw=true cache miss root cause
+  - [x] Implement robust exponential backoff retries with jitter and Retry-After support
+  - [x] Refactor HomeService to use Promise.allSettled and staggering to prevent 429 rate limit triggers
+  - [x] Optimize JikanProvider to clean default query parameters and slice arrays locally to maximize cache hit rates
+- [ ] Phase 2 & 3: Remove Frontend Direct Jikan Usage & Centralized API Client
+  - [ ] Search the frontend for direct Jikan references (api.jikan.moe)
+  - [ ] Ensure a centralized backend client handles development / production environments dynamically (EXPO_PUBLIC_API_URL and hostUri)
+  - [ ] Refactor all frontend Jikan adapters to route exclusively through the backend proxy client
+- [ ] Phase 4: Backend Endpoint Coverage
+  - [ ] Review all frontend Jikan/AniList integrations (e.g. relations, anime by genre, characters search, etc.)
+  - [ ] Implement any missing backend endpoints to ensure 100% backend API coverage
+- [ ] Phase 7-9: Testing, Cleanup, and Code Validation
+  - [ ] Terminate/delete obsolete scrapers, mock services, and unused files
+  - [ ] Verify TypeScript and build checks compile cleanly, with no errors

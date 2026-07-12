@@ -1,0 +1,28 @@
+# Jikan Removal and Client Unification Implementation Plan
+
+We will consolidate backend host/port resolving logic, remove duplication, and route all proxy queries through a single, unified client tier.
+
+## Proposed Changes
+
+### API Layer
+
+#### [NEW] [apiClient.ts](file:///m:/NEXORA%20GEN/AnimOrg2/src/services/api/apiClient.ts)
+- Implement unified host discovery bridging (supports `EXPO_PUBLIC_API_URL` in production, falls back to dynamic IP address discovery on emulators/devices, or default 127.0.0.1 on fallback).
+- Create a generic `executeBackendQuery` wrapper utility to fetch from this dynamically resolved endpoint.
+- Parse and strip error models, preventing raw connection messages from leaking into the UI.
+
+#### [MODIFY] [JikanAdapter.ts](file:///m:/NEXORA%20GEN/AnimOrg2/src/services/api/JikanAdapter.ts)
+- Strip duplicate [getBackendBaseUrl](file:///m:/NEXORA%20GEN/AnimOrg2/src/services/RecommendationService.ts#5-16) and [executeRestQuery](file:///m:/NEXORA%20GEN/AnimOrg2/src/services/api/JikanAdapter.ts#25-40) methods.
+- Import `executeBackendQuery` and `BACKEND_BASE` from `apiClient.ts`.
+- Clean all direct fetch implementations.
+
+#### [MODIFY] [RecommendationService.ts](file:///m:/NEXORA%20GEN/AnimOrg2/src/services/RecommendationService.ts)
+- Strip duplicated URL resolution code.
+- Import `BACKEND_BASE` / `executeBackendQuery` directly.
+
+## Verification Plan
+
+### Automated / Manual Verification
+- Compile the TypeScript application.
+- Launch the Expo app (`npm run start`).
+- Confirm all pages (Home, Search, Details) load data correctly from the backend proxy.
