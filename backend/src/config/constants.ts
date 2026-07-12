@@ -36,7 +36,7 @@ export const CACHE_KEYS = {
 
 // Jikan API endpoints base configuration
 export const JIKAN_API = {
-    BASE_URL: "https://api.jikan.moe/v4",
+    BASE_URL: "https://animorg-proxy.itisnexora.workers.dev/v4",
     ENDPOINTS: {
         ANIME_DETAILS: (id: string) => `/anime/${id}/full`,
         ANIME_CHARACTERS: (id: string) => `/anime/${id}/characters`,

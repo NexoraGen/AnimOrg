@@ -46,8 +46,8 @@ app.get("/debug/jikan", async (_req, res) => {
     // 1. axiosClient Test
     try {
         const start = Date.now();
-        console.log(`- Requesting via axiosClient: GET https://api.jikan.moe/v4/anime/21/full. Config duration limit: ${axiosClient.defaults.timeout}`);
-        const response = await axiosClient.get("https://api.jikan.moe/v4/anime/21/full");
+        console.log(`- Requesting via axiosClient: GET https://animorg-proxy.itisnexora.workers.dev/v4/anime/21/full. Config duration limit: ${axiosClient.defaults.timeout}`);
+        const response = await axiosClient.get("https://animorg-proxy.itisnexora.workers.dev/v4/anime/21/full");
         const duration = Date.now() - start;
         results.axiosClient = {
             success: true,
@@ -73,8 +73,8 @@ app.get("/debug/jikan", async (_req, res) => {
     // 2. plain axios Test
     try {
         const start = Date.now();
-        console.log(`- Requesting via raw axios: GET https://api.jikan.moe/v4/anime/21/full. Config timeout limit: ${configTimeout}`);
-        const response = await axios.get("https://api.jikan.moe/v4/anime/21/full", {
+        console.log(`- Requesting via raw axios: GET https://animorg-proxy.itisnexora.workers.dev/v4/anime/21/full. Config timeout limit: ${configTimeout}`);
+        const response = await axios.get("https://animorg-proxy.itisnexora.workers.dev/v4/anime/21/full", {
             timeout: configTimeout
         });
         const duration = Date.now() - start;
@@ -133,7 +133,7 @@ app.get("/debug/jikan", async (_req, res) => {
 
 app.get("/debug/network", async (_req, res) => {
     const urls = {
-        jikan: "https://api.jikan.moe/v4/random/anime",
+        jikan: "https://animorg-proxy.itisnexora.workers.dev/v4/random/anime",
         github: "https://api.github.com",
         jsonplaceholder: "https://jsonplaceholder.typicode.com/todos/1",
         google: "https://www.google.com"
