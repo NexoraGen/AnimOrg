@@ -10,6 +10,24 @@ class JikanProvider {
         return `${JIKAN_API.BASE_URL}${path}`;
     }
 
+    private async executeGet(url: string, config: any, methodName: string): Promise<any> {
+        try {
+            const response = await axiosClient.get(url, config);
+            return response.data;
+        } catch (error: any) {
+            console.error(`[JikanProvider Error] Method: ${methodName}`);
+            console.error(`- Axios URL: ${url}`);
+            console.error(`- Axios Params: ${JSON.stringify(config?.params || {})}`);
+            console.error(`- Response Status: ${error.response?.status || "N/A"}`);
+            console.error(`- Error Message: ${error.message || "N/A"}`);
+            if (error.response?.data) {
+                console.error(`- Response Data: ${JSON.stringify(error.response.data)}`);
+            }
+            console.error(`- Stack Trace:`, error.stack);
+            throw error;
+        }
+    }
+
     private cleanParams(params: any): any {
         const cleaned = { ...params };
         // Omit default page parameter if it is 1 to prevent Jikan cache misses
@@ -39,11 +57,11 @@ class JikanProvider {
     }
 
     async getAnime(id: string, config?: { timeout?: number }) {
-        const response = await axiosClient.get(
+        return this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.ANIME_DETAILS(id)),
-            { timeout: config?.timeout ?? 8000 }
+            { timeout: config?.timeout ?? 8000 },
+            "getAnime"
         );
-        return response.data;
     }
 
     async searchAnime(
@@ -64,14 +82,15 @@ class JikanProvider {
             delete cleaned.sfw;
         }
 
-        const response = await axiosClient.get(
+        const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.ANIME_SEARCH),
             {
                 params: cleaned,
                 timeout: config?.timeout ?? 12000,
-            }
+            },
+            "searchAnime"
         );
-        return this.sliceResponse(response.data, params.limit);
+        return this.sliceResponse(data, params.limit);
     }
 
     async getTopAnime(
@@ -79,14 +98,15 @@ class JikanProvider {
         config?: { timeout?: number }
     ) {
         const cleaned = this.cleanParams(params);
-        const response = await axiosClient.get(
+        const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.TOP_ANIME),
             {
                 params: cleaned,
                 timeout: config?.timeout ?? 10000,
-            }
+            },
+            "getTopAnime"
         );
-        return this.sliceResponse(response.data, params.limit);
+        return this.sliceResponse(data, params.limit);
     }
 
     async getCurrentSeason(
@@ -94,14 +114,15 @@ class JikanProvider {
         config?: { timeout?: number }
     ) {
         const cleaned = this.cleanParams(params);
-        const response = await axiosClient.get(
+        const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.SEASON_NOW),
             {
                 params: cleaned,
                 timeout: config?.timeout ?? 10000,
-            }
+            },
+            "getCurrentSeason"
         );
-        return this.sliceResponse(response.data, params.limit);
+        return this.sliceResponse(data, params.limit);
     }
 
     async getUpcomingAnime(
@@ -109,14 +130,15 @@ class JikanProvider {
         config?: { timeout?: number }
     ) {
         const cleaned = this.cleanParams(params);
-        const response = await axiosClient.get(
+        const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.SEASON_UPCOMING),
             {
                 params: cleaned,
                 timeout: config?.timeout ?? 10000,
-            }
+            },
+            "getUpcomingAnime"
         );
-        return this.sliceResponse(response.data, params.limit);
+        return this.sliceResponse(data, params.limit);
     }
 
     async getSchedule(
@@ -124,70 +146,72 @@ class JikanProvider {
         config?: { timeout?: number }
     ) {
         const cleaned = this.cleanParams(params);
-        const response = await axiosClient.get(
+        const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.AIRING_SCHEDULE),
             {
                 params: cleaned,
                 timeout: config?.timeout ?? 8000,
-            }
+            },
+            "getSchedule"
         );
-        return this.sliceResponse(response.data, params.limit);
+        return this.sliceResponse(data, params.limit);
     }
 
     async getEpisodes(id: string, page?: number, config?: { timeout?: number }) {
-        const response = await axiosClient.get(
+        return this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.ANIME_EPISODES(id)),
             {
                 params: { page },
                 timeout: config?.timeout ?? 10000,
-            }
+            },
+            "getEpisodes"
         );
-        return response.data;
     }
 
     async getCharacters(id: string, config?: { timeout?: number }) {
-        const response = await axiosClient.get(
+        return this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.ANIME_CHARACTERS(id)),
-            { timeout: config?.timeout ?? 10000 }
+            { timeout: config?.timeout ?? 10000 },
+            "getCharacters"
         );
-        return response.data;
     }
 
     async getRecommendations(id: string, config?: { timeout?: number }) {
-        const response = await axiosClient.get(
+        return this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.ANIME_RECOMMENDATIONS(id)),
-            { timeout: config?.timeout ?? 10000 }
+            { timeout: config?.timeout ?? 10000 },
+            "getRecommendations"
         );
-        return response.data;
     }
 
     async getAnimeRelations(id: string, config?: { timeout?: number }) {
-        const response = await axiosClient.get(
+        return this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.ANIME_RELATIONS(id)),
-            { timeout: config?.timeout ?? 10000 }
+            { timeout: config?.timeout ?? 10000 },
+            "getAnimeRelations"
         );
-        return response.data;
     }
 
     async getAnimeGenres(config?: { timeout?: number }) {
-        const response = await axiosClient.get(
+        return this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.GENRES),
-            { timeout: config?.timeout ?? 10000 }
+            { timeout: config?.timeout ?? 10000 },
+            "getAnimeGenres"
         );
-        return response.data;
     }
 
     async searchCharacters(query: string, page?: number, config?: { timeout?: number }) {
         const params = { q: query, page, limit: 10 };
         const cleaned = this.cleanParams(params);
-        const response = await axiosClient.get(
+        const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.CHARACTER_SEARCH),
             {
                 params: cleaned,
                 timeout: config?.timeout ?? 10000,
-            }
+            },
+            "searchCharacters"
         );
-        return this.sliceResponse(response.data, params.limit);
+        return this.sliceResponse(data, params.limit);
     }
 
     async getAnimeByGenre(genreId: number, page?: number, config?: { timeout?: number }) {
@@ -199,14 +223,15 @@ class JikanProvider {
             limit: 20,
         };
         const cleaned = this.cleanParams(params);
-        const response = await axiosClient.get(
+        const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.ANIME_SEARCH),
             {
                 params: cleaned,
                 timeout: config?.timeout ?? 10000,
-            }
+            },
+            "getAnimeByGenre"
         );
-        return this.sliceResponse(response.data, params.limit);
+        return this.sliceResponse(data, params.limit);
     }
 }
 

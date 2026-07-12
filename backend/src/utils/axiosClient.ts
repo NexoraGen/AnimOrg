@@ -13,10 +13,15 @@ const axiosClient = axios.create({
     timeout: 10000,
 });
 
+console.log("Axios default timeout =", axiosClient.defaults.timeout);
+
 // Request Interceptor to log startTime and ensure browser-like headers
 axiosClient.interceptors.request.use(
     (config: CustomAxiosRequestConfig) => {
         config.metadata = { startTime: new Date() };
+
+        // Log the exact Axios timeout configuration for this request
+        console.log(`[Axios Debug] Requesting ${config.url || ""}. Config timeout =`, config.timeout);
 
         // Ensure browser headers are injected directly to prevent Axios defaults and Jikan rate-limiting blocks
         config.headers = config.headers || {};

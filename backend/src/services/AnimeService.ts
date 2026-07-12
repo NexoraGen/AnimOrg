@@ -28,6 +28,17 @@ class AnimeService {
             saveCache(cacheKey, result, ttl);
             return result;
         } catch (error: any) {
+            console.error(`[AnimeService Error] Cache Key: ${cacheKey}`);
+            console.error(`- Error Message: ${error.message || "N/A"}`);
+            if (error.config) {
+                console.error(`- Axios URL: ${error.config.url}`);
+                console.error(`- Axios Params: ${JSON.stringify(error.config.params || {})}`);
+            }
+            if (error.response) {
+                console.error(`- Response Status: ${error.response.status}`);
+            }
+            console.error(`- Stack Trace:`, error.stack);
+
             const stale = getStaleCache<T>(cacheKey);
             if (stale) {
                 logger.info(`Serving stale cache fallback for key: "${cacheKey}"`, "AnimeService");

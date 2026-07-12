@@ -45,7 +45,18 @@ class HomeService {
         // Log failures individually
         results.forEach((res, index) => {
             if (res.status === "rejected") {
-                logger.error(`Home dashboard aggregate fetch failed at index ${index} (timeout or rate limit):`, res.reason);
+                const error = res.reason as any;
+                console.error(`[HomeService Error] Dashboard aggregation failed at index ${index}`);
+                console.error(`- Error Message: ${error?.message || "N/A"}`);
+                if (error?.config) {
+                    console.error(`- Axios URL: ${error.config.url}`);
+                    console.error(`- Axios Params: ${JSON.stringify(error.config.params || {})}`);
+                }
+                if (error?.response) {
+                    console.error(`- Response Status: ${error.response.status}`);
+                }
+                console.error(`- Stack Trace:`, error?.stack || "N/A");
+                logger.error(`Home dashboard aggregate fetch failed at index ${index} (timeout or rate limit):`, error);
             }
         });
 
