@@ -19,6 +19,18 @@ app.use(compression());
 app.use(express.json());
 app.use(morgan("dev"));
 
+// Health check endpoint for deployment platforms (Render, Railway, Koyeb, etc.)
+// Registered first to execute immediately and bypass router middlewares checks
+app.get("/healthz", (_req, res) => {
+    res.status(200).json({
+        success: true,
+        status: "OK",
+        service: "AnimOrg Backend",
+        version: "1.1.0",
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Register route handlers
 app.use("/api/anime", animeRoutes);
 app.use("/api/home", homeRoutes);
@@ -30,17 +42,6 @@ app.get("/", (req, res) => {
         status: "AnimOrg Backend Running",
         version: "1.1.0",
         environment: process.env.NODE_ENV,
-    });
-});
-
-// Health check endpoint for deployment platforms (Render, Railway, Koyeb, etc.)
-app.get("/healthz", (_req, res) => {
-    res.status(200).json({
-        success: true,
-        status: "OK",
-        service: "AnimOrg Backend",
-        version: "1.1.0",
-        timestamp: new Date().toISOString()
     });
 });
 
