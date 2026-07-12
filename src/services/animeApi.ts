@@ -258,13 +258,7 @@ export const animeApi = {
     );
   },
 
-  searchCharacters: async (query: string, page = 1, signal?: AbortSignal): Promise<{ data: any[], hasNextPage: boolean }> => {
-    return CacheManager.fetchWithCache(
-      `char_search_${query.toLowerCase()}_p${page}`,
-      () => RetryManager.execute(() => JikanAdapter.searchCharacters(query, page, signal)), // Jikan is better for raw char search in app
-      TTL.SEARCH
-    );
-  },
+
 
   getAnimeByGenre: async (genre: number | string, page = 1): Promise<Media[]> => {
     const genreStr = typeof genre === 'number' ? JIKAN_GENRE_MAP[genre] : genre;

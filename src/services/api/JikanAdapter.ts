@@ -171,19 +171,7 @@ export const JikanAdapter = {
         };
     },
 
-    searchCharacters: async (query: string, page = 1, signal?: AbortSignal): Promise<{ data: any[], hasNextPage: boolean }> => {
-        const data = await executeBackendQuery<any>(`${BASE_PATH}/characters?q=${encodeURIComponent(query)}&page=${page}`, signal);
-        return {
-            data: data.data.map((c: any) => ({
-                id: c.mal_id.toString(),
-                name: c.name,
-                imageUrl: c.images?.webp?.image_url || c.images?.jpg?.image_url,
-                about: c.about,
-                favorites: c.favorites,
-            })),
-            hasNextPage: data.pagination?.has_next_page || false
-        };
-    },
+
 
     getAiringSchedule: async (day?: string): Promise<Media[]> => {
         let url = `${BASE_PATH}/schedule`;

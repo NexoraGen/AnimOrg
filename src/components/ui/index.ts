@@ -13,7 +13,7 @@ export * from './EmptyRecommendations';
 export * from './StreamingHeader';
 export * from './HeroBanner';
 export * from './EpisodeList';
-export * from './CharacterSearchCard';
+
 export * from './AuthFeedback';
 export * from './AuthModal';
 export * from './ReviewComposer';

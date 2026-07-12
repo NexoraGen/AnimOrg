@@ -1,47 +1,62 @@
-# Retry Configuration Fix — Walkthrough
+# Search Simplification — Walkthrough
 
-## Problem
-The search endpoint was taking **34 seconds (backend)** / **51 seconds (app)** due to the backend retrying failed upstream 504 responses **3 times** with exponential backoff.
+## Changes Summary
 
-## Root Cause
-`axiosClient.ts` was configured with `retries: 3` and included HTTP 504 in `retryCondition`. When Jikan's `/characters` endpoint returned a 504, the backend would:
-1. Wait 10s for the first attempt to timeout/fail
-2. Wait ~2.5s exponential delay
-3. Retry (fail again in ~5s)
-4. Wait ~4.1s exponential delay
-5. Retry (fail again in ~0.3s)
-**Total: ~34 seconds** of wasted time for a single request.
-
-## Changes Made
-
-### [axiosClient.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/axiosClient.ts)
-render_diffs(file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/axiosClient.ts)
-
-### [JikanProvider.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/providers/JikanProvider.ts)
-render_diffs(file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/providers/JikanProvider.ts)
-
-## Verification Results
-
-### Retry Audit (No Duplicate Retries)
-| Layer | Has Retries? |
+### Files Modified
+| File | What Changed |
 |---|---|
-| `axios-retry` (axiosClient.ts) | Yes — but 504 excluded, search disabled via `noRetryConfig()` |
-| `RequestManager` | No — dedup only, deletes failed promises immediately |
-| `executeWithCache` (AnimeService.ts) | No — stale cache fallback only, no retry |
-| Express middleware (errorHandler.ts) | No — pass-through error handler |
-| Cloudflare Worker | No — single fetch, no retry |
+| [search.tsx](file:///m:/NEXORA%20GEN/AnimOrg2/app/(tabs)/search.tsx) | Removed all character search logic from global search |
+| [axiosClient.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/axiosClient.ts) | Removed 504 from retryable statuses, added `noRetryConfig()`, reduced retries 3→2 |
+| [JikanProvider.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/providers/JikanProvider.ts) | Search endpoints use `noRetryConfig()`, timeouts reduced to 4s |
 
-### Before vs After
+### Components Simplified in `search.tsx`
+- Removed `CharacterSearchCard` import
+- Removed `characterResults` state
+- Removed `handleCharacterPress` handler
+- Removed `Promise.all` — now uses direct `await animeApi.searchAnime()`
+- Removed character section from `ResultsListView`
+- Removed character data from `SEARCH_SESSION_CACHE`
+- Updated placeholder to `"Search anime..."`
+- Updated `showResults` and clear button logic
+
+### What Was Preserved
+- Backend `/api/anime/:id/characters` route — still used by Anime Details page
+- Backend `searchCharacters` service, provider, and controller
+- All debounce, cancellation, skeleton, caching, and pagination logic
+
+---
+
+## Search Flow
+
+### Before
+```
+User types → 500ms debounce → Promise.all([searchAnime, searchCharacters])
+→ Wait for BOTH to settle → Render
+```
+If characters failed (504), the entire search blocked for **34-51 seconds** due to retries + timeouts.
+
+### After
+```
+User types → 500ms debounce → searchAnime() → Render immediately
+```
+No character search. No `Promise.all`. No blocking.
+
+---
+
+## Performance
+
 | Metric | Before | After |
 |---|---|---|
-| Retry count (search) | 3 | **0** |
-| Retry count (other) | 3 | **2** (504 excluded) |
-| Avg failed search (backend) | ~34,000ms | **~1,020ms** |
-| Avg failed search (app) | ~51,000ms | **~1,332ms** |
+| Search duration (success) | 7.7s – 51s | **~1.8s** |
+| Search duration (failure) | 34s – 51s | **~4s** (timeout, no retries) |
+| Retries on search | 3 | **0** |
+| Anime Details characters | ✅ Works | ✅ Still works |
 
-### Test Results
-- Character search (504 failure): **1,020ms** ✅
-- Anime search (success): **1,602ms** ✅
-- Parallel Promise.all (both): **1,332ms** ✅
+---
+
+## Verification
 - `npm run build`: Clean ✅
-- `git push origin main`: Success ✅
+- Anime search `?q=naruto`: **1780ms**, 25 results ✅
+- Backend character endpoints preserved ✅
+- Committed: `"Remove character search from global search"` ✅
+- Pushed to `main` ✅

@@ -1,6 +1,6 @@
 {
   "artifactType": "ARTIFACT_TYPE_WALKTHROUGH",
-  "summary": "Documents the retry configuration fix that reduced search latency from 34-51 seconds to under 2 seconds, including before/after metrics, code changes, and verification results.",
-  "updatedAt": "2026-07-12T07:36:24.996480400Z",
-  "version": "29"
+  "summary": "Documents the complete search simplification: removing character search from global search, fixing retry configuration, and reducing search latency from 51s to under 2s.",
+  "updatedAt": "2026-07-12T07:48:05.660106300Z",
+  "version": "30"
 }
