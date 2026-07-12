@@ -65,7 +65,7 @@ app.get("/debug/jikan", async (_req, res) => {
             timeout: error.config?.timeout || axiosClient.defaults.timeout,
             status: error.response?.status || "N/A",
             duration: 0,
-            error: error.message || "N/A",
+            error: error.stack || error.message || String(error),
             dataPreview: "N/A"
         };
     }
@@ -94,7 +94,7 @@ app.get("/debug/jikan", async (_req, res) => {
             timeout: error.config?.timeout || configTimeout,
             status: error.response?.status || "N/A",
             duration: 0,
-            error: error.message || "N/A",
+            error: error.stack || error.message || String(error),
             dataPreview: "N/A"
         };
     }
