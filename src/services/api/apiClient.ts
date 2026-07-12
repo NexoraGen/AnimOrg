@@ -28,15 +28,19 @@ export const BACKEND_BASE = getBackendBaseUrl();
  * Unified rest query execution layer.
  * Standardizes fetch calls, logs endpoints during development, and intercepts proxy errors.
  */
-export const executeBackendQuery = async <T>(relativeUrl: string): Promise<T> => {
+export const executeBackendQuery = async <T>(relativeUrl: string, signal?: AbortSignal): Promise<T> => {
     const cleanUrl = relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`;
     const url = `${BACKEND_BASE}${cleanUrl}`;
 
     console.log(`[apiClient] Initiating request to URL: ${url}`);
 
     let response: Response;
+    const fetchStart = Date.now();
+    console.log(`[Search Metrics] [apiClient] Request start time for ${cleanUrl}: ${fetchStart}`);
     try {
-        response = await fetch(url);
+        response = await fetch(url, { signal });
+        const fetchDuration = Date.now() - fetchStart;
+        console.log(`[Search Metrics] [apiClient] Request duration for ${cleanUrl}: ${fetchDuration}ms`);
     } catch (networkError: any) {
         console.error(`[apiClient] Network connection failed for ${url}:`, networkError);
         throw new Error(`Connection to backend failed. Please ensure the backend is running.`);
@@ -56,7 +60,10 @@ export const executeBackendQuery = async <T>(relativeUrl: string): Promise<T> =>
         throw new Error(errorMsg);
     }
 
+    const jsonParseStart = Date.now();
     const json = await response.json();
+    const jsonParseDuration = Date.now() - jsonParseStart;
+    console.log(`[Search Metrics] [apiClient] JSON parse duration for ${cleanUrl}: ${jsonParseDuration}ms`);
 
     // Check if the response follows the error envelope structure
     if (json && json.success === false) {

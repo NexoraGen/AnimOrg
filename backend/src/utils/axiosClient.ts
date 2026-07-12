@@ -6,6 +6,11 @@ import logger from "./logger";
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
     metadata?: {
         startTime?: Date;
+        retryCount?: number;
+    };
+    // Allow callers to disable retries per-request (e.g. search)
+    "axios-retry"?: {
+        retries?: number;
     };
 }
 
@@ -18,7 +23,14 @@ console.log("Axios default timeout =", axiosClient.defaults.timeout);
 // Request Interceptor to log startTime and ensure browser-like headers
 axiosClient.interceptors.request.use(
     (config: CustomAxiosRequestConfig) => {
-        config.metadata = { startTime: new Date() };
+        // Initialize metadata on first attempt; on retries axios-retry re-uses the config
+        if (!config.metadata?.startTime) {
+            config.metadata = { startTime: new Date(), retryCount: 0 };
+        } else {
+            // Increment retry counter on subsequent attempts
+            config.metadata.retryCount = (config.metadata.retryCount || 0) + 1;
+            console.log(`[Axios Retry] Retry #${config.metadata.retryCount} for ${config.url || ""}`);
+        }
 
         // Log the exact Axios timeout configuration for this request
         console.log(`[Axios Debug] Requesting ${config.url || ""}. Config timeout =`, config.timeout);
@@ -43,12 +55,15 @@ axiosClient.interceptors.response.use(
         const config = response.config as CustomAxiosRequestConfig;
         if (config.metadata?.startTime) {
             const duration = new Date().getTime() - config.metadata.startTime.getTime();
+            const retries = config.metadata.retryCount || 0;
             logger.duration(
                 config.method?.toUpperCase() || "GET",
                 config.url || "",
                 duration,
                 response.status
             );
+            const cfCache = response.headers["cf-cache-status"];
+            console.log(`[Axios Debug] Total duration: ${duration}ms | Retries: ${retries} | CF-Cache-Status: ${cfCache || "NONE"}`);
         }
         return response;
     },
@@ -56,12 +71,14 @@ axiosClient.interceptors.response.use(
         const config = error.config as CustomAxiosRequestConfig | undefined;
         if (config?.metadata?.startTime) {
             const duration = new Date().getTime() - config.metadata.startTime.getTime();
+            const retries = config.metadata.retryCount || 0;
             logger.duration(
                 config.method?.toUpperCase() || "GET",
                 config.url || "",
                 duration,
                 error.response?.status || 500
             );
+            console.log(`[Axios Debug] FAILED Total duration: ${duration}ms | Retries: ${retries} | Status: ${error.response?.status || "N/A"}`);
         }
 
         // Log Jikan query failures
@@ -74,8 +91,10 @@ axiosClient.interceptors.response.use(
 );
 
 // Configure retry policy with custom logging
+// IMPORTANT: HTTP 504 is NOT retried — upstream gateway timeouts are terminal failures.
+// Retrying 504s caused 34+ second delays per search request.
 axiosRetry(axiosClient, {
-    retries: 3,
+    retries: 2,
     retryDelay: (retryCount, error) => {
         const status = error.response?.status;
         const headers = error.response?.headers;
@@ -99,22 +118,20 @@ axiosRetry(axiosClient, {
             }
         }
 
-        // Exponential backoff with jitter
-        const baseDelay = 1000;
-        const maxDelay = 10000;
-        const exponentialDelay = baseDelay * Math.pow(2, retryCount);
-        const jitter = Math.random() * 1000;
-        const delayMs = Math.min(maxDelay, exponentialDelay + jitter);
+        // Fixed short delay (no exponential backoff) to keep failure fast
+        const delayMs = 1000;
 
         const errorMsg = status ? `HTTP status ${status}` : error.message || "Axios retry triggered";
         logger.retry(retryCount, errorMsg, delayMs);
         return delayMs;
     },
     retryCondition: (error) => {
-        const DangerStatusCodes = [400, 401, 403, 404];
         const status = error.response?.status;
 
-        if (status && DangerStatusCodes.includes(status)) {
+        // Never retry these statuses — they are terminal failures
+        const noRetryStatuses = [400, 401, 403, 404, 504];
+        if (status && noRetryStatuses.includes(status)) {
+            console.log(`[Axios Retry] NOT retrying status ${status} — terminal failure`);
             return false;
         }
 
@@ -124,10 +141,20 @@ axiosRetry(axiosClient, {
             status === 429 ||
             status === 500 ||
             status === 502 ||
-            status === 503 ||
-            status === 504
+            status === 503
         );
     },
 });
+
+/**
+ * Creates a per-request config that disables all retries.
+ * Use this for search endpoints where fast failure is required.
+ */
+export function noRetryConfig(config?: Record<string, any>): Record<string, any> {
+    return {
+        ...config,
+        "axios-retry": { retries: 0 },
+    };
+}
 
 export default axiosClient;

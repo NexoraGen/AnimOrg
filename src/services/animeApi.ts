@@ -209,7 +209,8 @@ export const animeApi = {
     minScore?: number,
     orderBy?: string,
     sort?: string,
-    onRetryStatus?: (info: { attempt: number; maxAttempts: number; fallback: boolean; rawStatusMsg?: string }) => void
+    onRetryStatus?: (info: { attempt: number; maxAttempts: number; fallback: boolean; rawStatusMsg?: string }) => void,
+    signal?: AbortSignal
   ): Promise<{ data: Media[], hasNextPage: boolean }> => {
     // Unify mapping of genres for Cache Key
     const genresMapped: string[] = genres
@@ -233,7 +234,7 @@ export const animeApi = {
 
       try {
         return await RetryManager.execute(
-          () => AniListAdapter.searchAnime(query, page, genresMapped, minScore, orderBy, sort),
+          () => AniListAdapter.searchAnime(query, page, genresMapped, minScore, orderBy, sort, signal),
           3, 1000, proxyRetryStatus
         );
       } catch (err) {
@@ -242,7 +243,8 @@ export const animeApi = {
           () => JikanAdapter.searchAnime(
             query, page,
             genres.filter(g => typeof g === 'number') as number[],
-            minScore, orderBy, sort
+            minScore, orderBy, sort,
+            signal
           ),
           3, 1000, proxyRetryStatus
         );
@@ -256,10 +258,10 @@ export const animeApi = {
     );
   },
 
-  searchCharacters: async (query: string, page = 1): Promise<{ data: any[], hasNextPage: boolean }> => {
+  searchCharacters: async (query: string, page = 1, signal?: AbortSignal): Promise<{ data: any[], hasNextPage: boolean }> => {
     return CacheManager.fetchWithCache(
       `char_search_${query.toLowerCase()}_p${page}`,
-      () => RetryManager.execute(() => JikanAdapter.searchCharacters(query, page)), // Jikan is better for raw char search in app
+      () => RetryManager.execute(() => JikanAdapter.searchCharacters(query, page, signal)), // Jikan is better for raw char search in app
       TTL.SEARCH
     );
   },

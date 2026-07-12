@@ -1,4 +1,4 @@
-import axiosClient from "../utils/axiosClient";
+import axiosClient, { noRetryConfig } from "../utils/axiosClient";
 import { JIKAN_API } from "../config/constants";
 
 /**
@@ -84,10 +84,10 @@ class JikanProvider {
 
         const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.ANIME_SEARCH),
-            {
+            noRetryConfig({
                 params: cleaned,
-                timeout: config?.timeout ?? 12000,
-            },
+                timeout: config?.timeout ?? 4000,
+            }),
             "searchAnime"
         );
         return this.sliceResponse(data, params.limit);
@@ -205,10 +205,10 @@ class JikanProvider {
         const cleaned = this.cleanParams(params);
         const data = await this.executeGet(
             this.getUrl(JIKAN_API.ENDPOINTS.CHARACTER_SEARCH),
-            {
+            noRetryConfig({
                 params: cleaned,
-                timeout: config?.timeout ?? 10000,
-            },
+                timeout: config?.timeout ?? 4000,
+            }),
             "searchCharacters"
         );
         return this.sliceResponse(data, params.limit);

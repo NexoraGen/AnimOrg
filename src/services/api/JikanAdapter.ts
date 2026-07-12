@@ -46,15 +46,16 @@ export const JikanAdapter = {
         genres: number[] = [],
         minScore?: number,
         orderBy?: string,
-        sort?: string
+        sort?: string,
+        signal?: AbortSignal
     ): Promise<{ data: Media[], hasNextPage: boolean }> => {
-        let url = `${BASE_PATH}/search?q=${encodeURIComponent(query)}&page=${page}`;
+        let url = `${BASE_PATH}/search?q=${encodeURIComponent(query)}&page=${page}&limit=10`;
         if (genres.length > 0) url += `&genres=${genres.join(',')}`;
         if (minScore) url += `&minScore=${minScore}`;
         if (orderBy) url += `&orderBy=${orderBy}`;
         if (sort) url += `&sort=${sort}`;
 
-        const data = await executeBackendQuery<any>(url);
+        const data = await executeBackendQuery<any>(url, signal);
         return {
             data: (data.data || []).filter((item: any) => !isJikanExplicitContent(item)).map(mapJikanToMedia),
             hasNextPage: data.pagination?.has_next_page || false
@@ -170,8 +171,8 @@ export const JikanAdapter = {
         };
     },
 
-    searchCharacters: async (query: string, page = 1): Promise<{ data: any[], hasNextPage: boolean }> => {
-        const data = await executeBackendQuery<any>(`${BASE_PATH}/characters?q=${encodeURIComponent(query)}&page=${page}`);
+    searchCharacters: async (query: string, page = 1, signal?: AbortSignal): Promise<{ data: any[], hasNextPage: boolean }> => {
+        const data = await executeBackendQuery<any>(`${BASE_PATH}/characters?q=${encodeURIComponent(query)}&page=${page}`, signal);
         return {
             data: data.data.map((c: any) => ({
                 id: c.mal_id.toString(),

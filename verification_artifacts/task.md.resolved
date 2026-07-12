@@ -23,3 +23,81 @@
   - [x] Audit cache.ts and cacheWarmJob.ts for robustness and potential memory/logical issues
   - [x] Audit server and controller error boundaries and performance
   - [x] Create audit report and implement any necessary optimizations
+- [x] Phase 12: Resolve Render Healthcheck 404
+  - [x] Place healthz route at the top of route registries in server.ts
+  - [x] Run typescript compile checks
+  - [x] Confirm localhost local 200 responses
+  - [x] Verify build is ready for deployment push
+- [x] Phase 13: Expose Outbound Jikan Exceptions
+  - [x] Add detailed catch-block logging in JikanProvider.ts
+  - [x] Add detailed catch-block logging in AnimeService.ts
+  - [x] Add detailed catch-block logging in HomeService.ts
+  - [x] Refactor errorHandler.ts to return the full exception message (non-production mode / debug mode)
+  - [x] Run Typescript compile checks and verify local backend build
+- [x] Phase 14: Investigate 218ms Timeout Bug
+  - [x] Search codebase for timeout, AbortController, CancelToken, other axios instances
+  - [x] Add startup debug logs for axios defaults.timeout
+  - [x] Log config.timeout directly before all axios Client get requests
+  - [x] Isolate the exact source overriding the timeout to ~218ms
+- [x] Phase 15: Expose Render Exception Details
+  - [x] Implement detailed log dumps inside global errorHandler.ts (message, stack, Axios status/body/URL)
+  - [x] Verify controller endpoints call next(error) correctly
+  - [x] Verify JikanProvider and AnimeService do not swallow or modify error models before errorHandler
+  - [x] Perform local compilation built test verification
+- [x] Phase 16: Temporary Debug Route Connectivity Trace
+  - [x] Add GET /debug/jikan route in server.ts running both axiosClient and plain axios side-by-side
+  - [x] Log defaults.timeout, URL, headers, and Node versions on execution
+  - [x] Verify local compilation build is successful
+- [x] Phase 17: Deploy and Verify Debug Endpoint
+  - [x] Update /debug/jikan JSON response fields to match the exact keys requested (axiosClient: success/timeout/status/duration/error/dataPreview)
+  - [x] Commit all modified files to Git
+  - [x] Push changes to Github repository main branch
+  - [x] Poll the deployed endpoint on Render until it successfully responds with JSON results
+- [x] Phase 18: Add /debug/network Multi-API Connectivity Endpoint
+  - [x] Implement GET /debug/network in server.ts querying 4 public endpoints using raw axios
+  - [x] Verify typescript compilation and build locally
+  - [x] Commit and push /debug/network additions to Github
+  - [x] Poll /debug/network endpoint on Render and confirm JSON structure
+- [x] Phase 19: Implement Jikan Cloudflare Worker Proxy
+  - [x] Write the production-ready Workers script code to cloudflare-worker/index.js
+  - [x] Verify formatting and requirements compliance
+  - [x] Output the code directly for deployment
+- [x] Phase 20: Migrate Jikan to Cloudflare Worker Proxy
+  - [x] Replace JIKAN_API.BASE_URL with Cloudflare Worker proxy in constants.ts
+  - [x] Update Jikan base URLs in server.ts debug route instances
+  - [x] Run production tsc checks locally
+  - [x] Git commit and push changes
+  - [x] Poll healthz/home/details/search endpoints on Render and verify success
+- [x] Phase 21: Production Code Cleanup
+  - [x] Remove GET /debug/jikan and GET /debug/network from server.ts
+  - [x] Run production tsc checks locally
+  - [x] Git commit and push changes
+  - [x] Verify healthz/home/details/search endpoints of live Render backend
+- [x] Phase 22: Configure Environment Variable
+  - [x] Create and configure JIKAN_PROXY_URL in .env.example
+  - [x] Configure JIKAN_PROXY_URL in .env
+  - [x] Update JIKAN_API.BASE_URL in constants.ts to load process.env.JIKAN_PROXY_URL
+  - [x] Run build checks locally
+  - [x] Git commit and push changes
+- [x] Phase 23: Run the Application
+  - [x] Start Expo web server using npm run web
+  - [x] Verify frontend executes successfully in browser pages
+- [x] Phase 24: Optimize Search Flow
+  - [x] Implement AbortSignal in apiClient.ts, JikanAdapter.ts, AniListAdapter.ts, and animeApi.ts
+  - [x] Adjust default limits to 10 results in adapters and JikanProvider.ts backend
+  - [x] Add input states, debounce, cancel controller, in-memory SWR cache, and metrics in search.tsx
+  - [x] Verify build and performance metrics locally
+  - [x] Git commit and push changes
+- [x] Phase 25: Search Pipeline Profiling
+  - [x] Instrument frontend search hook/component with precise UI-to-network timers
+  - [x] Instrument backend controllers, service layer, and axios client request/response hooks
+  - [x] Instrument Cloudflare Worker or simulate/trace upstream delays
+  - [x] Measure exact durations for steps 1-11
+  - [x] Evaluate retries, request queuing, caching, and stale promises
+  - [x] Run diagnostic requests and analyze output logs
+  - [x] Generate comprehensive Timing Profile and Bottleneck Diagnostic Report
+
+
+
+
+

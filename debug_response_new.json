@@ -1,0 +1,26 @@
+{
+  "nodeVersion": "v24.14.1",
+  "axiosClient": {
+    "success": false,
+    "timeout": 2358.351698386291,
+    "status": "N/A",
+    "duration": 0,
+    "error": "AggregateError\n    at AxiosError.from (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:1355:24)\n    at RedirectableRequest.handleRequestError (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:4082:25)\n    at RedirectableRequest.emit (node:events:520:35)\n    at eventHandlers.<computed> (/opt/render/project/src/backend/node_modules/follow-redirects/index.js:56:24)\n    at ClientRequest.emit (node:events:508:28)\n    at emitErrorEvent (node:_http_client:108:11)\n    at TLSSocket.socketErrorListener (node:_http_client:575:5)\n    at TLSSocket.emit (node:events:520:35)\n    at emitErrorNT (node:internal/streams/destroy:170:8)\n    at emitErrorCloseNT (node:internal/streams/destroy:129:3)\n    at Axios.request (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:5517:41)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async Axios.request (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:5513:14)\n    at async Axios.request (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:5513:14)\n    at async /opt/render/project/src/backend/dist/server.js:48:26",
+    "dataPreview": "N/A"
+  },
+  "plainAxios": {
+    "success": false,
+    "timeout": 10000,
+    "status": "N/A",
+    "duration": 0,
+    "error": "AggregateError\n    at AxiosError.from (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:1355:24)\n    at RedirectableRequest.handleRequestError (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:4082:25)\n    at RedirectableRequest.emit (node:events:520:35)\n    at eventHandlers.<computed> (/opt/render/project/src/backend/node_modules/follow-redirects/index.js:56:24)\n    at ClientRequest.emit (node:events:508:28)\n    at emitErrorEvent (node:_http_client:108:11)\n    at TLSSocket.socketErrorListener (node:_http_client:575:5)\n    at TLSSocket.emit (node:events:520:35)\n    at emitErrorNT (node:internal/streams/destroy:170:8)\n    at emitErrorCloseNT (node:internal/streams/destroy:129:3)\n    at Axios.request (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:5517:41)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async /opt/render/project/src/backend/dist/server.js:75:26",
+    "dataPreview": "N/A"
+  },
+  "httpbin": {
+    "success": false,
+    "status": 503,
+    "duration": 0,
+    "error": "AxiosError: Request failed with status code 503\n    at settle (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:2216:12)\n    at IncomingMessage.handleStreamEnd (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:4062:11)\n    at IncomingMessage.emit (node:events:520:35)\n    at endReadableNT (node:internal/streams/readable:1729:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:90:21)\n    at Axios.request (/opt/render/project/src/backend/node_modules/axios/dist/node/axios.cjs:5517:41)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async /opt/render/project/src/backend/dist/server.js:104:26",
+    "dataPreview": "N/A"
+  }
+}

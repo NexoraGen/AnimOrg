@@ -7,7 +7,7 @@ const ANILIST_URL = 'https://graphql.anilist.co';
  * Pure API Adapter for AniList GraphQL.
  * Does not contain retry logic or caching. (Handled by UnifiedAnimeService)
  */
-const executeGraphQLQuery = async (query: string, variables: any = {}): Promise<any> => {
+const executeGraphQLQuery = async (query: string, variables: any = {}, signal?: AbortSignal): Promise<any> => {
   console.log('[AniListAdapter] Initiating GraphQL request. Variables:', JSON.stringify(variables));
   let response: Response;
   try {
@@ -18,6 +18,7 @@ const executeGraphQLQuery = async (query: string, variables: any = {}): Promise<
         'Accept': 'application/json',
       },
       body: JSON.stringify({ query, variables }),
+      signal
     });
   } catch (networkError: any) {
     console.error('[AniListAdapter] Network fetch failed:', networkError?.message, networkError);
@@ -336,8 +337,8 @@ export const AniListAdapter = {
       .map((n: any) => mapAniListToMedia(n.mediaRecommendation));
   },
 
-  searchAnime: async (queryStr: string, page = 1, genres: string[] = [], minScore?: number, orderBy?: string, sort?: string): Promise<{ data: Media[], hasNextPage: boolean }> => {
-    let variables: any = { page, perPage: 20 };
+  searchAnime: async (queryStr: string, page = 1, genres: string[] = [], minScore?: number, orderBy?: string, sort?: string, signal?: AbortSignal): Promise<{ data: Media[], hasNextPage: boolean }> => {
+    let variables: any = { page, perPage: 10 };
     let matchStrings: string[] = ['type: ANIME'];
     let valHeaders: string[] = ['$page: Int', '$perPage: Int'];
 
@@ -378,7 +379,7 @@ export const AniListAdapter = {
       }
     `;
 
-    const data = await executeGraphQLQuery(query, variables);
+    const data = await executeGraphQLQuery(query, variables, signal);
     return {
       data: (data.Page?.media || []).map(mapAniListToMedia),
       hasNextPage: data.Page?.pageInfo?.hasNextPage || false

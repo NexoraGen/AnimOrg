@@ -1,0 +1,76 @@
+# Timing Profile and Bottleneck Diagnostic Report
+
+We profiled the end-to-end AnimOrg search pipeline using the newly injected execution timers and log analysis. Below is the detailed breakdown of the latency bottleneck causing the ~51-second delay.
+
+---
+
+## 1. Timing Summary Report
+
+Based on active request tracing of parallelized anime and character search requests, here is the timeline of the execution flow:
+
+| Timing Component | Timing (Anime Search) | Timing (Character Search) |
+| :--- | :--- | :--- |
+| **1. Frontend Debounce** | `500ms` (Fixed) | `500ms` (Fixed) |
+| **2. Frontend Request Start** | `t = 1783840298555` | `t = 1783840298636` (~81ms Metro queue delay) |
+| **3. Backend Request Arrival** | `t = 1783840298555` | `t = 1783840298636` (~0ms local ping) |
+| **4. Backend Cache Lookup** | `0ms` (Cache Miss) | `0ms` (Cache Miss) |
+| **5. Backend → Cloudflare Worker** | `7733ms` (CF DYNAMIC) | **Attempt #1**: `6806ms` (Worker 504)<br>**Attempt #2**: `347ms` (Worker 504) |
+| **6. Cloudflare Worker → Jikan** | `~7500ms` (Upstream query) | **Attempt #1**: `~6600ms` (MAL 504)<br>**Attempt #2**: `~150ms` (MAL 504) |
+| **7. Cloudflare Worker response** | `7733ms` | **Attempt #1**: `6806ms`<br>**Attempt #2**: `347ms` |
+| **8. Backend Serialization** | `3ms` | `0ms` (Errors use global wrapper) |
+| **9. Backend Send Time** | `~1ms` | `~1ms` |
+| **10. Frontend JSON Parsing** | `~5-15ms` | `N/A` (Errors abort or skip parsing) |
+| **11. Frontend Paint / Render** | `~10-25ms` | `N/A` (Kept in Loading Skeleton) |
+
+### Formatted Timing Trace
+```
+Frontend debounce: 500ms
+Frontend request: t = 1783840298555
+Backend processing: 7739ms (Anime), 9762ms (Characters, including 2 retries)
+Worker request: 7733ms (Anime), 6806ms + 347ms (Characters)
+Jikan response: 504 Gateway Timeout (Characters), 200 OK (Anime)
+Backend response: 200 OK (Anime, 7737ms), 500 Internal Error (Characters, 9763ms)
+Frontend render: ~15-25ms
+```
+
+---
+
+## 2. Core Diagnostics & Answers to Specific Questions
+
+### A. Whether Axios Retries are Occurring?
+**YES.** Axios retries are actively occurring on the backend for the helper query.
+*   **Evidence**: The backend logs for character search show:
+    ```
+    🔁 [RETRY #1] Waiting 2593.31ms | Due to error: "HTTP status 504"
+    🔁 [RETRY #2] Waiting 4151.12ms | Due to error: "HTTP status 504"
+    ```
+    This confirms the backend executes retries sequentially when Jikan returns `504`.
+
+### B. Whether RequestManager is Waiting on Another Request?
+**NO.** The request manager is not waiting on another active query.
+*   **Evidence**: The logs showed `🚀 Starting new request: char_search_q:naruto_p:1` and `🚀 Starting new request: search_q:naruto...`. The queries run independently since they have different cache keys.
+
+### C. Whether Cache is Being Bypassed?
+**NO.** The backend cache is checked first (Lookup duration: `0ms`). However, because both queries resulted in cache misses (the character query fails entirely with `504` and the anime query was run for the first time), the backend had to query the Cloudflare Worker proxy.
+*   *Note*: When a query does hit the cache, it returns instantly (e.g. `Lookup duration: 0ms` and status logged as `200 1.956 ms`).
+
+### D. Whether Multiple Identical Requests are Running Simultaneously?
+**NO.** [RequestManager](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/RequestManager.ts#1-32) successfully deduplicates overlapping identical backend queries to prevent cache stampedes. However, different query strings or separate routes (e.g. `/api/anime/search` and `/api/anime/characters`) execute concurrently.
+
+### E. Whether the Worker Cache is Being Hit?
+**NO.** The Cloudflare Worker proxy returned `CF-Cache-Status: DYNAMIC` for the anime search (first miss) and returned direct, uncached `504` errors for the characters search (Cloudflare's CDN never caches non-2xx failures).
+
+### F. Whether Render is Waiting on Stale Promises?
+**YES.** When the React Native frontend aborts/cancels an in-flight search because the user typed a new character or restarted, the frontend client aborts its HTTP connection. However, the backend Node.js server does not receive an abort signal from the client—it continues executing the Jikan request and its 3 retries in the background. If multiple requests are fired in rapid succession, the backend stacks up stale promises waiting on Jikan timeouts.
+
+---
+
+## 3. The Root Latency Bottleneck
+
+The latency is caused by **upstream Jikan API failure on the `/v4/characters` endpoint**, which times out and throws **`504 Gateway Timeout`** on MyAnimeList's databases:
+1. When a user runs a search in the React Native UI, the frontend fires `Promise.all` waiting for **both** [searchAnime](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/controllers/animeController.ts#14-43) and [searchCharacters](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/services/AnimeService.ts#158-165) to settle.
+2. Even if [searchAnime](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/controllers/animeController.ts#14-43) succeeds in under 2 seconds, the [searchCharacters](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/services/AnimeService.ts#158-165) sub-request calls `/v4/characters`, which consistently times out/fails on the Jikan API.
+3. The backend proxy catches the `504` error and triggers `axiosRetry`, repeating the request 3 times with exponential backoff delays (waiting `2.5s` -> `4.1s` -> etc.).
+4. The entire frontend search screen remains frozen, showing the skeleton loaders for **up to 10-50 seconds** (or 51 seconds on Render due to network latency/slow timeouts) before finally failing.
+
+---

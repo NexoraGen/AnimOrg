@@ -1,0 +1,42 @@
+{
+  "jikan": {
+    "success": false,
+    "statusCode": null,
+    "errorMessage": null,
+    "errorCode": "ETIMEDOUT",
+    "errorCause": "AggregateError",
+    "errorErrno": null,
+    "errorAddress": null,
+    "errorPort": null
+  },
+  "github": {
+    "success": true,
+    "statusCode": 200,
+    "errorMessage": null,
+    "errorCode": null,
+    "errorCause": null,
+    "errorErrno": null,
+    "errorAddress": null,
+    "errorPort": null
+  },
+  "jsonplaceholder": {
+    "success": true,
+    "statusCode": 200,
+    "errorMessage": null,
+    "errorCode": null,
+    "errorCause": null,
+    "errorErrno": null,
+    "errorAddress": null,
+    "errorPort": null
+  },
+  "google": {
+    "success": true,
+    "statusCode": 200,
+    "errorMessage": null,
+    "errorCode": null,
+    "errorCause": null,
+    "errorErrno": null,
+    "errorAddress": null,
+    "errorPort": null
+  }
+}

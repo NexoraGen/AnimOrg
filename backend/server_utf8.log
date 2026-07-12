@@ -1,0 +1,413 @@
+﻿Axios default timeout = 10000
+Γùç injected env (3) from .env // tip: Γîÿ override existing { override: true }
+≡ƒÜÇ AnimOrg Backend running on port 5000
+[Backend Debug] Search Characters request arrived: 1783840872807
+[Backend Cache] Lookup duration for key "char_search_q:naruto_p:1": 0ms
+≡ƒÄ» [CACHE MISS] Key: "char_search_q:naruto_p:1"
+≡ƒÜÇ Starting new request: char_search_q:naruto_p:1
+[Axios Debug] Requesting https://animorg-proxy.itisnexora.workers.dev/v4/characters. Config timeout = 10000
+[INFO] [JikanProvider] Requesting provider URL: GET https://animorg-proxy.itisnexora.workers.dev/v4/characters
+ΓÅ▒∩╕Å [DURATION] GET https://animorg-proxy.itisnexora.workers.dev/v4/characters - Status: 500 in 10042ms
+[Axios Debug] FAILED Total duration: 10042ms | Retries: 0 | Status: N/A
+node.exe : Γ¥î [JIKAN 
+FAILURE] Endpoint: "htt
+ps://animorg-proxy.itis
+nexora.workers.dev/v4/c
+haracters" | Status: 
+500 | Details: 
+"timeout of 10000ms 
+exceeded"
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (Γ¥î [JIKAN FA   
+ IL...000ms exceede    
+d":String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+[JikanProvider Error] 
+Method: 
+searchCharacters
+- Axios URL: https://an
+imorg-proxy.itisnexora.
+workers.dev/v4/characte
+rs
+- Axios Params: 
+{"q":"naruto"}
+- Response Status: N/A
+- Error Message: 
+timeout of 10000ms 
+exceeded
+- Stack Trace: 
+AxiosError: timeout of 
+10000ms exceeded
+    at 
+createTimeoutError 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:3612:14)
+    at RedirectableRequ
+est.handleTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:4140:15)
+    at RedirectableRequ
+est.emit 
+(node:events:508:28)
+    at RedirectableRequ
+est.emit 
+(node:domain:489:12)
+    at 
+Timeout._onTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\f
+ollow-redirects\index.j
+s:233:12)
+    at listOnTimeout (n
+ode:internal/timers:605
+:17)
+    at processTimers (n
+ode:internal/timers:541
+:7)
+    at Axios.request 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:5517:41)
+    at processTicksAndR
+ejections (node:interna
+l/process/task_queues:1
+04:5)
+    at async JikanProvi
+der.executeGet 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:15:30)
+    at async JikanProvi
+der.searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:206:22
+)
+    at async AnimeServi
+ce.executeWithCache 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\services\A
+nimeService.ts:30:28)
+    at async 
+searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\controller
+s\animeController.ts:15
+2:22)
+[AnimeService Error] 
+Cache Key: char_search_
+q:naruto_p:1
+- Error Message: 
+timeout of 10000ms 
+exceeded
+- Axios URL: https://an
+imorg-proxy.itisnexora.
+workers.dev/v4/characte
+rs
+- Axios Params: 
+{"q":"naruto"}
+- Stack Trace: 
+AxiosError: timeout of 
+10000ms exceeded
+    at 
+createTimeoutError 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:3612:14)
+    at RedirectableRequ
+est.handleTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:4140:15)
+    at RedirectableRequ
+est.emit 
+(node:events:508:28)
+    at RedirectableRequ
+est.emit 
+(node:domain:489:12)
+    at 
+Timeout._onTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\f
+ollow-redirects\index.j
+s:233:12)
+    at listOnTimeout (n
+ode:internal/timers:605
+:17)
+    at processTimers (n
+ode:internal/timers:541
+:7)
+    at Axios.request 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:5517:41)
+    at processTicksAndR
+ejections (node:interna
+l/process/task_queues:1
+04:5)
+    at async JikanProvi
+der.executeGet 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:15:30)
+    at async JikanProvi
+der.searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:206:22
+)
+    at async AnimeServi
+ce.executeWithCache 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\services\A
+nimeService.ts:30:28)
+    at async 
+searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\controller
+s\animeController.ts:15
+2:22)
+≡ƒÆÑ [ERROR] Failed 
+executing 
+cache-fallbacked 
+provider for key: "char
+_search_q:naruto_p:1" 
+Stack: AxiosError: 
+timeout of 10000ms 
+exceeded
+    at 
+createTimeoutError 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:3612:14)
+    at RedirectableRequ
+est.handleTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:4140:15)
+    at RedirectableRequ
+est.emit 
+(node:events:508:28)
+    at RedirectableRequ
+est.emit 
+(node:domain:489:12)
+    at 
+Timeout._onTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\f
+ollow-redirects\index.j
+s:233:12)
+    at listOnTimeout (n
+ode:internal/timers:605
+:17)
+    at processTimers (n
+ode:internal/timers:541
+:7)
+    at Axios.request 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:5517:41)
+    at processTicksAndR
+ejections (node:interna
+l/process/task_queues:1
+04:5)
+    at async JikanProvi
+der.executeGet 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:15:30)
+    at async JikanProvi
+der.searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:206:22
+)
+    at async AnimeServi
+ce.executeWithCache 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\services\A
+nimeService.ts:30:28)
+    at async 
+searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\controller
+s\animeController.ts:15
+2:22)
+=== DETAILED ERROR 
+ENCOUNTERED ===
+- Error Name: 
+AxiosError
+- Error Message: 
+timeout of 10000ms 
+exceeded
+- Error Stack: 
+AxiosError: timeout of 
+10000ms exceeded
+    at 
+createTimeoutError 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:3612:14)
+    at RedirectableRequ
+est.handleTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:4140:15)
+    at RedirectableRequ
+est.emit 
+(node:events:508:28)
+    at RedirectableRequ
+est.emit 
+(node:domain:489:12)
+    at 
+Timeout._onTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\f
+ollow-redirects\index.j
+s:233:12)
+    at listOnTimeout (n
+ode:internal/timers:605
+:17)
+    at processTimers (n
+ode:internal/timers:541
+:7)
+    at Axios.request 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:5517:41)
+    at processTicksAndR
+ejections (node:interna
+l/process/task_queues:1
+04:5)
+    at async JikanProvi
+der.executeGet 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:15:30)
+    at async JikanProvi
+der.searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:206:22
+)
+    at async AnimeServi
+ce.executeWithCache 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\services\A
+nimeService.ts:30:28)
+    at async 
+searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\controller
+s\animeController.ts:15
+2:22)
+- Axios Response: N/A
+- Axios Request URL: 
+GET https://animorg-pro
+xy.itisnexora.workers.d
+ev/v4/characters
+- Axios Request 
+Params: {"q":"naruto"}
+- Axios Request 
+Timeout config: 10000
+=======================
+============
+≡ƒÆÑ [ERROR] Error 
+encountered while 
+processing request 
+[GET] /api/anime/charac
+ters?q=naruto: 
+Stack: AxiosError: 
+timeout of 10000ms 
+exceeded
+    at 
+createTimeoutError 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:3612:14)
+    at RedirectableRequ
+est.handleTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:4140:15)
+    at RedirectableRequ
+est.emit 
+(node:events:508:28)
+    at RedirectableRequ
+est.emit 
+(node:domain:489:12)
+    at 
+Timeout._onTimeout 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\f
+ollow-redirects\index.j
+s:233:12)
+    at listOnTimeout (n
+ode:internal/timers:605
+:17)
+    at processTimers (n
+ode:internal/timers:541
+:7)
+    at Axios.request 
+(M:\NEXORA GEN\AnimOrg2
+\backend\node_modules\a
+xios\dist\node\axios.cj
+s:5517:41)
+    at processTicksAndR
+ejections (node:interna
+l/process/task_queues:1
+04:5)
+    at async JikanProvi
+der.executeGet 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:15:30)
+    at async JikanProvi
+der.searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\providers\
+JikanProvider.ts:206:22
+)
+    at async AnimeServi
+ce.executeWithCache 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\services\A
+nimeService.ts:30:28)
+    at async 
+searchCharacters 
+(M:\NEXORA GEN\AnimOrg2
+\backend\src\controller
+s\animeController.ts:15
+2:22)
+[0mGET /api/anime/characters?q=naruto [31m500[0m 10050.367 ms - 1399[0m

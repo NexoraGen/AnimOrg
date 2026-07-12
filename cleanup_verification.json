@@ -1,0 +1,25 @@
+{
+  "verifyResults": {
+    "healthz": {
+      "success": true,
+      "status": 200
+    },
+    "home": {
+      "success": true
+    },
+    "details": {
+      "success": true
+    },
+    "search": {
+      "success": true
+    },
+    "debugJikan": {
+      "success": true,
+      "status": 404
+    },
+    "debugNetwork": {
+      "success": true,
+      "status": 404
+    }
+  }
+}

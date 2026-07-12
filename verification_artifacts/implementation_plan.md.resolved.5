@@ -1,0 +1,25 @@
+# Production Code Cleanup Plan
+
+We will remove the temporary connectivity/troubleshooting code from the codebase to restore clean, production-grade logic.
+
+## Proposed Changes
+
+### Express Server Entry Point
+
+#### [MODIFY] [server.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/server.ts)
+- Remove `import axios from "axios"` (only used by debug endpoints).
+- Delete the `/debug/jikan` routes.
+- Delete the `/debug/network` routes.
+- Purge any raw debug console outputs.
+
+## Verification Plan
+
+### Automated / Manual Verification
+- Compile and build the backend using `npm run build`.
+- Run the server locally.
+- Confirm local endpoint success for all standard paths:
+  - `/healthz`
+  - `/api/home`
+  - `/api/anime/21`
+  - `/api/anime/search?q=naruto`
+- Ensure GET `/debug/jikan` and GET `/debug/network` now return `404 Not Found`.

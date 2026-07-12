@@ -14,7 +14,10 @@ class AnimeService {
         ttl: number,
         fetcher: () => Promise<T>
     ): Promise<T> {
+        const lookupStart = Date.now();
         const cached = getFreshCache<T>(cacheKey);
+        const lookupDuration = Date.now() - lookupStart;
+        console.log(`[Backend Cache] Lookup duration for key "${cacheKey}": ${lookupDuration}ms`);
         if (cached) {
             logger.cacheHit(cacheKey);
             return cached.data;

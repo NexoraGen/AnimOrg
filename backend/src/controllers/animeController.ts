@@ -13,6 +13,8 @@ export const getAnime = async (req: Request, res: Response, next: NextFunction) 
 
 export const searchAnime = async (req: Request, res: Response, next: NextFunction) => {
     try {
+        const arrival = Date.now();
+        console.log(`[Backend Debug] Search Anime request arrived: ${arrival}`);
         const query = req.query.q as string;
         const page = req.query.page ? Number(req.query.page) : undefined;
         const genres = req.query.genres as string | undefined;
@@ -30,7 +32,10 @@ export const searchAnime = async (req: Request, res: Response, next: NextFunctio
             sort,
             limit
         );
+        const serializeStart = Date.now();
         res.json(results);
+        const serializeDone = Date.now();
+        console.log(`[Backend Debug] Search Anime serialization time: ${serializeDone - serializeStart}ms | Total time in controller: ${serializeDone - arrival}ms`);
     } catch (error) {
         next(error);
     }
@@ -139,11 +144,16 @@ export const getAnimeGenres = async (_req: Request, res: Response, next: NextFun
 
 export const searchCharacters = async (req: Request, res: Response, next: NextFunction) => {
     try {
+        const arrival = Date.now();
+        console.log(`[Backend Debug] Search Characters request arrived: ${arrival}`);
         const query = req.query.q as string;
         const page = req.query.page ? Number(req.query.page) : undefined;
 
         const data = await AnimeService.searchCharacters(query, page);
+        const serializeStart = Date.now();
         res.json(data);
+        const serializeDone = Date.now();
+        console.log(`[Backend Debug] Search Characters serialization time: ${serializeDone - serializeStart}ms | Total time in controller: ${serializeDone - arrival}ms`);
     } catch (error) {
         next(error);
     }

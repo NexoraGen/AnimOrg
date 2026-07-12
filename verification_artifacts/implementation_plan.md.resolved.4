@@ -1,0 +1,33 @@
+# Jikan Cloudflare Worker Proxy Migration Plan
+
+We will redirect all outbound Jikan requests from the Node.js backend through our newly implemented Cloudflare Worker proxy to circumvent Cloudflare/Jikan IP blocks on Render subnets.
+
+## Proposed Changes
+
+### Configuration Updates
+
+#### [MODIFY] [constants.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/config/constants.ts)
+- Replace `BASE_URL: "https://api.jikan.moe/v4"` with `BASE_URL: "https://animorg-proxy.itisnexora.workers.dev/v4"`.
+
+---
+
+### Diagnostic Endpoints
+
+#### [MODIFY] [server.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/server.ts)
+- Replace the legacy `api.jikan.moe` URLs within the `/debug/jikan` and `/debug/network` endpoints with the Cloudflare Worker URL:
+  - `https://api.jikan.moe/v4/anime/21/full` -> `https://animorg-proxy.itisnexora.workers.dev/v4/anime/21/full`
+  - `https://api.jikan.moe/v4/random/anime` -> `https://animorg-proxy.itisnexora.workers.dev/v4/random/anime`
+
+## Verification Plan
+
+### Automated / Manual Verification
+- Compile and build the backend using `npm run build`.
+- Run the server locally.
+- Confirm local endpoint success.
+- Stage, commit, and push additions.
+- Wait for Render deployment.
+- Verify live endpoint JSON outputs:
+  - `/healthz`
+  - `/api/home`
+  - `/api/anime/21`
+  - `/api/anime/search?q=naruto`
