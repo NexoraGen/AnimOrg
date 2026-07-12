@@ -147,42 +147,7 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch(() => { });
   }, []);
 
-  useEffect(() => {
-    const unsubscribe = initializeAuth();
 
-    // Aggressive cleanup sweep of legacy oversized cache objects
-    // Fixes SQLite Full crashes globally on startup for corrupted devices
-    const performCleanupSweep = async () => {
-      try {
-        const legacyOverloads = [
-          'animorg_seasonal_airing_schedule_v2',
-          'swr_cache_schedule'
-        ];
-        await AsyncStorage.multiRemove(legacyOverloads);
-      } catch (e) {
-        // fail silently 
-      }
-    };
-    performCleanupSweep();
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      if (modalCount > 0) {
-        document.body.style.overflow = 'hidden';
-        document.body.style.width = '100%';
-        document.body.style.height = '100%';
-        document.body.style.position = 'fixed';
-      } else {
-        document.body.style.overflow = 'auto';
-        document.body.style.width = '';
-        document.body.style.height = '';
-        document.body.style.position = '';
-      }
-    }
-  }, [modalCount]);
 
   return (
     <ErrorBoundary>
