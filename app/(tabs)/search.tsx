@@ -26,8 +26,7 @@ import {
   SkeletonLoader,
   HEADER_HEIGHT,
   GenreChip,
-  SectionHeader,
-  CharacterSearchCard
+  SectionHeader
 } from '../../src/components/ui';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useRouter } from 'expo-router';
@@ -50,7 +49,6 @@ const THEME_MAP: Record<string, number> = {
 // Memory cache for active search session (Page 1 results)
 const SEARCH_SESSION_CACHE = new Map<string, {
   results: Media[];
-  characterResults: any[];
   hasNextPage: boolean;
 }>();
 
@@ -211,7 +209,6 @@ const SkeletonLoaderGrid = React.memo(({
 // Memoized List View
 const ResultsListView = React.memo(({
   results,
-  characterResults,
   numColumns,
   cardWidth,
   themeColors,
@@ -219,11 +216,9 @@ const ResultsListView = React.memo(({
   isMoreLoading,
   searchError,
   isLoading,
-  handleMediaPress,
-  handleCharacterPress
+  handleMediaPress
 }: {
   results: Media[];
-  characterResults: any[];
   numColumns: number;
   cardWidth: number;
   themeColors: any;
@@ -232,7 +227,6 @@ const ResultsListView = React.memo(({
   searchError: string | null;
   isLoading: boolean;
   handleMediaPress: (id: string) => void;
-  handleCharacterPress: (id: string) => void;
 }) => {
   return (
     <FlashList<Media>
@@ -262,20 +256,7 @@ const ResultsListView = React.memo(({
       )}
       ListFooterComponent={
         <>
-          {characterResults.length > 0 && (
-            <View style={styles.section}>
-              <SectionHeader title="Characters" icon="users" />
-              {characterResults.map(char => (
-                <CharacterSearchCard
-                  key={char.id}
-                  character={char}
-                  onPress={handleCharacterPress}
-                />
-              ))}
-            </View>
-          )}
-
-          {results.length === 0 && characterResults.length === 0 && !isLoading && (
+          {results.length === 0 && !isLoading && (
             <View style={{ alignItems: 'center', marginTop: 80, paddingHorizontal: spacing.xl }}>
               <Feather name="alert-circle" size={48} color={themeColors.textDim} style={{ marginBottom: spacing.md }} />
               <Text style={{ color: themeColors.textDim, fontSize: 16, textAlign: 'center', fontWeight: 'bold' }}>
@@ -324,7 +305,6 @@ export default function SearchScreen() {
   const debouncedQuery = useDebounce(inputText, 500);
 
   const [results, setResults] = useState<Media[]>([]);
-  const [characterResults, setCharacterResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isMoreLoading, setIsMoreLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -445,7 +425,6 @@ export default function SearchScreen() {
       if (debouncedQuery.trim() === '' && !hasFilters) {
         if (!isDiscoverMode) {
           setResults([]);
-          setCharacterResults([]);
         }
         setIsLoading(false);
         setPage(1);
@@ -462,13 +441,11 @@ export default function SearchScreen() {
       if (cached) {
         // Render instantly
         setResults(cached.results);
-        setCharacterResults(cached.characterResults);
         setHasNextPage(cached.hasNextPage);
         setIsLoading(false);
       } else {
         setIsLoading(true);
         setResults([]);
-        setCharacterResults([]);
       }
 
       setIsDiscoverMode(false);
@@ -498,16 +475,7 @@ export default function SearchScreen() {
 
         const apiStart = Date.now();
         console.log(`[Search Metrics] [search.tsx] Request start timestamp: ${apiStart} | query: "${debouncedQuery}"`);
-        const [animeResponse, charResponse] = await Promise.all([
-          animeApi.searchAnime(debouncedQuery, 1, selectedGenres, undefined, 'score', 'desc', onRetryStatus, controller.signal),
-          debouncedQuery.trim() !== ''
-            ? animeApi.searchCharacters(debouncedQuery, 1, controller.signal).catch(err => {
-              if (err.name === 'AbortError') throw err;
-              console.warn("Character search failed silently:", err);
-              return { data: [], hasNextPage: false };
-            })
-            : Promise.resolve({ data: [], hasNextPage: false })
-        ]);
+        const animeResponse = await animeApi.searchAnime(debouncedQuery, 1, selectedGenres, undefined, 'score', 'desc', onRetryStatus, controller.signal);
 
         const apiDuration = Date.now() - apiStart;
         console.log(`[Search Metrics] API response time: ${apiDuration}ms`);
@@ -515,14 +483,12 @@ export default function SearchScreen() {
         // Cache fresh results
         SEARCH_SESSION_CACHE.set(cacheKey, {
           results: animeResponse.data,
-          characterResults: charResponse.data,
           hasNextPage: animeResponse.hasNextPage
         });
 
         setResults(animeResponse.data);
         setHasNextPage(animeResponse.hasNextPage);
         setSnackbarMessage(null);
-        setCharacterResults(charResponse.data);
       } catch (error: any) {
         if (error.name === 'AbortError') {
           console.log(`[Search] Search query "${debouncedQuery}" cancelled.`);
@@ -567,9 +533,7 @@ export default function SearchScreen() {
     router.push(`/details/${id}`);
   };
 
-  const handleCharacterPress = (charId: string) => {
-    handleInputChange(results[0]?.title || inputText);
-  };
+
 
   // Profile render paint duration
   useEffect(() => {
@@ -577,7 +541,7 @@ export default function SearchScreen() {
     console.log(`[Search Metrics] Render time: ${elapsed.toFixed(2)}ms`);
   });
 
-  const showResults = results.length > 0 || characterResults.length > 0 || selectedGenres.length > 0 || debouncedQuery.trim() !== '';
+  const showResults = results.length > 0 || selectedGenres.length > 0 || debouncedQuery.trim() !== '';
 
   const isDebouncing = inputText.trim() !== '' && inputText !== debouncedQuery;
   const showSkeletons = isLoading || isDebouncing;
@@ -591,14 +555,14 @@ export default function SearchScreen() {
           <Feather name="search" color={themeColors.primary} size={20} />
           <TextInput
             style={[styles.input, { color: themeColors.text }]}
-            placeholder="Search anime, characters..."
+            placeholder="Search anime..."
             placeholderTextColor={themeColors.textDim}
             value={inputText}
             onChangeText={handleInputChange}
             returnKeyType="search"
           />
           {(inputText.length > 0 || selectedGenres.length > 0) && (
-            <TouchableOpacity onPress={() => { setInputText(''); setSelectedGenres([]); setResults([]); setCharacterResults([]); setSearchError(null); }} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => { setInputText(''); setSelectedGenres([]); setResults([]); setSearchError(null); }} activeOpacity={0.7}>
               <View style={[styles.clearButton, { backgroundColor: themeColors.surfaceVariant }]}>
                 <Feather name="x" color={themeColors.text} size={14} />
               </View>
@@ -630,7 +594,6 @@ export default function SearchScreen() {
         ) : showResults ? (
           <ResultsListView
             results={results}
-            characterResults={characterResults}
             numColumns={numColumns}
             cardWidth={cardWidth}
             themeColors={themeColors}
@@ -639,7 +602,6 @@ export default function SearchScreen() {
             searchError={searchError}
             isLoading={isLoading}
             handleMediaPress={handleMediaPress}
-            handleCharacterPress={handleCharacterPress}
           />
         ) : (
           <ThemesAndOptionsView

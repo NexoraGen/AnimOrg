@@ -1,6 +1,6 @@
 {
   "artifactType": "ARTIFACT_TYPE_WALKTHROUGH",
-  "summary": "walkthrough.md was updated to document UI error screen sanitization with embedded screenshots from browser validation.",
-  "updatedAt": "2026-07-12T02:42:51.046422600Z",
-  "version": "2"
+  "summary": "Documents the retry configuration fix that reduced search latency from 34-51 seconds to under 2 seconds, including before/after metrics, code changes, and verification results.",
+  "updatedAt": "2026-07-12T07:36:24.996480400Z",
+  "version": "29"
 }
