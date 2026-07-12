@@ -98,6 +98,34 @@ app.get("/debug/jikan", async (_req, res) => {
             dataPreview: "N/A"
         };
     }
+
+    // 3. HTTPBin Test (to verify general outbound internet access)
+    try {
+        const start = Date.now();
+        console.log(`- Requesting via raw axios to httpbin: GET https://httpbin.org/get`);
+        const response = await axios.get("https://httpbin.org/get", {
+            timeout: 5000,
+            headers: { "User-Agent": "Mozilla/5.0" }
+        });
+        const duration = Date.now() - start;
+        results.httpbin = {
+            success: true,
+            status: response.status,
+            duration,
+            error: null,
+            dataPreview: JSON.stringify(response.data).substring(0, 200)
+        };
+        console.log(`- httpbin SUCCESS: status ${response.status} in ${duration}ms`);
+    } catch (error: any) {
+        console.error("- httpbin FAILED:", error.message || error);
+        results.httpbin = {
+            success: false,
+            status: error.response?.status || "N/A",
+            duration: 0,
+            error: error.stack || error.message || String(error),
+            dataPreview: "N/A"
+        };
+    }
     console.log("=======================================");
 
     res.json(results);
