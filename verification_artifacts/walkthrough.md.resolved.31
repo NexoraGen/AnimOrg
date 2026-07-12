@@ -1,0 +1,58 @@
+# Search Simplification & Startup Optimization — Walkthrough
+
+## Changes Summary
+
+### Files Modified
+| File | What Changed |
+|---|---|
+| [search.tsx](file:///m:/NEXORA%20GEN/AnimOrg2/app/(tabs)/search.tsx) | Removed all character search logic from global search |
+| [_layout.tsx](file:///m:/NEXORA%20GEN/AnimOrg2/app/_layout.tsx) | Removed duplicate [initializeAuth()](file:///m:/NEXORA%20GEN/AnimOrg2/src/store/useAppStore.ts#158-395) / [performCleanupSweep()](file:///m:/NEXORA%20GEN/AnimOrg2/app/_layout.tsx#109-122) useEffect triggers |
+| [axiosClient.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/axiosClient.ts) | Removed 504 from retryable statuses, added [noRetryConfig()](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/axiosClient.ts#149-159), reduced retries 3→2 |
+| [JikanProvider.ts](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/providers/JikanProvider.ts) | Search endpoints use [noRetryConfig()](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/utils/axiosClient.ts#149-159), timeouts reduced to 4s |
+| [JikanAdapter.ts](file:///m:/NEXORA%20GEN/AnimOrg2/src/services/api/JikanAdapter.ts) | Removed client-side [searchCharacters](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/services/AnimeService.ts#158-165) method |
+| [animeApi.ts](file:///m:/NEXORA%20GEN/AnimOrg2/src/services/animeApi.ts) | Removed client-side [searchCharacters](file:///m:/NEXORA%20GEN/AnimOrg2/backend/src/services/AnimeService.ts#158-165) method |
+| [CharacterSearchCard.tsx](file:///m:/NEXORA%20GEN/AnimOrg2/src/components/ui/CharacterSearchCard.tsx) | Deleted file |
+
+---
+
+## 1. App Startup Optimization
+- **Problem**: The Root Layout ([app/_layout.tsx](file:///m:/NEXORA%20GEN/AnimOrg2/app/_layout.tsx)) contained identical, duplicate `useEffect` blocks that mounted simultaneously. This triggered [initializeAuth()](file:///m:/NEXORA%20GEN/AnimOrg2/src/store/useAppStore.ts#158-395) twice on app start, leading to redundant Firebase auth and Firestore listener subscriptions, as well as multiple concurrent cache cleanup operations, causing increased app startup latency.
+- **Solution**: Removed the redundant duplicate `useEffect` blocks so that authentication listener and AsyncStorage cleanup register exactly once on mount, streamlining javascript boot execution.
+
+---
+
+## 2. Search Flow
+
+### Before
+```
+User types → 500ms debounce → Promise.all([searchAnime, searchCharacters])
+→ Wait for BOTH to settle → Render
+```
+If characters failed (504), the entire search blocked for **34-51 seconds** due to retries + timeouts.
+
+### After
+```
+User types → 500ms debounce → searchAnime() → Render immediately
+```
+No character search. No `Promise.all`. No blocking.
+
+---
+
+## Performance
+
+| Metric | Before | After |
+|---|---|---|
+| Search duration (success) | 7.7s – 51s | **~1.8s** |
+| Search duration (failure) | 34s – 51s | **~4s** (timeout, no retries) |
+| Retries on search | 3 | **0** |
+| Anime Details characters | ✅ Works | ✅ Still works |
+| App Startup Listener Count | 2 onAuthStateChanged | **1 onAuthStateChanged** |
+
+---
+
+## Verification
+- `npm run build`: Clean ✅
+- `npx tsc --noEmit`: Clean ✅
+- Anime search `?q=naruto`: **1780ms**, 25 results ✅
+- Backend character endpoints preserved ✅
+- Committed & Pushed to `main` ✅

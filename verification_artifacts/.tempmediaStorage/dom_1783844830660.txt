@@ -1,0 +1,82 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+[0] (500,500)<div  />
+	[1] (39,38)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-backgroundColor-drfeu3 r-borderRadius-16uyjmq r-height-1ugchlj r-justifyContent-1777fci r-width-usgzl9' />
+		[2] (39,38)<div > />
+	[3] (962,38)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-backgroundColor-drfeu3 r-borderRadius-16uyjmq r-height-1ugchlj r-justifyContent-1777fci r-width-usgzl9' />
+		[4] (962,38)<div > />
+	[5] (500,500)<div class='css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-eqz5dr r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-11yh6sk r-overflowY-1rnoaur r-transform-agouwx' scrollable='true' />
+		[6] (492,101)<div class='css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-eqz5dr r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-11yh6sk r-overflowY-1rnoaur r-transform-agouwx' scrollable='true' />
+			475
+			[7] (498,1)<div >9/8/2016 />
+			[8] (485,78)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-justifyContent-1wtj0ep r-paddingBlock-w7s2jr r-paddingInline-3pj75a' />
+				[9] (470,77)<div  />
+					[10] (94,77)<div >474 />
+					[11] (498,77)<div  />
+						[12] (498,66)<div >Congratulations />
+						[13] (498,91)<div >9/1/2016 />
+				[14] (889,77)<div  />
+			[15] (485,168)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-justifyContent-1wtj0ep r-paddingBlock-w7s2jr r-paddingInline-3pj75a' />
+				[16] (470,168)<div  />
+					[17] (94,168)<div >473 />
+					[18] (498,168)<div  />
+						[19] (498,156)<div >The Sharingan Revived />
+						[20] (498,181)<div >8/25/2016 />
+				[21] (889,168)<div  />
+			[22] (485,258)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-justifyContent-1wtj0ep r-paddingBlock-w7s2jr r-paddingInline-3pj75a' />
+				[23] (470,258)<div  />
+					[24] (94,258)<div >472 />
+					[25] (498,258)<div  />
+						[26] (498,246)<div >You Better... />
+						[27] (498,272)<div >8/18/2016 />
+				[28] (889,258)<div  />
+			[29] (485,348)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-justifyContent-1wtj0ep r-paddingBlock-w7s2jr r-paddingInline-3pj75a' />
+				[30] (470,348)<div  />
+					[31] (94,348)<div >471 />
+					[32] (498,348)<div  />
+						[33] (498,336)<div >The Two of Them...Always />
+						[34] (498,362)<div >8/11/2016 />
+				[35] (889,348)<div  />
+			[36] (485,438)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-justifyContent-1wtj0ep r-paddingBlock-w7s2jr r-paddingInline-3pj75a' />
+				[37] (470,438)<div  />
+					[38] (94,438)<div >470 />
+					[39] (498,438)<div  />
+						[40] (498,426)<div >Connecting Thoughts />
+						[41] (498,452)<div >8/4/2016 />
+				[42] (889,438)<div  />
+			469
+			A Special Mission
+			7/28/2016
+			468
+			The Successor
+			7/21/2016
+			467
+			Ashura's Decision
+			7/7/2016
+			466
+			The Tumultuous Journey
+			6/30/2016
+			465
+			Ashura and Indra
+			6/16/2016
+			464
+			Ninshu: The Ninja Creed
+			6/9/2016
+		[43] (492,523)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-paddingBlock-zo2zu6' />
+			[44] (492,523)<div >Show More Released (+50) />
+		Live Discussions
+		[45] (877,621)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73' />
+			[46] (877,621)<div >Join Community />
+		[47] (492,710)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73' />
+			[48] (94,710)<div  />
+				[49] (94,710)<div > />
+			[50] (507,710)<div  />
+				[51] (507,696)<div >Active Episode Threads />
+				[52] (507,726)<div >Interact with the fandom and debate recent episodes. />
+			[53] (905,710)<div > />
+		Characters
+		[54] (492,1023)<div class='css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-lltvgl r-overflowY-buy8e9 r-transform-agouwx r-scrollbarWidth-2eszeu' scrollable='true' />
+
+</current_dom>

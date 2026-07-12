@@ -96,8 +96,12 @@
   - [x] Evaluate retries, request queuing, caching, and stale promises
   - [x] Run diagnostic requests and analyze output logs
   - [x] Generate comprehensive Timing Profile and Bottleneck Diagnostic Report
-
-
-
-
+- [x] Phase 26: Optimize App Startup Performance
+  - [x] Remove duplicated useEffect hook in app/_layout.tsx
+  - [x] Identify and refactor any other initialization bottlenecks in store or layouts
+  - [x] Verify build and startup performance
+- [x] Phase 27: Full production audit
+  - [x] Inspect frontend (Expo SDK, state sizing/partialize, FlashList)
+  - [x] Inspect backend proxy (Helmet, CORS, validator, node-cache, retry configuration)
+  - [x] Write comprehensive production audit report
 

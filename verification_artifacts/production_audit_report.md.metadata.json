@@ -1,5 +1,6 @@
 {
   "artifactType": "ARTIFACT_TYPE_OTHER",
-  "summary": "Production audit report analyzing security middleware, routing validators, query deduplication, retry policy, and in-memory cache resilience.",
-  "updatedAt": "2026-07-12T03:00:33.236581100Z"
+  "summary": "A comprehensive full-stack production readiness audit report for the AnimOrg React Native frontend and Express backend. Evaluates security, input validation, caching performance, retry configurations, state footprint pruning, and build system configuration.",
+  "updatedAt": "2026-07-12T08:10:54.330113Z",
+  "version": "1"
 }

@@ -1,0 +1,109 @@
+<current_dom_explanation>
+This is a temporary snapshot of the current page's DOM structure. The DOM will change if you navigate to or interact with another page. Use a tool like browser_get_dom to capture and preserve the DOM in your trajectory if needed for later reference.
+</current_dom_explanation>
+<current_dom>
+[0] (500,500)<div  />
+	Anim
+	Org
+	[1] (500,459)<div class='css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-eqz5dr r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-11yh6sk r-overflowY-1rnoaur r-transform-agouwx r-scrollbarWidth-2eszeu' scrollable='true' />
+		Gintama Season 3
+		⭐
+		9.0
+		•
+		Action • Comedy • Drama
+		•
+		ANIME
+		
+		View Details
+		
+		Trending Now
+		[2] (500,847)<div class='css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-lltvgl r-overflowY-buy8e9 r-transform-agouwx r-scrollbarWidth-2eszeu' scrollable='true' />
+			Daemons of the Shadow Realm
+			
+			7.8
+			Rich Girl Caretaker: I'm Secretly the Caregiver of the Most Popular Girl in This Rich Kid School
+			
+			7.2
+			BLACK TORCH
+			
+			7.2
+			That Time I Got Reincarnated as a Slime Season 4
+			
+			8.2
+	Anim
+	Org
+	
+	[3] (528,138)<input class='css-textinput-11aywtz r-placeholderTextColor-6taxm2 r-flex-13awgt0 r-fontSize-ubezar r-fontWeight-1kfrs79 r-marginLeft-1ow6zhx' placeholder='Search anime...' />
+	[4] (500,565)<div class='css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-eqz5dr r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-11yh6sk r-overflowY-1rnoaur r-transform-agouwx r-scrollbarWidth-2eszeu' scrollable='true' />
+		Anime Themes
+		[5] (500,317)<div class='css-view-g5y9jx r-WebkitOverflowScrolling-150rngu r-flexDirection-18u37iz r-flexGrow-16y2uox r-flexShrink-1wbh5a2 r-overflowX-lltvgl r-overflowY-buy8e9 r-transform-agouwx r-marginBottom-1peese0 r-scrollbarWidth-2eszeu' scrollable='true' />
+			[6] (127,271)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[7] (127,271)<div >Action />
+			[8] (127,328)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[9] (127,328)<div >Adventure />
+			[10] (300,271)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[11] (300,271)<div >Comedy />
+			[12] (300,328)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[13] (300,328)<div >Romance />
+			[14] (489,271)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[15] (489,271)<div >Psychological />
+			[16] (489,328)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[17] (489,328)<div >Fantasy />
+			[18] (669,271)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[19] (669,271)<div >Thriller />
+			[20] (669,328)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[21] (669,328)<div >Shonen />
+			[22] (816,271)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[23] (816,271)<div >Seinen />
+			[24] (816,328)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[25] (816,328)<div >Sports />
+			[26] (965,271)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[27] (965,271)<div >Sci-Fi />
+			[28] (965,328)<div class='css-view-g5y9jx r-cursor-1loqt21 r-touchAction-1otgn73 r-borderRadius-sdzlij r-marginBottom-5oul0u r-marginRight-1kb76zh r-paddingBlock-cnw61z r-paddingInline-3pj75a' />
+				[29] (965,328)<div >Mystery />
+		[30] (500,459)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderColor-1wioyrx r-borderRadius-y47klf r-borderWidth-rs99b7 r-boxShadow-27dw5e r-flexDirection-18u37iz r-height-wy61xf r-marginBottom-1peese0 r-overflow-1udh08x r-paddingInline-cxgwc0' />
+			[31] (97,459)<div  />
+				[32] (97,459)<div > />
+			[33] (522,459)<div  />
+				[34] (522,447)<div >Surprise Me! />
+				[35] (522,476)<div >Find something you'll love />
+			[36] (913,459)<div  />
+				[37] (913,459)<div > />
+		
+		Trending Topics
+		[38] (500,655)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-paddingBlock-w7s2jr r-paddingInline-is05cd' />
+			[39] (72,655)<div  />
+				[40] (72,655)<div >1 />
+			[41] (522,655)<div >Solo Leveling />
+			[42] (937,655)<div > />
+		[43] (500,733)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-paddingBlock-w7s2jr r-paddingInline-is05cd' />
+			[44] (72,733)<div  />
+				[45] (72,733)<div >2 />
+			[46] (522,733)<div >One Piece />
+			[47] (937,733)<div > />
+		[48] (500,812)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-paddingBlock-w7s2jr r-paddingInline-is05cd' />
+			[49] (72,811)<div  />
+				[50] (72,811)<div >3 />
+			[51] (522,811)<div >Jujutsu Kaisen />
+			[52] (937,811)<div > />
+		[53] (500,890)<div class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-borderBottomWidth-qklmqi r-flexDirection-18u37iz r-paddingBlock-w7s2jr r-paddingInline-is05cd' />
+			[54] (72,889)<div  />
+				[55] (72,889)<div >4 />
+			[56] (522,889)<div >Oshi no Ko />
+			[57] (937,889)<div > />
+	[58] (83,960)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[59] (83,960)<div  />
+			[60] (83,960)<div > />
+	[61] (250,960)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[62] (250,960)<div  />
+			[63] (250,960)<div > />
+	
+	
+	[64] (750,960)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[65] (750,960)<div  />
+			[66] (750,960)<div > />
+	[67] (917,960)<button class='css-view-g5y9jx r-transitionProperty-1i6wzkk r-userSelect-lrvibr r-cursor-1loqt21 r-touchAction-1otgn73 r-alignItems-1awozwy r-flex-13awgt0 r-justifyContent-1777fci' role='button' />
+		[68] (917,960)<div  />
+			[69] (917,960)<div > />
+
+</current_dom>

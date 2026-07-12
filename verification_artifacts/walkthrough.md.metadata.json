@@ -1,6 +1,6 @@
 {
   "artifactType": "ARTIFACT_TYPE_WALKTHROUGH",
-  "summary": "Documents the complete search simplification: removing character search from global search, fixing retry configuration, and reducing search latency from 51s to under 2s.",
-  "updatedAt": "2026-07-12T07:48:05.660106300Z",
-  "version": "30"
+  "summary": "Documents the search page simplification, app startup optimizations, and the successful browser verification showing search and details page functionality with embedded recordings and screenshots.",
+  "updatedAt": "2026-07-12T08:28:19.090301100Z",
+  "version": "32"
 }
