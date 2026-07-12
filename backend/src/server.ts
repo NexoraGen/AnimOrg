@@ -33,6 +33,17 @@ app.get("/", (req, res) => {
     });
 });
 
+// Health check endpoint for deployment platforms (Render, Railway, Koyeb, etc.)
+app.get("/healthz", (_req, res) => {
+    res.status(200).json({
+        success: true,
+        status: "OK",
+        service: "AnimOrg Backend",
+        version: "1.1.0",
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Centralized error handling middleware (must be registered last)
 app.use(errorHandler);
 
