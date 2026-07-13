@@ -37,8 +37,10 @@ import {
   EpisodeList,
   SkeletonLoader,
   ReviewComposer,
-  AuthPromptModal
+  AuthPromptModal,
+  TrackingNotificationPrompt
 } from '../../src/components/ui';
+import { notificationPermission } from '../../src/services/notificationPermission';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { CinematicModal } from '../../src/components/layout/CinematicModal';
 import { CharacterCard } from '../../src/components/features/CharacterCard';
@@ -197,6 +199,14 @@ function DetailsScreenInner() {
   const [isPostingReview, setIsPostingReview] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [showTrackingPrompt, setShowTrackingPrompt] = useState(false);
+
+  const checkAndPromptNotifications = async () => {
+    const shouldShow = await notificationPermission.shouldShowTrackingPrompt();
+    if (shouldShow) {
+      setShowTrackingPrompt(true);
+    }
+  };
 
   useEffect(() => {
     setModalActive(isStatusModalVisible);
@@ -384,7 +394,10 @@ function DetailsScreenInner() {
     if (isInWatchlist) {
       updateWatchlistStatus(id, status);
     } else {
-      if (media) addToWatchlist(media, status);
+      if (media) {
+        addToWatchlist(media, status);
+        checkAndPromptNotifications();
+      }
     }
     setStatusModalVisible(false);
     triggerHaptic('medium');
@@ -489,6 +502,7 @@ function DetailsScreenInner() {
       if (media) {
         await addToWatchlist(media, 'plan-to-watch');
         toggleFavorite(id);
+        checkAndPromptNotifications();
       }
     }
   };
@@ -914,6 +928,11 @@ function DetailsScreenInner() {
         visible={showAuthGate}
         onClose={() => setShowAuthGate(false)}
         message="Sign in to track episode progress, post reviews, and personalize your recommendations!"
+      />
+
+      <TrackingNotificationPrompt
+        visible={showTrackingPrompt}
+        onClose={() => setShowTrackingPrompt(false)}
       />
     </AnimatedScreen>
   );

@@ -28,6 +28,8 @@ if (Platform.OS !== 'web') {
 }
 
 import { CinematicOverlay } from '../src/components/ui/CinematicOverlay';
+import { NotificationPermissionDialog } from '../src/components/ui';
+import { notificationPermission } from '../src/services/notificationPermission';
 
 export default function RootLayout() {
   const [shouldShowSplash] = useState(() => {
@@ -49,6 +51,19 @@ export default function RootLayout() {
   const modalCount = useAppStore(state => state.modalCount);
   const isAppInitializing = useAppStore(state => state.isAppInitializing);
   const hasHydrated = useAppStore(state => state.hasHydrated);
+
+  const [showNotifDialog, setShowNotifDialog] = useState(false);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    const checkOnboarding = async () => {
+      const shown = await notificationPermission.hasOnboardingBeenShown();
+      if (!shown) {
+        setShowNotifDialog(true);
+      }
+    };
+    checkOnboarding();
+  }, [hasHydrated]);
 
   const router = useRouter();
   const segments = useSegments();
@@ -173,6 +188,10 @@ export default function RootLayout() {
         <CinematicOverlay visible={modalCount > 0} />
         <StatusBar style="light" />
         {(shouldShowSplash || !hasHydrated) && <CinematicStartupSplash isReady={!isAppInitializing && hasHydrated} />}
+        <NotificationPermissionDialog
+          visible={showNotifDialog}
+          onClose={() => setShowNotifDialog(false)}
+        />
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

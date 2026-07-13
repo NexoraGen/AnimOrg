@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, FlatList, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, FlatList, Modal, TextInput, AppState } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { useAppStore } from '../src/store/useAppStore';
@@ -15,6 +16,7 @@ import { GlassHeader } from '../src/components/ui';
 import { firestoreService } from '../src/services/firebase/firestore';
 import { searchTimezones, autoDetectTimezone } from '../src/utils/timezoneHelper';
 import { getLocalAiringInfo } from '../src/utils/releaseHelper';
+import { notificationPermission } from '../src/services/notificationPermission';
 
 export default function AppSettingsScreen() {
   const router = useRouter();
@@ -36,6 +38,55 @@ export default function AppSettingsScreen() {
 
   const [timezoneModalVisible, setTimezoneModalVisible] = React.useState(false);
   const [searchText, setSearchText] = React.useState('');
+
+  const [permissionStatus, setPermissionStatus] = React.useState<'unknown' | 'granted' | 'denied' | 'blocked'>('unknown');
+  const [upcomingAlertsEnabled, setUpcomingAlertsEnabled] = React.useState(true);
+  const [recommendationAlertsEnabled, setRecommendationAlertsEnabled] = React.useState(true);
+  const [announcementAlertsEnabled, setAnnouncementAlertsEnabled] = React.useState(true);
+
+  const checkPermission = React.useCallback(async () => {
+    const status = await notificationPermission.getPermissionStatus();
+    setPermissionStatus(status);
+  }, []);
+
+  React.useEffect(() => {
+    const loadGranularSettings = async () => {
+      try {
+        const upcoming = await AsyncStorage.getItem('animorg_notif_upcoming');
+        const rec = await AsyncStorage.getItem('animorg_notif_recommendation');
+        const news = await AsyncStorage.getItem('animorg_notif_news');
+
+        if (upcoming !== null) setUpcomingAlertsEnabled(upcoming === 'true');
+        if (rec !== null) setRecommendationAlertsEnabled(rec === 'true');
+        if (news !== null) setAnnouncementAlertsEnabled(news === 'true');
+      } catch (e) {
+        // Silent
+      }
+    };
+
+    loadGranularSettings();
+    checkPermission();
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        checkPermission();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [checkPermission]);
+
+  const toggleGranularSetting = async (key: string, value: boolean, setter: (val: boolean) => void) => {
+    setter(value);
+    triggerHaptic();
+    try {
+      await AsyncStorage.setItem(key, value.toString());
+    } catch {
+      // Silent
+    }
+  };
 
   const activeTimezoneId = user?.timezone || autoDetectTimezone().id;
   const filteredTimezones = React.useMemo(() => {
@@ -169,16 +220,67 @@ export default function AppSettingsScreen() {
         </View>
 
         <Text style={[styles.sectionTitle, { color: themeColors.primary }]}>NOTIFICATIONS</Text>
-        <View style={[styles.sectionGroup, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
-          {renderToggle('Push Notifications', 'bell', notificationsEnabled, () => {
-            setNotificationsEnabled(!notificationsEnabled);
+        <View style={[styles.sectionGroup, { backgroundColor: themeColors.surface, borderColor: themeColors.border, marginBottom: 12 }]}>
+          {renderToggle('Push Notifications', 'bell', notificationsEnabled && permissionStatus === 'granted', async () => {
+            if (permissionStatus === 'blocked' || permissionStatus === 'denied') {
+              Alert.alert(
+                "Notifications Disabled",
+                "Please enable notifications in your device settings to receive updates.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Open Settings", onPress: () => notificationPermission.openSettings() }
+                ]
+              );
+              return;
+            }
+            if (permissionStatus === 'unknown') {
+              const result = await notificationPermission.requestPermission();
+              setPermissionStatus(result);
+              if (result === 'granted') {
+                setNotificationsEnabled(true);
+              } else {
+                setNotificationsEnabled(false);
+              }
+              triggerHaptic();
+              return;
+            }
+
+            const nextVal = !notificationsEnabled;
+            setNotificationsEnabled(nextVal);
             triggerHaptic();
           })}
-          {renderToggle('Episode Releasing Alerts', 'tv', episodeAlertsEnabled, () => {
-            setEpisodeAlertsEnabled(!episodeAlertsEnabled);
-            triggerHaptic();
-          })}
+
+          <View style={(!notificationsEnabled || permissionStatus !== 'granted') && { opacity: 0.5 }} pointerEvents={(!notificationsEnabled || permissionStatus !== 'granted') ? 'none' : 'auto'}>
+            {renderToggle('Episode Releasing Alerts', 'tv', episodeAlertsEnabled, () => {
+              setEpisodeAlertsEnabled(!episodeAlertsEnabled);
+              triggerHaptic();
+            })}
+            {renderToggle('Upcoming Season Alerts', 'calendar', upcomingAlertsEnabled, () => {
+              toggleGranularSetting('animorg_notif_upcoming', !upcomingAlertsEnabled, setUpcomingAlertsEnabled);
+            })}
+            {renderToggle('Personalized Recommendations', 'aperture', recommendationAlertsEnabled, () => {
+              toggleGranularSetting('animorg_notif_recommendation', !recommendationAlertsEnabled, setRecommendationAlertsEnabled);
+            })}
+            {renderToggle('News & Announcements', 'file-text', announcementAlertsEnabled, () => {
+              toggleGranularSetting('animorg_notif_news', !announcementAlertsEnabled, setAnnouncementAlertsEnabled);
+            })}
+          </View>
         </View>
+
+        {(permissionStatus === 'blocked' || permissionStatus === 'denied') && (
+          <View style={[styles.warningBanner, { backgroundColor: `${themeColors.error}10`, borderColor: `${themeColors.error}30`, borderWidth: 1 }]}>
+            <Feather name="alert-triangle" size={16} color={themeColors.error} />
+            <Text style={[styles.warningText, { color: themeColors.textDim }]}>
+              Notifications are disabled for AnimOrg in your device settings.
+            </Text>
+            <TouchableOpacity
+              style={[styles.settingsButton, { backgroundColor: themeColors.primary }]}
+              onPress={() => notificationPermission.openSettings()}
+            >
+              <Text style={styles.settingsButtonText}>Open Settings</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <Text style={[styles.sectionTitle, { color: themeColors.primary }]}>REGION & TIME</Text>
         <View style={[styles.sectionGroup, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
@@ -597,6 +699,31 @@ const styles = StyleSheet.create({
   },
   tzLabelText: {
     fontSize: 11,
+  },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.xl,
+    gap: spacing.sm,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  settingsButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsButtonText: {
+    color: '#FFF',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
 });
 
