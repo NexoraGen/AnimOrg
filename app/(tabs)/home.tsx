@@ -264,6 +264,7 @@ export default function HomeScreen() {
           icon="zap"
           data={trendingAnime}
           onPress={handleMediaPress}
+          onViewAll={() => router.push('/category/trending')}
         />
 
         {recommendations.length > 0 ? (
@@ -272,6 +273,7 @@ export default function HomeScreen() {
             icon="heart"
             data={recommendations as any[]}
             onPress={handleMediaPress}
+            onViewAll={() => router.push('/category/made-for-you')}
             renderItem={({ item }) => (
               <View style={{ width: 170, paddingBottom: 4 }}>
                 <PosterCard
@@ -324,6 +326,7 @@ export default function HomeScreen() {
           icon="activity"
           data={seasonalAnime}
           onPress={handleMediaPress}
+          onViewAll={() => router.push('/category/current-season')}
         />
 
         {Object.entries(curatedAnime).map(([category, data]) => (
@@ -341,6 +344,7 @@ export default function HomeScreen() {
           icon="calendar"
           data={upcomingAnime}
           onPress={handleMediaPress}
+          onViewAll={() => router.push('/category/upcoming')}
         />
 
         <View style={{ height: 100 }} />
