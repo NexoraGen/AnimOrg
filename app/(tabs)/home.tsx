@@ -35,6 +35,7 @@ import { WatchNextSection } from '../../src/components/features/WatchNextSection
 import { notificationService } from '../../src/services/notifications';
 import { RecommendationService, RecommendationResult } from '../../src/services/RecommendationService';
 import { PosterCard } from '../../src/components/ui/PosterCard';
+import { ForYouSection } from '../../src/components/features/ForYouSection';
 
 const RotatingHeroBanner = React.memo(({ topRated, onPress }: { topRated: Media[], onPress: (id: string) => void }) => {
   const [heroAnime, setHeroAnime] = useState<Media | null>(null);
@@ -87,7 +88,6 @@ export default function HomeScreen() {
   const [seasonalAnime, setSeasonalAnime] = useState<Media[]>([]);
   const [upcomingAnime, setUpcomingAnime] = useState<Media[]>([]);
   const [curatedAnime, setCuratedAnime] = useState<Record<string, Media[]>>({});
-  const [recommendations, setRecommendations] = useState<RecommendationResult[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -182,14 +182,7 @@ export default function HomeScreen() {
 
       setCuratedAnime(premiumData);
 
-      // Advanced recommendation logic using the new Personalized Taste DNA Engine
-      const recs = await RecommendationService.getPersonalizedRecommendations(
-        watchlist,
-        userRatings,
-        getFavoriteGenres(),
-        15
-      );
-      setRecommendations(recs);
+
 
     } catch (error) {
       console.error('Error fetching home data:', error);
@@ -267,59 +260,7 @@ export default function HomeScreen() {
           onViewAll={() => router.push('/category/trending')}
         />
 
-        {recommendations.length > 0 ? (
-          <HorizontalCarousel
-            title="Made For Your Taste"
-            icon="heart"
-            data={recommendations as any[]}
-            onPress={handleMediaPress}
-            onViewAll={() => router.push('/category/made-for-you')}
-            renderItem={({ item }) => (
-              <View style={{ width: 170, paddingBottom: 4 }}>
-                <PosterCard
-                  media={item.anime}
-                  onPress={handleMediaPress}
-                  width={154}
-                  height={224}
-                />
-                <View style={{
-                  marginTop: 6,
-                  marginHorizontal: 8,
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  backgroundColor: 'rgba(255, 59, 48, 0.06)',
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: 'rgba(255, 59, 48, 0.12)',
-                  alignItems: 'center'
-                }}>
-                  <Text style={{
-                    color: themeColors.primary,
-                    fontSize: 10,
-                    fontWeight: '900',
-                    textAlign: 'center'
-                  }} numberOfLines={1}>
-                    🔥 {item.score}% Match
-                  </Text>
-                  <Text style={{
-                    color: themeColors.textDim,
-                    fontSize: 8.5,
-                    marginTop: 2,
-                    textAlign: 'center',
-                    fontWeight: '500' as any
-                  }} numberOfLines={1}>
-                    {item.reason}
-                  </Text>
-                </View>
-              </View>
-            )}
-            itemWidth={170}
-          />
-        ) : (
-          (watchlist.length === 0 && (continueWatching?.length || 0) === 0 && (userRatings?.length || 0) === 0) && (
-            <EmptyRecommendations onPress={() => router.push('/search')} />
-          )
-        )}
+        <ForYouSection />
 
         <HorizontalCarousel
           title="Airing This Season"

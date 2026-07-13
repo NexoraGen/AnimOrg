@@ -1,5 +1,7 @@
 import { animeApi } from '../services/animeApi';
 import { Media } from '../types';
+import { useAppStore } from '../store/useAppStore';
+import { RecommendationService } from '../services/RecommendationService';
 
 export interface CategoryConfig {
     title: string;
@@ -70,7 +72,16 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     'made-for-you': {
         title: 'Made For You',
         icon: 'heart',
-        fetchFn: async () => [], // Handled client-side via RecommendationService
+        fetchFn: async () => {
+            const { watchlist, userRatings, getFavoriteGenres } = useAppStore.getState();
+            const recs = await RecommendationService.getPersonalizedRecommendations(
+                watchlist,
+                userRatings,
+                getFavoriteGenres(),
+                30
+            );
+            return recs.map(r => r.anime);
+        },
         emptyMessage: "We're still learning your preferences. Add anime to your watchlist!",
         emptyIcon: 'heart',
         analyticsName: 'made_for_you',
