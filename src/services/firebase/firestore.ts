@@ -291,8 +291,12 @@ export const firestoreService = {
       const newCommentRef = doc(commentsRef);
       const commentId = newCommentRef.id;
 
+      const cleanCommentData = Object.fromEntries(
+        Object.entries(commentData).filter(([_, v]) => v !== undefined)
+      );
+
       const newComment = {
-        ...commentData,
+        ...cleanCommentData,
         id: commentId,
         createdAt: serverTimestamp(),
         likes: 0,
@@ -390,9 +394,12 @@ export const firestoreService = {
   // --- Notifications ---
   createNotification: async (notification: Omit<CommunityNotification, 'id' | 'createdAt' | 'read'>) => {
     try {
+      const cleanNotification = Object.fromEntries(
+        Object.entries(notification).filter(([_, v]) => v !== undefined)
+      );
       const notifRef = collection(db, 'notifications');
       await addDoc(notifRef, {
-        ...notification,
+        ...cleanNotification,
         read: false,
         createdAt: serverTimestamp(),
       });

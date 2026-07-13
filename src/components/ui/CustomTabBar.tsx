@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, TouchableOpacity, Animated, Platform, StyleSheet, Dimensions } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { spacing, borderRadius } from '../../theme';
 import { BlurView } from 'expo-blur';
@@ -9,8 +10,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
   const themeColors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const underlineAnim = useRef(new Animated.Value(0)).current;
-  
+
   const tabCount = state.routes.length;
   const tabWidth = SCREEN_WIDTH / tabCount;
 
@@ -24,11 +26,18 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
   }, [state.index]);
 
   return (
-    <View style={[styles.tabBar, { backgroundColor: themeColors.surface }]}>
+    <View style={[
+      styles.tabBar,
+      {
+        backgroundColor: themeColors.surface,
+        height: 64 + insets.bottom,
+        paddingBottom: insets.bottom,
+      }
+    ]}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
-        
+
         const onPress = () => {
           const event = navigation.emit({
             type: 'tabPress',
@@ -40,10 +49,10 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
           }
         };
 
-        const icon = options.tabBarIcon ? options.tabBarIcon({ 
-          focused: isFocused, 
-          color: isFocused ? themeColors.primary : themeColors.textDim, 
-          size: 24 
+        const icon = options.tabBarIcon ? options.tabBarIcon({
+          focused: isFocused,
+          color: isFocused ? themeColors.primary : themeColors.textDim,
+          size: 24
         }) : null;
 
         return (
@@ -56,7 +65,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
             activeOpacity={0.7}
           >
             <View style={[
-              styles.iconWrapper, 
+              styles.iconWrapper,
               isFocused && { backgroundColor: `${themeColors.primary}15` }
             ]}>
               {icon}
@@ -64,7 +73,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
           </TouchableOpacity>
         );
       })}
-      
+
       <Animated.View
         style={[
           styles.underline,
@@ -83,8 +92,6 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
 const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
-    height: Platform.OS === 'ios' ? 88 : 64,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 0,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.05)',
     position: 'relative',

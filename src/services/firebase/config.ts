@@ -35,7 +35,8 @@ try {
     dbInstance = initializeFirestore(app, {
         localCache: persistentLocalCache({
             tabManager: persistentMultipleTabManager() // Native/Web-safe resilient offline local caching
-        })
+        }),
+        ignoreUndefinedProperties: true
     });
 } catch (e) {
     console.warn("Firestore offline persistence failed to initialize (Quota or Environment issue), falling back to standard memory cache:", e);
@@ -43,7 +44,9 @@ try {
         const { getFirestore } = require('firebase/firestore');
         dbInstance = getFirestore(app);
     } catch (innerErr) {
-        dbInstance = initializeFirestore(app, {});
+        dbInstance = initializeFirestore(app, {
+            ignoreUndefinedProperties: true
+        });
     }
 }
 const db = dbInstance;

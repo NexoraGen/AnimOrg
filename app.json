@@ -25,7 +25,10 @@
       },
       "package": "com.nexora.animorg",
       "versionCode": 14,
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "splash": {
+        "backgroundColor": "#0B0B0B"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

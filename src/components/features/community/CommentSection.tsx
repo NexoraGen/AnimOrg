@@ -65,11 +65,16 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose })
                 postId: post.id,
                 userId: user.id,
                 username: user.username,
-                userAvatar: user.avatarUrl,
                 text: text.trim(),
-                parentId: replyTo?.id || undefined,
                 depth: replyTo ? (replyTo.depth || 0) + 1 : 0,
             };
+
+            if (user.avatarUrl) {
+                commentData.userAvatar = user.avatarUrl;
+            }
+            if (replyTo?.id) {
+                commentData.parentId = replyTo.id;
+            }
 
             await firestoreService.addPostComment(post.id, commentData);
 
@@ -140,22 +145,24 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose })
                     </View>
                 )}
                 {user ? (
-                    <View style={[styles.inputContainer, { borderTopColor: theme.border, backgroundColor: theme.surface }]}>
-                        <TextInput
-                            style={[styles.input, { color: theme.text }]}
-                            placeholder="Add a comment..."
-                            placeholderTextColor={theme.textDim}
-                            value={text}
-                            onChangeText={setText}
-                            multiline
-                        />
-                        <TouchableOpacity
-                            onPress={handleSend}
-                            disabled={!text.trim() || isPosting}
-                            style={[styles.sendBtn, { backgroundColor: text.trim() ? theme.primary : theme.surfaceVariant }]}
-                        >
-                            {isPosting ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="send" size={18} color="#fff" />}
-                        </TouchableOpacity>
+                    <View style={[styles.inputContainer, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
+                        <View style={[styles.inputWrapper, { borderColor: theme.border, backgroundColor: theme.surface }]}>
+                            <TextInput
+                                style={[styles.input, { color: theme.text }]}
+                                placeholder="Add a comment..."
+                                placeholderTextColor={theme.textDim}
+                                value={text}
+                                onChangeText={setText}
+                                multiline
+                            />
+                            <TouchableOpacity
+                                onPress={handleSend}
+                                disabled={!text.trim() || isPosting}
+                                style={[styles.sendBtn, { backgroundColor: text.trim() ? theme.primary : theme.surfaceVariant }]}
+                            >
+                                {isPosting ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="send" size={16} color="#fff" />}
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 ) : (
                     <View style={[styles.inputContainer, { borderTopColor: theme.border, backgroundColor: theme.surface, justifyContent: 'center', alignItems: 'center', gap: 12 }]}>
@@ -217,17 +224,26 @@ const styles = StyleSheet.create({
         fontSize: 12,
     },
     inputContainer: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        paddingBottom: Platform.OS === 'ios' ? 40 : spacing.sm,
+        borderTopWidth: 1,
+    },
+    inputWrapper: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: spacing.md,
-        paddingBottom: Platform.OS === 'ios' ? 40 : spacing.md,
-        borderTopWidth: 1,
+        borderWidth: 1,
+        borderRadius: 24,
+        paddingHorizontal: 16,
+        paddingVertical: Platform.OS === 'ios' ? 8 : 4,
+        flex: 1,
     },
     input: {
         flex: 1,
         maxHeight: 100,
         fontSize: 15,
-        paddingTop: 8,
+        paddingTop: Platform.OS === 'ios' ? 4 : 0,
+        paddingBottom: Platform.OS === 'ios' ? 4 : 0,
         paddingRight: 12,
     },
     sendBtn: {
@@ -236,5 +252,6 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         justifyContent: 'center',
         alignItems: 'center',
+        marginLeft: 8,
     }
 });
