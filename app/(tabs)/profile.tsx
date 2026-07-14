@@ -755,7 +755,7 @@ export default function ProfileScreen() {
               icon={<Feather name="log-out" color={themeColors.error} size={20} />}
             />
           )}
-          <Text style={[styles.versionText, { color: themeColors.textDim }]}>AnimOrg v1.0.6</Text>
+          <Text style={[styles.versionText, { color: themeColors.textDim }]}>AnimOrg v1.0.11</Text>
         </View>
       </Animated.ScrollView>
     </AnimatedScreen>
