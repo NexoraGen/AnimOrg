@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, WatchlistItem, Media, WatchHistoryEntry, UserRating, ActivityFeedItem, AnimeProgress, Episode } from '../types';
+import { User, WatchlistItem, Media, WatchHistoryEntry, UserRating, ActivityFeedItem, AnimeProgress, Episode, NotificationCategorySettings } from '../types';
 import { firebaseAuthService } from '../services/firebase/auth';
 import { firestoreService } from '../services/firebase/firestore';
 import { notificationService } from '../services/notifications';
 import { resolveAnimeTrackingStatus, getCurrentlyReleasedEpisodesCount } from '../utils/releaseHelper';
+import { XPService } from '../services/XPService';
+import { AchievementService } from '../services/AchievementService';
+import { getRankForLevel } from '../config/ranks';
 
 interface AppState {
   // Auth State
@@ -52,6 +55,8 @@ interface AppState {
   notificationsEnabled: boolean;
   setNotificationsEnabled: (enabled: boolean) => Promise<void>;
   registerNotifications: () => Promise<void>;
+  notificationSettings: NotificationCategorySettings;
+  updateNotificationSettings: (settings: Partial<NotificationCategorySettings>) => void;
 
   // Social State (Phase 4)
   following: string[];
@@ -108,6 +113,16 @@ interface AppState {
   // Hydration State
   hasHydrated: boolean;
   setHasHydrated: (val: boolean) => void;
+
+  // Level Up Modal & Progression State
+  levelUpModalVisible: boolean;
+  setLevelUpModalVisible: (val: boolean) => void;
+  levelUpModalData: { oldLevel: number; newLevel: number; isRankUp?: boolean } | null;
+  setLevelUpModalData: (data: { oldLevel: number; newLevel: number; isRankUp?: boolean } | null) => void;
+  levelUpAnimationsEnabled: boolean;
+  setLevelUpAnimationsEnabled: (val: boolean) => void;
+
+  awardXpAction: (event: string, context?: any) => Promise<void>;
 }
 
 let globalTrackedListener: (() => void) | null = null;
@@ -121,6 +136,62 @@ export const useAppStore = create<AppState>()(
 
       isAppInitializing: true,
       setIsAppInitializing: (val) => set({ isAppInitializing: val }),
+
+      // Level Up Modal & Progression State
+      levelUpModalVisible: false,
+      levelUpModalData: null,
+      levelUpAnimationsEnabled: true,
+      setLevelUpModalVisible: (val) => set({ levelUpModalVisible: val }),
+      setLevelUpModalData: (data) => set({ levelUpModalData: data }),
+      setLevelUpAnimationsEnabled: (val) => set({ levelUpAnimationsEnabled: val }),
+
+      awardXpAction: async (event, context) => {
+        const { user, watchlist, animeProgress, updateProfile, levelUpAnimationsEnabled } = get();
+        if (!user) return;
+
+        const xpResult = XPService.processXPEvent(user, event as any, context);
+        if (xpResult.xpAdded === 0 && !xpResult.levelUp) {
+          if (Object.keys(xpResult.updatedProfile).length > 0) {
+            await updateProfile(xpResult.updatedProfile);
+          }
+          return;
+        }
+
+        const currentBadges = user.badges || [];
+        const d = new Date();
+        const watchHour = d.getHours();
+        const watchDay = d.getDay();
+
+        const newBadges = AchievementService.evaluateBadges(
+          currentBadges,
+          watchlist,
+          animeProgress,
+          { watchHour, watchDay }
+        );
+
+        const badgesChanged = JSON.stringify(currentBadges) !== JSON.stringify(newBadges);
+        const profileUpdate = {
+          ...xpResult.updatedProfile,
+          ...(badgesChanged ? { badges: newBadges } : {})
+        };
+
+        await updateProfile(profileUpdate);
+
+        if (xpResult.levelUp && levelUpAnimationsEnabled) {
+          const oldRank = getRankForLevel(xpResult.oldLevel);
+          const newRank = getRankForLevel(xpResult.newLevel);
+          const rankUp = oldRank.title !== newRank.title;
+
+          set({
+            levelUpModalVisible: true,
+            levelUpModalData: {
+              oldLevel: xpResult.oldLevel,
+              newLevel: xpResult.newLevel,
+              isRankUp: rankUp
+            }
+          });
+        }
+      },
 
       // guest state
       isGuest: false,
@@ -344,6 +415,18 @@ export const useAppStore = create<AppState>()(
                   isLoadingAuth: false
                 });
 
+                // Check daily login XP
+                const currentUser = get().user;
+                if (currentUser) {
+                  const loginResult = XPService.processXPEvent(currentUser, 'DAILY_LOGIN');
+                  if (loginResult.xpAdded > 0) {
+                    set({ user: { ...currentUser, ...loginResult.updatedProfile } });
+                    firestoreService.updateUserProfile(currentUser.id, loginResult.updatedProfile).catch(e => {
+                      console.warn('Failed to save daily login XP:', e);
+                    });
+                  }
+                }
+
                 if (get().notificationsEnabled) {
                   get().registerNotifications();
                 }
@@ -446,6 +529,17 @@ export const useAppStore = create<AppState>()(
 
         set({ watchlist: [...watchlist, newItem] });
 
+        // Award XP actions
+        get().awardXpAction('ADD_TO_WATCHLIST');
+        if (status === 'watching') {
+          get().awardXpAction('START_TRACKING');
+        }
+        const existingGenres = new Set((watchlist || []).flatMap(w => w.genres || []));
+        const hasNewGenre = enrichedMedia.genres?.some(g => !existingGenres.has(g));
+        if (hasNewGenre) {
+          get().awardXpAction('DISCOVER_GENRE', { newGenre: true });
+        }
+
         addActivityFeedItem({
           type: 'added',
           animeId: enrichedMedia.id,
@@ -473,6 +567,14 @@ export const useAppStore = create<AppState>()(
             item.mediaId === mediaId ? { ...item, status } : item
           )
         });
+
+        // Award XP actions
+        if (status === 'watching') {
+          get().awardXpAction('START_TRACKING');
+        } else if (status === 'completed') {
+          const completedCount = watchlist.filter(w => w.status === 'completed').length;
+          get().awardXpAction('COMPLETE_ANIME', { firstCompleted: completedCount === 0 });
+        }
 
         if (user) {
           try {
@@ -668,6 +770,14 @@ export const useAppStore = create<AppState>()(
             console.error("Failed to sync episode progress:", error);
           }
         }
+
+        // 7. PROGRESSION XP UPDATES
+        if (watched) {
+          await get().awardXpAction('EPISODE_WATCHED');
+          if (highestEp > 0 && highestEp === totalEpisodes) {
+            await get().awardXpAction('FINISH_SEASON');
+          }
+        }
       },
 
       markSeasonWatched: async (animeId, episodeNums, totalCount, media) => {
@@ -692,6 +802,9 @@ export const useAppStore = create<AppState>()(
         // Update list of ratings (for profile display)
         const updatedRatings = get().userRatings.filter(r => r.animeId !== animeId);
         set({ userRatings: [newRating, ...updatedRatings] });
+
+        // Award XP for rating
+        await get().awardXpAction('RATE_ANIME');
 
         addActivityFeedItem({
           type: 'rated',
@@ -784,6 +897,27 @@ export const useAppStore = create<AppState>()(
       // Notification Actions (Phase 3)
       pushToken: null,
       notificationsEnabled: false,
+      notificationSettings: {
+        episodeReleases: true,
+        continueWatching: true,
+        recommendations: true,
+        achievements: true,
+        weeklySummary: true,
+        news: true,
+      },
+      updateNotificationSettings: (settings) => set((state) => ({
+        notificationSettings: {
+          ...(state.notificationSettings || {
+            episodeReleases: true,
+            continueWatching: true,
+            recommendations: true,
+            achievements: true,
+            weeklySummary: true,
+            news: true,
+          }),
+          ...settings,
+        }
+      })),
       setNotificationsEnabled: async (enabled) => {
         set({ notificationsEnabled: enabled });
         if (enabled) {
@@ -868,6 +1002,7 @@ export const useAppStore = create<AppState>()(
         const { searchHistory } = get();
         const filtered = searchHistory.filter(q => q !== query);
         set({ searchHistory: [query, ...filtered].slice(0, 10) });
+        get().awardXpAction('USE_SEARCH');
       },
       clearSearchHistory: () => set({ searchHistory: [] }),
 
@@ -877,6 +1012,7 @@ export const useAppStore = create<AppState>()(
         const { recentlyViewed } = get();
         const filtered = recentlyViewed.filter(m => m.id !== media.id);
         set({ recentlyViewed: [media, ...filtered].slice(0, 20) });
+        get().awardXpAction('OPEN_DETAILS');
       },
       clearRecentlyViewed: () => set({ recentlyViewed: [] }),
 
@@ -1000,6 +1136,7 @@ export const useAppStore = create<AppState>()(
         isGuest: state.isGuest,
         theme: state.theme,
         notificationsEnabled: state.notificationsEnabled,
+        notificationSettings: state.notificationSettings,
         pushToken: state.pushToken,
         autoplayTrailer: state.autoplayTrailer,
         reduceHaptics: state.reduceHaptics,
@@ -1008,6 +1145,7 @@ export const useAppStore = create<AppState>()(
         appLanguage: state.appLanguage,
         use24Hour: state.use24Hour,
         episodeAlertsEnabled: state.episodeAlertsEnabled,
+        levelUpAnimationsEnabled: state.levelUpAnimationsEnabled,
         // Severely prune massive datasets strictly prior to JSON serialization saving to SQLite
         watchlist: state.watchlist,
         animeProgress: Object.fromEntries(Object.entries(state.animeProgress || {}).slice(0, 150)),

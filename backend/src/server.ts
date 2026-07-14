@@ -1,15 +1,16 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import dotenv from "dotenv";
 import morgan from "morgan";
 import axiosClient from "./utils/axiosClient";
 import animeRoutes from "./routes/animeRoutes";
 import homeRoutes from "./routes/homeRoutes";
 import { errorHandler } from "./middleware/errorHandler";
 
-dotenv.config();
 
 const app = express();
 

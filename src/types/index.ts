@@ -95,6 +95,19 @@ export interface User {
   timezoneLabel?: string;
   country?: string;
   timeFormat?: '12h' | '24h';
+
+  // User progression
+  xp?: number;
+  level?: number;
+  badges?: string[];
+  lastLoginDate?: string;
+  searchCountToday?: number;
+  lastSearchDate?: string;
+  detailsViewCountToday?: number;
+  lastDetailsViewDate?: string;
+  currentStreak?: number;
+  longestStreak?: number;
+  lastWatchDate?: string;
 }
 
 export type WatchStatus = 'watching' | 'completed' | 'plan-to-watch' | 'dropped' | 'awaiting';
@@ -294,4 +307,13 @@ export interface PostFollow {
   followerId: string;
   followingId: string;
   createdAt: any;
+}
+
+export interface NotificationCategorySettings {
+  episodeReleases: boolean;
+  continueWatching: boolean;
+  recommendations: boolean;
+  achievements: boolean;
+  weeklySummary: boolean;
+  news: boolean;
 }

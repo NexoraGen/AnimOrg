@@ -33,16 +33,15 @@ export default function AppSettingsScreen() {
     use24Hour, setUse24Hour,
     notificationsEnabled, setNotificationsEnabled,
     user, updateProfile,
-    isGuest
+    isGuest,
+    levelUpAnimationsEnabled, setLevelUpAnimationsEnabled,
+    notificationSettings, updateNotificationSettings
   } = useAppStore();
 
   const [timezoneModalVisible, setTimezoneModalVisible] = React.useState(false);
   const [searchText, setSearchText] = React.useState('');
 
   const [permissionStatus, setPermissionStatus] = React.useState<'unknown' | 'granted' | 'denied' | 'blocked'>('unknown');
-  const [upcomingAlertsEnabled, setUpcomingAlertsEnabled] = React.useState(true);
-  const [recommendationAlertsEnabled, setRecommendationAlertsEnabled] = React.useState(true);
-  const [announcementAlertsEnabled, setAnnouncementAlertsEnabled] = React.useState(true);
 
   const checkPermission = React.useCallback(async () => {
     const status = await notificationPermission.getPermissionStatus();
@@ -50,21 +49,6 @@ export default function AppSettingsScreen() {
   }, []);
 
   React.useEffect(() => {
-    const loadGranularSettings = async () => {
-      try {
-        const upcoming = await AsyncStorage.getItem('animorg_notif_upcoming');
-        const rec = await AsyncStorage.getItem('animorg_notif_recommendation');
-        const news = await AsyncStorage.getItem('animorg_notif_news');
-
-        if (upcoming !== null) setUpcomingAlertsEnabled(upcoming === 'true');
-        if (rec !== null) setRecommendationAlertsEnabled(rec === 'true');
-        if (news !== null) setAnnouncementAlertsEnabled(news === 'true');
-      } catch (e) {
-        // Silent
-      }
-    };
-
-    loadGranularSettings();
     checkPermission();
 
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -77,16 +61,6 @@ export default function AppSettingsScreen() {
       subscription.remove();
     };
   }, [checkPermission]);
-
-  const toggleGranularSetting = async (key: string, value: boolean, setter: (val: boolean) => void) => {
-    setter(value);
-    triggerHaptic();
-    try {
-      await AsyncStorage.setItem(key, value.toString());
-    } catch {
-      // Silent
-    }
-  };
 
   const activeTimezoneId = user?.timezone || autoDetectTimezone().id;
   const filteredTimezones = React.useMemo(() => {
@@ -251,18 +225,29 @@ export default function AppSettingsScreen() {
           })}
 
           <View style={(!notificationsEnabled || permissionStatus !== 'granted') && { opacity: 0.5 }} pointerEvents={(!notificationsEnabled || permissionStatus !== 'granted') ? 'none' : 'auto'}>
-            {renderToggle('Episode Releasing Alerts', 'tv', episodeAlertsEnabled, () => {
-              setEpisodeAlertsEnabled(!episodeAlertsEnabled);
+            {renderToggle('Episode Releases', 'tv', notificationSettings?.episodeReleases ?? true, () => {
+              updateNotificationSettings({ episodeReleases: !(notificationSettings?.episodeReleases ?? true) });
               triggerHaptic();
             })}
-            {renderToggle('Upcoming Season Alerts', 'calendar', upcomingAlertsEnabled, () => {
-              toggleGranularSetting('animorg_notif_upcoming', !upcomingAlertsEnabled, setUpcomingAlertsEnabled);
+            {renderToggle('Continue Watching', 'clock', notificationSettings?.continueWatching ?? true, () => {
+              updateNotificationSettings({ continueWatching: !(notificationSettings?.continueWatching ?? true) });
+              triggerHaptic();
             })}
-            {renderToggle('Personalized Recommendations', 'aperture', recommendationAlertsEnabled, () => {
-              toggleGranularSetting('animorg_notif_recommendation', !recommendationAlertsEnabled, setRecommendationAlertsEnabled);
+            {renderToggle('Recommendations', 'aperture', notificationSettings?.recommendations ?? true, () => {
+              updateNotificationSettings({ recommendations: !(notificationSettings?.recommendations ?? true) });
+              triggerHaptic();
             })}
-            {renderToggle('News & Announcements', 'file-text', announcementAlertsEnabled, () => {
-              toggleGranularSetting('animorg_notif_news', !announcementAlertsEnabled, setAnnouncementAlertsEnabled);
+            {renderToggle('Achievements', 'award', notificationSettings?.achievements ?? true, () => {
+              updateNotificationSettings({ achievements: !(notificationSettings?.achievements ?? true) });
+              triggerHaptic();
+            })}
+            {renderToggle('Weekly Summary', 'list', notificationSettings?.weeklySummary ?? true, () => {
+              updateNotificationSettings({ weeklySummary: !(notificationSettings?.weeklySummary ?? true) });
+              triggerHaptic();
+            })}
+            {renderToggle('News & Announcements', 'file-text', notificationSettings?.news ?? true, () => {
+              updateNotificationSettings({ news: !(notificationSettings?.news ?? true) });
+              triggerHaptic();
             })}
           </View>
         </View>
@@ -324,6 +309,10 @@ export default function AppSettingsScreen() {
         <View style={[styles.sectionGroup, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           {renderToggle('Dark Mode', 'moon', theme === 'dark', toggleTheme)}
           {renderToggle('Reduce Haptic Feedback', 'smartphone', reduceHaptics, () => setReduceHaptics(!reduceHaptics))}
+          {renderToggle('Level Up Celebrations', 'award', levelUpAnimationsEnabled, () => {
+            setLevelUpAnimationsEnabled(!levelUpAnimationsEnabled);
+            triggerHaptic();
+          })}
         </View>
 
         <Text style={[styles.sectionTitle, { color: themeColors.primary }]}>PLAYBACK & DATA</Text>

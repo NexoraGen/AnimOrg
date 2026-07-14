@@ -39,6 +39,10 @@ import { CommunityPostCard } from '../../src/components/features/community/Commu
 import { CommunityPost } from '../../src/types';
 import { firestoreService } from '../../src/services/firebase/firestore';
 import { getAvatarSource } from '../../src/constants/avatars';
+import { LevelService } from '../../src/services/LevelService';
+import { ACHIEVEMENTS } from '../../src/config/achievements';
+import { LevelUpModal } from '../../src/components/ui/LevelUpModal';
+import { RankDetailsModal } from '../../src/components/ui/RankDetailsModal';
 
 const DEFAULT_BANNER = require('../../assets/profile-banner.png');
 const GUEST_AVATAR = require('../../assets/guest-avatar.png');
@@ -70,6 +74,12 @@ export default function ProfileScreen() {
   const refreshUserData = useAppStore(state => state.refreshUserData);
   const isAppInitializing = useAppStore(state => state.isAppInitializing);
 
+  const levelUpModalVisible = useAppStore(state => state.levelUpModalVisible);
+  const setLevelUpModalVisible = useAppStore(state => state.setLevelUpModalVisible);
+  const levelUpModalData = useAppStore(state => state.levelUpModalData);
+
+  const [rankModalVisible, setRankModalVisible] = React.useState(false);
+
   const [userPosts, setUserPosts] = React.useState<CommunityPost[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -84,7 +94,9 @@ export default function ProfileScreen() {
   const isGuest = !user || !user.email || !isAuthenticated;
 
   // --- All useMemo calls placed here, above any conditional return (Rules of Hooks) ---
-  const userLevel = useMemo(() => calculateUserLevel(watchlist || [], userRatings || []), [watchlist, userRatings]);
+  const levelInfo = useMemo(() => {
+    return LevelService.getLevelInfo(user?.xp || 0);
+  }, [user?.xp]);
 
   const stats = useMemo(() => {
     const totalEpisodesWatched = Object.values(animeProgress || {}).reduce((acc, p) => acc + (p.lastWatchedEpisode || 0), 0);
@@ -110,6 +122,17 @@ export default function ProfileScreen() {
     genres: item.genres || [],
     type: 'anime' as const,
   })), [watchlist]);
+
+  const topGenre = useMemo(() => {
+    const genreCounts: Record<string, number> = {};
+    (watchlist || []).forEach(item => {
+      item.genres?.forEach(g => {
+        genreCounts[g] = (genreCounts[g] || 0) + 1;
+      });
+    });
+    const sorted = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]);
+    return sorted.length > 0 ? sorted[0][0] : 'None';
+  }, [watchlist]);
 
   const ratedAnime = useMemo(() => (userRatings || []).map(r => ({
     id: r.animeId,
@@ -274,14 +297,51 @@ export default function ProfileScreen() {
 
               <View style={styles.headerTextContainer}>
                 <Text style={[styles.username, { color: 'white' }]}>{user?.username ? user.username : 'Guest User'}</Text>
+                {!isGuest && (
+                  <TouchableOpacity
+                    onPress={() => setRankModalVisible(true)}
+                    activeOpacity={0.7}
+                    style={styles.rankRowTouch}
+                  >
+                    <Text style={styles.rankPrefixIcon}>{levelInfo.rankIcon}</Text>
+                    <Text style={[styles.rankTextTitle, { color: themeColors.primary }]}>
+                      {levelInfo.rankTitle}
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 <View style={styles.badgeRow}>
-                  <View style={[styles.levelBadge, { backgroundColor: '#E5091425', borderColor: '#E50914' }]}>
-                    <Text style={[styles.levelText, { color: '#E50914' }]}>LVL {userLevel.level}</Text>
+                  <View style={[styles.levelBadge, { backgroundColor: `${themeColors.primary}20`, borderColor: themeColors.primary }]}>
+                    <Text style={[styles.levelText, { color: themeColors.primary }]}>LVL {levelInfo.level}</Text>
                   </View>
-                  <Text style={[styles.levelTitle, { color: 'rgba(255,255,255,0.8)' }]}>{userLevel.title}</Text>
+                  <Text style={[styles.levelTitle, { color: 'rgba(255,255,255,0.8)' }]}>{levelInfo.title}</Text>
                 </View>
               </View>
             </View>
+
+            {/* XP PROGRESS BAR */}
+            {!isGuest && (
+              <View style={styles.xpProgressContainer}>
+                <View style={styles.xpTextRow}>
+                  <Text style={[styles.xpText, { color: 'rgba(255,255,255,0.7)' }]}>
+                    {levelInfo.currentXp - levelInfo.xpForCurrentLevel} / {levelInfo.xpForNextLevel - levelInfo.xpForCurrentLevel} XP ({Math.round(levelInfo.progressPercentage)}%)
+                  </Text>
+                  <Text style={[styles.xpUntilText, { color: themeColors.primary }]}>
+                    {levelInfo.xpForNextLevel - levelInfo.currentXp} XP until Level {levelInfo.level + 1}
+                  </Text>
+                </View>
+                <View style={[styles.progressTrack, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      {
+                        backgroundColor: themeColors.primary,
+                        width: `${levelInfo.progressPercentage}%`
+                      }
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
 
             {isGuest ? (
               <TouchableOpacity
@@ -328,26 +388,46 @@ export default function ProfileScreen() {
           onPostsPress={() => { }}
         />
 
-        {/* --- PREMIUM COMPACT STATS --- */}
+        {/* --- PREMIUM COMPACT STATS GRID --- */}
         <View style={styles.statsContainer}>
           <View style={[styles.focusedStatBox, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
             <View style={styles.statHeaderRow}>
-              <View style={[styles.statIconCircle, { backgroundColor: '#E5091415' }]}>
+              <View style={[styles.statIconCircle, { backgroundColor: `${themeColors.primary}12` }]}>
                 <Feather name="play" size={16} color={themeColors.primary} />
               </View>
               <Text style={[styles.statValue, { color: 'white' }]}>{stats.episodes.toLocaleString()}</Text>
             </View>
-            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1}>Episodes</Text>
+            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>Episodes Watched</Text>
           </View>
 
           <View style={[styles.focusedStatBox, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
             <View style={styles.statHeaderRow}>
-              <View style={[styles.statIconCircle, { backgroundColor: '#E5091415' }]}>
+              <View style={[styles.statIconCircle, { backgroundColor: `${themeColors.primary}12` }]}>
                 <Feather name="clock" size={16} color={themeColors.primary} />
               </View>
-              <Text style={[styles.statValue, { color: 'white' }]}>{stats.days}</Text>
+              <Text style={[styles.statValue, { color: 'white' }]}>{Math.round(parseFloat(stats.days) * 24).toLocaleString()}h</Text>
             </View>
-            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1}>Days Watched</Text>
+            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>Hours Watched</Text>
+          </View>
+
+          <View style={[styles.focusedStatBox, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
+            <View style={styles.statHeaderRow}>
+              <View style={[styles.statIconCircle, { backgroundColor: `${themeColors.primary}12` }]}>
+                <Feather name="zap" size={16} color={themeColors.primary} />
+              </View>
+              <Text style={[styles.statValue, { color: 'white' }]}>{user?.currentStreak || 0}d</Text>
+            </View>
+            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>Current Streak</Text>
+          </View>
+
+          <View style={[styles.focusedStatBox, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
+            <View style={styles.statHeaderRow}>
+              <View style={[styles.statIconCircle, { backgroundColor: `${themeColors.primary}12` }]}>
+                <Feather name="award" size={16} color={themeColors.primary} />
+              </View>
+              <Text style={[styles.statValue, { color: 'white' }]}>{user?.longestStreak || 0}d</Text>
+            </View>
+            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>Longest Streak</Text>
           </View>
         </View>
 
@@ -441,6 +521,108 @@ export default function ProfileScreen() {
             ))}
           </View>
         </View>
+
+        {/* --- TASTE INSIGHT --- */}
+        {!isGuest && (
+          <View style={[styles.tasteInsightCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <Feather name="heart" size={18} color={themeColors.primary} />
+              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>Otaku Taste Insights</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }}>
+              <View>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>TOP GENRE</Text>
+                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>{topGenre}</Text>
+              </View>
+              <View>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>COMPLETED</Text>
+                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
+                  {(watchlist || []).filter(item => item.status === 'completed').length} Shows
+                </Text>
+              </View>
+              <View>
+                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>NEXT LEVEL</Text>
+                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
+                  {levelInfo.xpForNextLevel - levelInfo.currentXp} XP to go
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* --- ACHIEVEMENTS / BADGES GRID --- */}
+        {!isGuest && (
+          <View style={styles.section}>
+            <SectionHeader
+              title={`Unlocked Achievements (${(user?.badges || []).length}/${ACHIEVEMENTS.length})`}
+              onViewAll={undefined}
+            />
+            {user?.badges && user.badges.length > 0 ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.badgesScroll}
+              >
+                {ACHIEVEMENTS.map(badge => {
+                  const isUnlocked = user.badges?.includes(badge.id);
+                  return (
+                    <View
+                      key={badge.id}
+                      style={[
+                        styles.badgeCard,
+                        {
+                          backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                          borderColor: isUnlocked ? `${themeColors.primary}30` : 'rgba(255, 255, 255, 0.05)',
+                          opacity: isUnlocked ? 1 : 0.35
+                        }
+                      ]}
+                    >
+                      <View style={[
+                        styles.badgeIconCircle,
+                        {
+                          backgroundColor: isUnlocked ? `${themeColors.primary}15` : 'rgba(255, 255, 255, 0.03)'
+                        }
+                      ]}>
+                        <Feather
+                          name={badge.icon as any}
+                          size={18}
+                          color={isUnlocked ? themeColors.primary : 'rgba(255, 255, 255, 0.3)'}
+                        />
+                      </View>
+                      <Text style={[styles.badgeTitleText, { color: isUnlocked ? 'white' : 'rgba(255,255,255,0.4)', fontWeight: 'bold' }]} numberOfLines={1}>
+                        {badge.title}
+                      </Text>
+                      <Text style={[styles.badgeDescText, { color: 'rgba(255,255,255,0.5)' }]} numberOfLines={2}>
+                        {badge.description}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            ) : (
+              <View style={[styles.emptyBadgesCard, { borderColor: 'rgba(255,255,255,0.05)' }]}>
+                <Feather name="award" size={24} color="rgba(255,255,255,0.2)" />
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+                  No achievements unlocked yet. Track anime to earn badges!
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        <LevelUpModal
+          visible={levelUpModalVisible}
+          onClose={() => setLevelUpModalVisible(false)}
+          oldLevel={levelUpModalData?.oldLevel || 1}
+          newLevel={levelUpModalData?.newLevel || 1}
+          isRankUp={levelUpModalData?.isRankUp || false}
+        />
+
+        <RankDetailsModal
+          visible={rankModalVisible}
+          onClose={() => setRankModalVisible(false)}
+          levelInfo={levelInfo}
+        />
 
 
 
@@ -959,5 +1141,99 @@ const styles = StyleSheet.create({
   },
   tzLabelText: {
     fontSize: 11,
+  },
+
+  // Progression styles
+  xpProgressContainer: {
+    marginVertical: spacing.sm,
+    width: '100%',
+    paddingHorizontal: 4,
+  },
+  xpTextRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  xpText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  xpUntilText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  tasteInsightCard: {
+    marginHorizontal: spacing.xl,
+    padding: spacing.md,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  badgesScroll: {
+    paddingLeft: spacing.xl,
+    paddingRight: spacing.xl,
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  badgeCard: {
+    width: 140,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  badgeIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  badgeTitleText: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  badgeDescText: {
+    fontSize: 10,
+    textAlign: 'center',
+    lineHeight: 13,
+  },
+  emptyBadgesCard: {
+    marginHorizontal: spacing.xl,
+    padding: spacing.xl,
+    borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rankRowTouch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  rankPrefixIcon: {
+    fontSize: 14,
+  },
+  rankTextTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
