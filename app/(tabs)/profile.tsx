@@ -43,6 +43,7 @@ import { LevelService } from '../../src/services/LevelService';
 import { ACHIEVEMENTS } from '../../src/config/achievements';
 import { LevelUpModal } from '../../src/components/ui/LevelUpModal';
 import { RankDetailsModal } from '../../src/components/ui/RankDetailsModal';
+import { UserCollection } from '../../src/types';
 
 const DEFAULT_BANNER = require('../../assets/profile-banner.png');
 const GUEST_AVATAR = require('../../assets/guest-avatar.png');
@@ -61,6 +62,7 @@ export default function ProfileScreen() {
   const user = useAppStore(state => state.user);
   const updateProfile = useAppStore(state => state.updateProfile);
   const watchlist = useAppStore(state => state.watchlist);
+  const collections = useAppStore(state => state.collections);
   const userRatings = useAppStore(state => state.userRatings);
   const notificationsEnabled = useAppStore(state => state.notificationsEnabled);
   const setNotificationsEnabled = useAppStore(state => state.setNotificationsEnabled);
@@ -296,18 +298,35 @@ export default function ProfileScreen() {
               </TouchableOpacity>
 
               <View style={styles.headerTextContainer}>
-                <Text style={[styles.username, { color: 'white' }]}>{user?.username ? user.username : 'Guest User'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text style={[styles.username, { color: 'white' }]}>{user?.username ? user.username : 'Guest User'}</Text>
+                  {user?.favoriteBadgeId && (
+                    <View style={[styles.favoriteBadgeShowcase, { backgroundColor: `${themeColors.primary}20`, borderColor: themeColors.primary }]}>
+                      <Feather name={(ACHIEVEMENTS.find(a => a.id === user.favoriteBadgeId)?.icon || "award") as any} size={10} color={themeColors.primary} />
+                      <Text style={[styles.favoriteBadgeShowcaseText, { color: themeColors.primary }]} numberOfLines={1}>
+                        {ACHIEVEMENTS.find(a => a.id === user.favoriteBadgeId)?.title}
+                      </Text>
+                    </View>
+                  )}
+                </View>
                 {!isGuest && (
-                  <TouchableOpacity
-                    onPress={() => setRankModalVisible(true)}
-                    activeOpacity={0.7}
-                    style={styles.rankRowTouch}
-                  >
-                    <Text style={styles.rankPrefixIcon}>{levelInfo.rankIcon}</Text>
-                    <Text style={[styles.rankTextTitle, { color: themeColors.primary }]}>
-                      {levelInfo.rankTitle}
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                    <TouchableOpacity
+                      onPress={() => setRankModalVisible(true)}
+                      activeOpacity={0.7}
+                      style={styles.rankRowTouch}
+                    >
+                      <Text style={styles.rankPrefixIcon}>{levelInfo.rankIcon}</Text>
+                      <Text style={[styles.rankTextTitle, { color: themeColors.primary }]}>
+                        {levelInfo.rankTitle}
+                      </Text>
+                    </TouchableOpacity>
+                    {levelInfo.nextRankTitle && (
+                      <Text style={[styles.nextRankPromo, { color: themeColors.textDim }]}>
+                        Next Rank: {levelInfo.nextRankTitle} (Level {levelInfo.nextRankMinLevel})
+                      </Text>
+                    )}
+                  </View>
                 )}
                 <View style={styles.badgeRow}>
                   <View style={[styles.levelBadge, { backgroundColor: `${themeColors.primary}20`, borderColor: themeColors.primary }]}>
@@ -431,6 +450,66 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* --- ACHIEVEMENTS SUMMARY --- */}
+        {!isGuest && (
+          <View style={styles.section}>
+            <SectionHeader
+              title="Achievements"
+              onViewAll={() => router.push('/achievements' as any)}
+            />
+
+            <TouchableOpacity
+              style={[styles.achievementSummaryCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}
+              onPress={() => router.push('/achievements' as any)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.achievementSummaryHeader}>
+                <View style={styles.badgeCountContainer}>
+                  <Text style={[styles.badgeCountValue, { color: 'white' }]}>
+                    {user?.badges?.length || 0}
+                  </Text>
+                  <Text style={[styles.badgeCountLabel, { color: 'rgba(255,255,255,0.5)' }]}>
+                    / {ACHIEVEMENTS.length} Badges Earned
+                  </Text>
+                </View>
+
+                <View style={styles.badgeProgressCompact}>
+                  <Text style={[styles.badgeProgressPct, { color: themeColors.primary }]}>
+                    {Math.round(((user?.badges?.length || 0) / ACHIEVEMENTS.length) * 100)}% Complete
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.badgeIconShowcase}>
+                {ACHIEVEMENTS.slice(0, 5).map((badge) => {
+                  const isUnlocked = user?.badges?.includes(badge.id);
+                  return (
+                    <View
+                      key={badge.id}
+                      style={[
+                        styles.badgeIconBubble,
+                        {
+                          backgroundColor: isUnlocked ? `${themeColors.primary}15` : 'rgba(255,255,255,0.02)',
+                          borderColor: isUnlocked ? `${themeColors.primary}30` : 'rgba(255,255,255,0.04)'
+                        }
+                      ]}
+                    >
+                      <Feather
+                        name={(badge.icon || "award") as any}
+                        size={18}
+                        color={isUnlocked ? themeColors.primary : 'rgba(255,255,255,0.2)'}
+                      />
+                    </View>
+                  );
+                })}
+                <View style={styles.viewMoreBubble}>
+                  <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.6)" />
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* --- MY LISTS --- */}
         <View style={styles.section}>
           <SectionHeader title="My Lists" onViewAll={() => router.push('/watchlist')} />
@@ -471,6 +550,46 @@ export default function ProfileScreen() {
               </AnimatedPressable>
             ))}
           </View>
+        </View>
+
+        {/* --- CUSTOM COLLECTIONS --- */}
+        <View style={styles.section}>
+          <SectionHeader title="Custom Collections" onViewAll={() => router.push('/collections')} />
+          {collections.length === 0 ? (
+            <TouchableOpacity
+              style={[styles.emptyCollectionsCard, { borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' }]}
+              onPress={() => router.push('/collections')}
+            >
+              <Feather name="folder-plus" size={18} color={themeColors.primary} />
+              <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginLeft: 8 }}>
+                Create custom lists to group your favorites!
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: spacing.md, paddingVertical: 4 }}
+            >
+              {collections.map(col => (
+                <TouchableOpacity
+                  key={col.id}
+                  style={[styles.miniCollectionCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}
+                  onPress={() => router.push(`/collections/${col.id}`)}
+                >
+                  <Text style={{ fontSize: 20 }}>{col.emoji || '📂'}</Text>
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }} numberOfLines={1}>
+                      {col.name}
+                    </Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>
+                      {col.animeIds.length} titles
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
         </View>
 
         {/* --- SHOWS (Currently Watching) --- */}
@@ -971,6 +1090,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     opacity: 0.5,
   },
+  emptyCollectionsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  miniCollectionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 150,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
 
   // upgraded settings layout
   settingsRowClickable: {
@@ -1235,5 +1371,81 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.5,
+  },
+  nextRankPromo: {
+    fontSize: 10,
+    fontWeight: '600' as any,
+    opacity: 0.8,
+    marginTop: -2,
+    marginBottom: 4,
+    marginLeft: 4,
+  },
+  favoriteBadgeShowcase: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+    marginLeft: 8,
+    alignSelf: 'center',
+  },
+  favoriteBadgeShowcaseText: {
+    fontSize: 9,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  achievementSummaryCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: spacing.md,
+    gap: spacing.md,
+    marginHorizontal: spacing.xl,
+  },
+  achievementSummaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  badgeCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  badgeCountValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  badgeCountLabel: {
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  badgeProgressCompact: {},
+  badgeProgressPct: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  badgeIconShowcase: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  badgeIconBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewMoreBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 'auto',
   },
 });

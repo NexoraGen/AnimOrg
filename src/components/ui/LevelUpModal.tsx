@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { typography, spacing, borderRadius } from '../../theme';
 import { getLevelTitle } from '../../config/levelConfig';
-import { getRankForLevel } from '../../config/ranks';
+import { RankService } from '../../services/RankService';
 
 interface LevelUpModalProps {
     visible: boolean;
@@ -19,7 +19,7 @@ interface LevelUpModalProps {
 
 export const LevelUpModal: React.FC<LevelUpModalProps> = ({ visible, onClose, oldLevel, newLevel, isRankUp = false }) => {
     const themeColors = useThemeColors();
-    const rankInfo = getRankForLevel(newLevel);
+    const rankInfo = RankService.getRankByLevel(newLevel);
 
     useEffect(() => {
         if (visible) {

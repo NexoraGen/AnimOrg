@@ -1,5 +1,5 @@
 import { getXpForLevel, getLevelTitle } from '../config/levelConfig';
-import { getRankForLevel, getNextRank } from '../config/ranks';
+import { RankService } from './RankService';
 
 export interface LevelInfo {
     level: number;
@@ -38,8 +38,8 @@ export const LevelService = {
             ? Math.min(Math.max((xpIntoCurrentLevel / xpDiffNeeded) * 100, 0), 100)
             : 100;
 
-        const currentRank = getRankForLevel(level);
-        const nextRankObj = getNextRank(level);
+        const currentRank = RankService.getRankByLevel(level);
+        const nextRankObj = RankService.getNextRank(level);
 
         return {
             level,

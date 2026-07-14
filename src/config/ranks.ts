@@ -10,99 +10,64 @@ export const RANKS: RankDefinition[] = [
     {
         minimumLevel: 1,
         maximumLevel: 4,
-        title: 'Newcomer',
+        title: 'AnimOrg Rookie',
         icon: '🌱',
-        description: 'Welcome to AnimOrg! You are starting to catalog and discover your anime collection.'
+        description: 'Welcome to AnimOrg! Starting your premier tracking journey.'
     },
     {
         minimumLevel: 5,
         maximumLevel: 9,
-        title: 'Anime Explorer',
+        title: 'AnimOrg Explorer',
         icon: '✨',
-        description: 'You are discovering new worlds and building your anime journey.'
+        description: 'Diving into anime catalogs and setting up your first watchlist.'
     },
     {
         minimumLevel: 10,
         maximumLevel: 14,
-        title: 'Story Seeker',
+        title: 'AnimOrg Scout',
         icon: '🎬',
-        description: 'Diving deeper into complex narratives and tracking your seasonal favorites.'
+        description: 'Deeper tracking of seasonal titles, episodes, and reviews.'
     },
     {
         minimumLevel: 15,
-        maximumLevel: 19,
-        title: 'Manga Scholar',
-        icon: '📖',
-        description: 'Analyzing plot arcs, character development, and source adaptations.'
-    },
-    {
-        minimumLevel: 20,
         maximumLevel: 24,
-        title: 'Genre Connoisseur',
-        icon: '🎭',
-        description: 'Having broad knowledge across romance, action, slice-of-life and sci-fi genres.'
+        title: 'AnimOrg Enthusiast',
+        icon: '📖',
+        description: 'Expressing passion through reviews, ratings, and genre tags.'
     },
     {
         minimumLevel: 25,
-        maximumLevel: 29,
-        title: 'Elite Otaku',
-        icon: '⚔️',
-        description: 'A dedicated follower of Japanese animation, completing shows at an impressive pace.'
-    },
-    {
-        minimumLevel: 30,
         maximumLevel: 39,
-        title: 'Anime Veteran',
-        icon: '🔥',
-        description: 'Your dedication to anime continues to grow, and you have seen legendary masterpieces.'
+        title: 'AnimOrg Veteran',
+        icon: '⚔️',
+        description: 'A solid track record of watching classics and creating collections.'
     },
     {
         minimumLevel: 40,
-        maximumLevel: 49,
-        title: 'Mythic Collector',
-        icon: '💎',
-        description: 'Curating custom watchlists and rating anime like a seasoned industry critic.'
-    },
-    {
-        minimumLevel: 50,
-        maximumLevel: 64,
-        title: 'Grand Archivist',
+        maximumLevel: 59,
+        title: 'AnimOrg Elite',
         icon: '👑',
-        description: 'Holding memory of hundreds of episodes and detailed database knowledge.'
+        description: 'Commanding extensive database lists, rating insights, and scores.'
     },
     {
-        minimumLevel: 65,
+        minimumLevel: 60,
         maximumLevel: 79,
-        title: 'Celestial Curator',
+        title: 'AnimOrg Master',
         icon: '🌌',
-        description: 'Floating above ordinary realms of fandom, organizing lists with ultimate precision.'
+        description: 'Deep dedication with hundreds of watched episodes cataloged.'
     },
     {
         minimumLevel: 80,
         maximumLevel: 99,
-        title: 'Anime Virtuoso',
+        title: 'AnimOrg Legend',
         icon: '🏆',
-        description: 'Flawless commitment to anime cataloging, tracking every watch milestone.'
+        description: 'A mythic presence in the community, logging milestones effortlessly.'
     },
     {
         minimumLevel: 100,
         maximumLevel: 9999,
-        title: 'AnimOrg Legend',
+        title: 'AnimOrg Grandmaster',
         icon: '🚀',
-        description: 'The absolute pinnacle. Your title is etched forever in the history of anime trackers.'
+        description: 'The absolute zenith of tracking. A legendary archivist.'
     }
 ];
-
-export const getRankForLevel = (level: number): RankDefinition => {
-    const rank = RANKS.find(r => level >= r.minimumLevel && level <= r.maximumLevel);
-    return rank || RANKS[0];
-};
-
-export const getNextRank = (level: number): RankDefinition | null => {
-    const currentRank = getRankForLevel(level);
-    const currentIndex = RANKS.findIndex(r => r.title === currentRank.title);
-    if (currentIndex !== -1 && currentIndex < RANKS.length - 1) {
-        return RANKS[currentIndex + 1];
-    }
-    return null;
-};

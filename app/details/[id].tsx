@@ -185,6 +185,12 @@ function DetailsScreenInner() {
   const userRatings = useAppStore(state => state.userRatings);
   const setModalActive = useAppStore(state => state.setModalActive);
 
+  // Collections integration
+  const collections = useAppStore(state => state.collections);
+  const addAnimeToCollectionAction = useAppStore(state => state.addAnimeToCollectionAction);
+  const removeAnimeFromCollectionAction = useAppStore(state => state.removeAnimeFromCollectionAction);
+  const createCollectionAction = useAppStore(state => state.createCollectionAction);
+
   const shareScale = useRef(new Animated.Value(1)).current;
   const isInputFocused = useRef(false);
 
@@ -200,6 +206,11 @@ function DetailsScreenInner() {
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [showTrackingPrompt, setShowTrackingPrompt] = useState(false);
+
+  // Collections states
+  const [isCollectionModalVisible, setCollectionModalVisible] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [isCreatingInline, setIsCreatingInline] = useState(false);
 
   const checkAndPromptNotifications = async () => {
     const shouldShow = await notificationPermission.shouldShowTrackingPrompt();
@@ -377,6 +388,10 @@ function DetailsScreenInner() {
   const watchlistItem = watchlist.find(item => item.mediaId === id);
   const isInWatchlist = !!watchlistItem;
   const isFavorite = watchlistItem?.isFavorite || false;
+
+  const isInAnyCollection = React.useMemo(() => {
+    return collections.some(col => col.animeIds.includes(String(id)));
+  }, [collections, id]);
 
   const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
     { value: 'watching', label: 'Watching' },
@@ -648,6 +663,28 @@ function DetailsScreenInner() {
                   fill={isFavorite ? themeColors.accent : 'transparent'}
                 />
                 <Text style={[styles.actionIconLabel, { color: isFavorite ? themeColors.accent : themeColors.textDim }]}>Fav</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionIcon,
+                  { backgroundColor: themeColors.surface, borderColor: themeColors.border },
+                  isInAnyCollection && { borderColor: themeColors.primary, backgroundColor: `${themeColors.primary}15` }
+                ]}
+                onPress={() => {
+                  if (!user) {
+                    setShowAuthGate(true);
+                  } else {
+                    setCollectionModalVisible(true);
+                  }
+                }}
+              >
+                <Feather
+                  name="folder"
+                  color={isInAnyCollection ? themeColors.primary : themeColors.text}
+                  size={22}
+                />
+                <Text style={[styles.actionIconLabel, { color: isInAnyCollection ? themeColors.primary : themeColors.textDim }]}>Collect</Text>
               </TouchableOpacity>
             </View>
 
@@ -934,6 +971,121 @@ function DetailsScreenInner() {
         visible={showTrackingPrompt}
         onClose={() => setShowTrackingPrompt(false)}
       />
+
+      {/* Collect checklist modal */}
+      <CinematicModal
+        visible={isCollectionModalVisible}
+        onClose={() => setCollectionModalVisible(false)}
+        maxWidth={340}
+      >
+        <View style={styles.collectionModalContent}>
+          <Text style={[styles.collectionModalTitle, { color: 'white' }]}>Add to Collections</Text>
+          <Text style={[styles.collectionModalSubtitle, { color: themeColors.textDim }]}>
+            Organize "{media.title}" into custom lists:
+          </Text>
+
+          {/* List of Collections */}
+          {collections.length === 0 ? (
+            <Text style={[styles.noCollectionsText, { color: themeColors.textMuted }]}>
+              You haven't created any collections yet.
+            </Text>
+          ) : (
+            <ScrollView style={styles.collectionListScroll} showsVerticalScrollIndicator={false}>
+              {collections.map(col => {
+                const isSelected = col.animeIds.includes(String(id));
+                return (
+                  <TouchableOpacity
+                    key={col.id}
+                    style={[
+                      styles.collectionItemRow,
+                      { borderColor: 'rgba(255,255,255,0.06)' }
+                    ]}
+                    onPress={async () => {
+                      triggerHaptic('light');
+                      if (isSelected) {
+                        await removeAnimeFromCollectionAction(col.id, id);
+                      } else {
+                        await addAnimeToCollectionAction(col.id, id);
+                      }
+                    }}
+                  >
+                    <View style={styles.collectionItemInfo}>
+                      <Text style={styles.collectionItemEmoji}>{col.emoji || '📂'}</Text>
+                      <Text style={[styles.collectionItemName, { color: 'white' }]} numberOfLines={1}>
+                        {col.name}
+                      </Text>
+                    </View>
+                    <Feather
+                      name={isSelected ? "check-square" : "square"}
+                      size={18}
+                      color={isSelected ? themeColors.primary : themeColors.textDim}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {/* Inline creation form */}
+          {isCreatingInline ? (
+            <View style={styles.inlineCreateBox}>
+              <TextInput
+                placeholder="Collection Name..."
+                placeholderTextColor="rgba(255,255,255,0.3)"
+                value={newCollectionName}
+                onChangeText={setNewCollectionName}
+                style={[
+                  styles.inlineInput,
+                  {
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    borderColor: 'rgba(255,255,255,0.06)',
+                    color: 'white'
+                  }
+                ]}
+              />
+              <View style={styles.inlineActions}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsCreatingInline(false);
+                    setNewCollectionName('');
+                  }}
+                  style={[styles.inlineActionBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }]}
+                >
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (newCollectionName.trim()) {
+                      await createCollectionAction(newCollectionName.trim());
+                      setNewCollectionName('');
+                      setIsCreatingInline(false);
+                      triggerHaptic('success');
+                    }
+                  }}
+                  style={[styles.inlineActionBtn, { backgroundColor: themeColors.primary }]}
+                >
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>Create</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={() => setIsCreatingInline(true)}
+              style={[styles.inlineAddBtn, { borderColor: 'rgba(255,255,255,0.06)' }]}
+            >
+              <Feather name="plus-circle" size={16} color={themeColors.primary} style={{ marginRight: 6 }} />
+              <Text style={{ color: themeColors.primary, fontSize: 12, fontWeight: 'bold' }}>New Collection</Text>
+            </TouchableOpacity>
+          )}
+
+          <Button
+            title="Done"
+            variant="outline"
+            onPress={() => setCollectionModalVisible(false)}
+            style={{ width: '100%', height: 46, marginTop: spacing.md }}
+          />
+        </View>
+      </CinematicModal>
     </AnimatedScreen>
   );
 }
@@ -1237,5 +1389,84 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontWeight: 'bold',
     marginLeft: spacing.sm,
-  }
+  },
+  collectionModalContent: {
+    paddingTop: spacing.xs,
+    alignItems: 'center',
+    width: '100%',
+  },
+  collectionModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: spacing.xs,
+  },
+  collectionModalSubtitle: {
+    fontSize: 12,
+    marginBottom: spacing.md,
+    textAlign: 'center',
+  },
+  collectionListScroll: {
+    width: '100%',
+    maxHeight: 200,
+    marginBottom: spacing.md,
+  },
+  collectionItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  collectionItemInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  collectionItemEmoji: {
+    fontSize: 18,
+    marginRight: 10,
+  },
+  collectionItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  noCollectionsText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginVertical: spacing.md,
+  },
+  inlineAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    padding: 10,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginTop: spacing.xs,
+  },
+  inlineCreateBox: {
+    width: '100%',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  inlineInput: {
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    height: 38,
+    paddingHorizontal: spacing.md,
+    fontSize: 13,
+  },
+  inlineActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'flex-end',
+  },
+  inlineActionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: borderRadius.md,
+  },
 });

@@ -108,6 +108,8 @@ export interface User {
   currentStreak?: number;
   longestStreak?: number;
   lastWatchDate?: string;
+  favoriteBadgeId?: string | null;
+  collections?: UserCollection[];
 }
 
 export type WatchStatus = 'watching' | 'completed' | 'plan-to-watch' | 'dropped' | 'awaiting';
@@ -316,4 +318,15 @@ export interface NotificationCategorySettings {
   achievements: boolean;
   weeklySummary: boolean;
   news: boolean;
+}
+
+export interface UserCollection {
+  id: string;
+  name: string;
+  description?: string;
+  emoji?: string;
+  coverImage?: string;
+  isPinned?: boolean;
+  animeIds: string[];
+  createdAt: string;
 }

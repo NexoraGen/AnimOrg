@@ -30,6 +30,7 @@ if (Platform.OS !== 'web') {
 import { CinematicOverlay } from '../src/components/ui/CinematicOverlay';
 import { NotificationPermissionDialog } from '../src/components/ui';
 import { notificationPermission } from '../src/services/notificationPermission';
+import { AchievementUnlockModal } from '../src/components/ui/AchievementUnlockModal';
 
 export default function RootLayout() {
   const [shouldShowSplash] = useState(() => {
@@ -51,6 +52,10 @@ export default function RootLayout() {
   const modalCount = useAppStore(state => state.modalCount);
   const isAppInitializing = useAppStore(state => state.isAppInitializing);
   const hasHydrated = useAppStore(state => state.hasHydrated);
+
+  const achievementUnlockModalVisible = useAppStore(state => state.achievementUnlockModalVisible);
+  const activeAchievementBadge = useAppStore(state => state.activeAchievementBadge);
+  const closeAchievementUnlockModal = useAppStore(state => state.closeAchievementUnlockModal);
 
   const [showNotifDialog, setShowNotifDialog] = useState(false);
 
@@ -191,6 +196,11 @@ export default function RootLayout() {
         <NotificationPermissionDialog
           visible={showNotifDialog}
           onClose={() => setShowNotifDialog(false)}
+        />
+        <AchievementUnlockModal
+          visible={achievementUnlockModalVisible}
+          badge={activeAchievementBadge}
+          onClose={closeAchievementUnlockModal}
         />
       </GestureHandlerRootView>
     </ErrorBoundary>

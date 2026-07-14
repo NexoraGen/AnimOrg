@@ -25,3 +25,5 @@ export * from './AnimatedToggle';
 export * from './AuthPromptModal';
 export * from './NotificationPermissionDialog';
 export * from './TrackingNotificationPrompt';
+export * from './CollectionCard';
+export * from './CreateCollectionModal';

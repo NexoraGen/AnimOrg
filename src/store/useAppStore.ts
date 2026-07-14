@@ -1,14 +1,15 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, WatchlistItem, Media, WatchHistoryEntry, UserRating, ActivityFeedItem, AnimeProgress, Episode, NotificationCategorySettings } from '../types';
+import { User, WatchlistItem, Media, WatchHistoryEntry, UserRating, ActivityFeedItem, AnimeProgress, Episode, NotificationCategorySettings, UserCollection } from '../types';
+import { ACHIEVEMENTS, Badge } from '../config/achievements';
 import { firebaseAuthService } from '../services/firebase/auth';
 import { firestoreService } from '../services/firebase/firestore';
 import { notificationService } from '../services/notifications';
 import { resolveAnimeTrackingStatus, getCurrentlyReleasedEpisodesCount } from '../utils/releaseHelper';
 import { XPService } from '../services/XPService';
 import { AchievementService } from '../services/AchievementService';
-import { getRankForLevel } from '../config/ranks';
+import { RankService } from '../services/RankService';
 
 interface AppState {
   // Auth State
@@ -122,6 +123,24 @@ interface AppState {
   levelUpAnimationsEnabled: boolean;
   setLevelUpAnimationsEnabled: (val: boolean) => void;
 
+  // Achievement & Collections States
+  collections: UserCollection[];
+  achievementUnlockQueue: string[];
+  achievementUnlockModalVisible: boolean;
+  activeAchievementBadge: Badge | null;
+
+  createCollectionAction: (name: string, description?: string, emoji?: string, coverImage?: string) => Promise<void>;
+  updateCollectionAction: (collectionId: string, updates: Partial<UserCollection>) => Promise<void>;
+  addAnimeToCollectionAction: (collectionId: string, animeId: string) => Promise<void>;
+  removeAnimeFromCollectionAction: (collectionId: string, animeId: string) => Promise<void>;
+  deleteCollectionAction: (collectionId: string) => Promise<void>;
+  togglePinCollectionAction: (collectionId: string) => Promise<void>;
+  reorderCollectionAnimeAction: (collectionId: string, animeIds: string[]) => Promise<void>;
+
+  showNextAchievementUnlock: () => void;
+  closeAchievementUnlockModal: () => void;
+  setFavoriteAchievementAction: (badgeId: string | null) => Promise<void>;
+
   awardXpAction: (event: string, context?: any) => Promise<void>;
 }
 
@@ -145,48 +164,287 @@ export const useAppStore = create<AppState>()(
       setLevelUpModalData: (data) => set({ levelUpModalData: data }),
       setLevelUpAnimationsEnabled: (val) => set({ levelUpAnimationsEnabled: val }),
 
+      // Achievement & Collection State
+      collections: [],
+      achievementUnlockQueue: [],
+      achievementUnlockModalVisible: false,
+      activeAchievementBadge: null,
+
+      showNextAchievementUnlock: () => {
+        const { achievementUnlockQueue } = get();
+        if (achievementUnlockQueue.length === 0) return;
+
+        const nextId = achievementUnlockQueue[0];
+        const badge = ACHIEVEMENTS.find(a => a.id === nextId);
+
+        set({
+          achievementUnlockQueue: achievementUnlockQueue.slice(1),
+          activeAchievementBadge: badge || null,
+          achievementUnlockModalVisible: true,
+        });
+      },
+
+      closeAchievementUnlockModal: () => {
+        set({ achievementUnlockModalVisible: false, activeAchievementBadge: null });
+        setTimeout(() => {
+          if (get().achievementUnlockQueue.length > 0) {
+            get().showNextAchievementUnlock();
+          }
+        }, 300);
+      },
+
+      setFavoriteAchievementAction: async (badgeId) => {
+        const { user } = get();
+        if (!user) return;
+        await get().updateProfile({ favoriteBadgeId: badgeId });
+      },
+
+      createCollectionAction: async (name, description, emoji, coverImage) => {
+        const { user, collections } = get();
+        const newCol: UserCollection = {
+          id: `col_${Date.now()}`,
+          name,
+          description,
+          emoji: emoji || '📂',
+          coverImage: coverImage || '',
+          isPinned: false,
+          animeIds: [],
+          createdAt: new Date().toISOString()
+        };
+        const updated = [...collections, newCol];
+        set({ collections: updated });
+
+        if (user) {
+          try {
+            await firestoreService.updateUserProfile(user.id, { collections: updated });
+          } catch (e) {
+            console.warn('Firestore collections sync failed:', e);
+          }
+        }
+
+        await get().awardXpAction('CREATE_COLLECTION');
+      },
+
+      updateCollectionAction: async (collectionId, updates) => {
+        const { user, collections } = get();
+        const updated = collections.map(col => {
+          if (col.id === collectionId) {
+            return {
+              ...col,
+              ...updates
+            };
+          }
+          return col;
+        });
+        set({ collections: updated });
+
+        if (user) {
+          try {
+            await firestoreService.updateUserProfile(user.id, { collections: updated });
+          } catch (e) {
+            console.warn('Firestore collections sync failed:', e);
+          }
+        }
+      },
+
+      addAnimeToCollectionAction: async (collectionId, animeId) => {
+        const { user, collections } = get();
+        const updated = collections.map(col => {
+          if (col.id === collectionId) {
+            if (col.animeIds.includes(animeId)) return col;
+            return {
+              ...col,
+              animeIds: [...col.animeIds, animeId]
+            };
+          }
+          return col;
+        });
+        set({ collections: updated });
+
+        if (user) {
+          try {
+            await firestoreService.updateUserProfile(user.id, { collections: updated });
+          } catch (e) {
+            console.warn('Firestore collections sync failed:', e);
+          }
+        }
+
+        await get().awardXpAction('ADD_TO_COLLECTION');
+      },
+
+      removeAnimeFromCollectionAction: async (collectionId, animeId) => {
+        const { user, collections } = get();
+        const updated = collections.map(col => {
+          if (col.id === collectionId) {
+            return {
+              ...col,
+              animeIds: col.animeIds.filter(id => id !== animeId)
+            };
+          }
+          return col;
+        });
+        set({ collections: updated });
+
+        if (user) {
+          try {
+            await firestoreService.updateUserProfile(user.id, { collections: updated });
+          } catch (e) {
+            console.warn('Firestore collections sync failed:', e);
+          }
+        }
+
+        await get().awardXpAction('REMOVE_FROM_COLLECTION');
+      },
+
+      deleteCollectionAction: async (collectionId) => {
+        const { user, collections } = get();
+        const updated = collections.filter(col => col.id !== collectionId);
+        set({ collections: updated });
+
+        if (user) {
+          try {
+            await firestoreService.updateUserProfile(user.id, { collections: updated });
+          } catch (e) {
+            console.warn('Firestore collections sync failed:', e);
+          }
+        }
+
+        await get().awardXpAction('DELETE_COLLECTION');
+      },
+
+      togglePinCollectionAction: async (collectionId) => {
+        const { user, collections } = get();
+        const updated = collections.map(col => {
+          if (col.id === collectionId) {
+            return {
+              ...col,
+              isPinned: !col.isPinned
+            };
+          }
+          return col;
+        });
+        set({ collections: updated });
+
+        if (user) {
+          try {
+            await firestoreService.updateUserProfile(user.id, { collections: updated });
+          } catch (e) {
+            console.warn('Firestore collections sync failed:', e);
+          }
+        }
+      },
+
+      reorderCollectionAnimeAction: async (collectionId, animeIds) => {
+        const { user, collections } = get();
+        const updated = collections.map(col => {
+          if (col.id === collectionId) {
+            return {
+              ...col,
+              animeIds
+            };
+          }
+          return col;
+        });
+        set({ collections: updated });
+
+        if (user) {
+          try {
+            await firestoreService.updateUserProfile(user.id, { collections: updated });
+          } catch (e) {
+            console.warn('Firestore collections sync failed:', e);
+          }
+        }
+      },
+
       awardXpAction: async (event, context) => {
         const { user, watchlist, animeProgress, updateProfile, levelUpAnimationsEnabled } = get();
         if (!user) return;
 
         const xpResult = XPService.processXPEvent(user, event as any, context);
-        if (xpResult.xpAdded === 0 && !xpResult.levelUp) {
+
+        // Evaluate achievements
+        const currentBadges = user.badges || [];
+        const newBadges = AchievementService.evaluateBadges(
+          currentBadges,
+          watchlist,
+          animeProgress,
+          {
+            longestStreak: xpResult.updatedProfile.longestStreak || user.longestStreak || 0,
+            userRatings: get().userRatings,
+            collections: get().collections,
+            totalReviews: user.totalReviews || 0,
+            reviewLikes: 0 // Future extension
+          }
+        );
+
+        const newlyUnlocked = newBadges.filter(bId => !currentBadges.includes(bId));
+
+        let extraXp = 0;
+        const newlyUnlockedBadgeObjects: Badge[] = [];
+        newlyUnlocked.forEach(bId => {
+          const badge = ACHIEVEMENTS.find(a => a.id === bId);
+          if (badge) {
+            extraXp += badge.xpReward;
+            newlyUnlockedBadgeObjects.push(badge);
+          }
+        });
+
+        // Trigger notifications and modal queue for unlocked badges
+        if (newlyUnlockedBadgeObjects.length > 0) {
+          const NotificationManager = require('../services/notifications/NotificationManager').NotificationManager;
+          newlyUnlockedBadgeObjects.forEach(badge => {
+            NotificationManager.triggerAchievement(badge.title).catch((e: any) => {
+              console.warn('Failed to trigger achievement notification:', e);
+            });
+          });
+
+          const currentQueue = get().achievementUnlockQueue;
+          set({
+            achievementUnlockQueue: [...currentQueue, ...newlyUnlockedBadgeObjects.map(b => b.id)]
+          });
+
+          if (!get().achievementUnlockModalVisible) {
+            get().showNextAchievementUnlock();
+          }
+        }
+
+        const baseXpAdded = xpResult.xpAdded;
+        const totalXpAdded = baseXpAdded + extraXp;
+
+        if (totalXpAdded === 0 && newBadges.length === currentBadges.length) {
           if (Object.keys(xpResult.updatedProfile).length > 0) {
             await updateProfile(xpResult.updatedProfile);
           }
           return;
         }
 
-        const currentBadges = user.badges || [];
-        const d = new Date();
-        const watchHour = d.getHours();
-        const watchDay = d.getDay();
+        const currentXp = user.xp || 0;
+        const finalXp = currentXp + totalXpAdded;
+        const LevelService = require('../services/LevelService').LevelService;
+        const finalLevelInfo = LevelService.getLevelInfo(finalXp);
+        const finalLevel = finalLevelInfo.level;
+        const oldLevel = user.level || 1;
+        const levelUp = finalLevel > oldLevel;
 
-        const newBadges = AchievementService.evaluateBadges(
-          currentBadges,
-          watchlist,
-          animeProgress,
-          { watchHour, watchDay }
-        );
-
-        const badgesChanged = JSON.stringify(currentBadges) !== JSON.stringify(newBadges);
         const profileUpdate = {
           ...xpResult.updatedProfile,
-          ...(badgesChanged ? { badges: newBadges } : {})
+          xp: finalXp,
+          level: finalLevel,
+          badges: newBadges
         };
 
         await updateProfile(profileUpdate);
 
-        if (xpResult.levelUp && levelUpAnimationsEnabled) {
-          const oldRank = getRankForLevel(xpResult.oldLevel);
-          const newRank = getRankForLevel(xpResult.newLevel);
+        if (levelUp && levelUpAnimationsEnabled) {
+          const oldRank = RankService.getRankByLevel(oldLevel);
+          const newRank = RankService.getRankByLevel(finalLevel);
           const rankUp = oldRank.title !== newRank.title;
 
           set({
             levelUpModalVisible: true,
             levelUpModalData: {
-              oldLevel: xpResult.oldLevel,
-              newLevel: xpResult.newLevel,
+              oldLevel: oldLevel,
+              newLevel: finalLevel,
               isRankUp: rankUp
             }
           });
@@ -411,6 +669,7 @@ export const useAppStore = create<AppState>()(
                   notInterested: notInterested || [],
                   following: followingList || [],
                   followers: followersList || [],
+                  collections: userProfile?.collections || get().collections || [],
                   isAppInitializing: false, // Background tasks finished, mark init complete if not done
                   isLoadingAuth: false
                 });
@@ -461,6 +720,7 @@ export const useAppStore = create<AppState>()(
                 animeProgress: {},
                 notInterested: [],
                 recommendationHistory: [],
+                collections: [],
                 isGuest: false
               });
             }
@@ -1110,6 +1370,7 @@ export const useAppStore = create<AppState>()(
             notInterested: notInterested || [],
             following: followingList || [],
             followers: followersList || [],
+            collections: userProfile?.collections || state.collections || [],
           }));
         } catch (error) {
           console.error("Failed to refresh user data:", error);
@@ -1154,6 +1415,7 @@ export const useAppStore = create<AppState>()(
         continueWatching: (state.continueWatching || []).slice(0, 15),
         notInterested: (state.notInterested || []).slice(0, 50),
         userRatings: state.userRatings,
+        collections: state.collections || [],
       }),
     }
   )

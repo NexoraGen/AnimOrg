@@ -82,7 +82,7 @@ export const RankDetailsModal: React.FC<RankDetailsModalProps> = ({ visible, onC
                         </View>
                     ) : (
                         <Text style={[styles.description, { color: themeColors.primary }]}>
-                            You have attained the ultimate rank: AnimOrg Legend! 🚀
+                            You have attained the ultimate rank: AnimOrg Grandmaster! 🚀
                         </Text>
                     )}
 
