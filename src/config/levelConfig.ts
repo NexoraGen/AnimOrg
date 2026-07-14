@@ -1,3 +1,5 @@
+import { RankService } from '../services/RankService';
+
 export const LEVEL_THRESHOLDS = [0, 100, 250, 450, 700];
 
 export const getXpForLevel = (level: number): number => {
@@ -17,11 +19,6 @@ export const getXpForLevel = (level: number): number => {
 };
 
 export const getLevelTitle = (level: number): string => {
-    if (level >= 75) return 'Legendary Sage';
-    if (level >= 50) return 'Anime Master';
-    if (level >= 35) return 'Elite Watcher';
-    if (level >= 20) return 'Seasonal Veteran';
-    if (level >= 10) return 'Otaku Explorer';
-    if (level >= 5) return 'Anime Apprentice';
-    return 'Anlist Rookie';
+    return RankService.getRankByLevel(level).title;
 };
+

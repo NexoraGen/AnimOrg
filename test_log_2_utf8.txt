@@ -1,0 +1,94 @@
+﻿node.exe : C:\Users\iam
+mo\AppData\Local\npm-ca
+che\_npx\1bf7c3c15bf47d
+04\node_modules\ts-node
+\dist\configuration.js:
+91
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (C:\Users\iamm   
+ o\...iguration.js:    
+91:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+    const { fileExists 
+= ts.sys.fileExists, 
+readFile = 
+ts.sys.readFile, 
+skipProject = index_1.D
+EFAULTS.skipProject, 
+project = index_1.DEFAU
+LTS.project, tsTrace = 
+index_1.DEFAULTS.tsTrac
+e, } = rawApiOptions;
+                       
+         ^
+
+TypeError: Cannot read 
+properties of 
+undefined (reading 
+'fileExists')
+    at readConfig (C:\U
+sers\iammo\AppData\Loca
+l\npm-cache\_npx\1bf7c3
+c15bf47d04\node_modules
+\ts-node\dist\configura
+tion.js:91:33)
+    at 
+findAndReadConfig (C:\U
+sers\iammo\AppData\Loca
+l\npm-cache\_npx\1bf7c3
+c15bf47d04\node_modules
+\ts-node\dist\configura
+tion.js:50:84)
+    at phase3 (C:\Users
+\iammo\AppData\Local\np
+m-cache\_npx\1bf7c3c15b
+f47d04\node_modules\ts-
+node\dist\bin.js:254:67
+)
+    at bootstrap (C:\Us
+ers\iammo\AppData\Local
+\npm-cache\_npx\1bf7c3c
+15bf47d04\node_modules\
+ts-node\dist\bin.js:47:
+30)
+    at main (C:\Users\i
+ammo\AppData\Local\npm-
+cache\_npx\1bf7c3c15bf4
+7d04\node_modules\ts-no
+de\dist\bin.js:33:12)
+    at 
+Object.<anonymous> (C:\
+Users\iammo\AppData\Loc
+al\npm-cache\_npx\1bf7c
+3c15bf47d04\node_module
+s\ts-node\dist\bin.js:5
+79:5)
+    at Module._compile 
+(node:internal/modules/
+cjs/loader:1812:14)
+    at Object..js (node
+:internal/modules/cjs/l
+oader:1943:10)
+    at Module.load (nod
+e:internal/modules/cjs/
+loader:1533:32)
+    at Module._load (no
+de:internal/modules/cjs
+/loader:1335:12)
+
+Node.js v24.14.0

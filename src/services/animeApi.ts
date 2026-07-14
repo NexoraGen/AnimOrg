@@ -303,12 +303,58 @@ export const animeApi = {
     } : undefined;
 
     // Use Jikan as primary for episodes (since AniList lacks episode list API via GraphQL directly unless heavily paginated)
-    const rawResult = await CacheManager.fetchWithCache(
-      `episodes_${id}_all`,
-      () => RetryManager.execute(() => JikanAdapter.getAnimeEpisodes(id)),
-      bypassCache ? 0 : TTL.EPISODES,
-      wrapOnUpdate as any
-    );
+    let rawResult: any;
+    try {
+      rawResult = await CacheManager.fetchWithCache(
+        `episodes_${id}_all`,
+        () => RetryManager.execute(() => JikanAdapter.getAnimeEpisodes(id)),
+        bypassCache ? 0 : TTL.EPISODES,
+        wrapOnUpdate as any
+      );
+    } catch (jikanError) {
+      console.warn(`[animeApi] Jikan episodes fetch failed, initiating self-heal fallback.`, jikanError);
+
+      // Attempt self-healing via cached details or AniList GraphQL direct details fetch
+      let episodesCount = 0;
+      try {
+        const cachedDetails = await CacheManager.getCacheEntry<Media>(`details_${id}`);
+        if (cachedDetails && cachedDetails.episodes) {
+          episodesCount = cachedDetails.episodes;
+        } else {
+          const freshDetails = await AniListAdapter.getAnimeDetails(id);
+          if (freshDetails && freshDetails.episodes) {
+            episodesCount = freshDetails.episodes;
+          }
+        }
+      } catch (err) {
+        console.error("[animeApi] Fallback details retrieval failed:", err);
+      }
+
+      if (episodesCount > 0) {
+        console.log(`[animeApi] Self-healing resolved: generating ${episodesCount} synthetic episodes.`);
+        const syntheticEps: Episode[] = [];
+        for (let i = 1; i <= episodesCount; i++) {
+          syntheticEps.push({
+            id: `synthetic-${id}-${i}`,
+            number: i,
+            title: `Episode ${i}`,
+            aired: undefined,
+          });
+        }
+
+        const fallbackResult = {
+          data: syntheticEps,
+          totalCount: episodesCount
+        };
+
+        if (onUpdate) {
+          onUpdate(fallbackResult);
+        }
+        return fallbackResult;
+      }
+
+      throw jikanError;
+    }
 
     const corrected = await animeApi.correctEpisodeList(id, {
       data: (rawResult as any)?.data || [],
