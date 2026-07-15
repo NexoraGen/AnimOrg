@@ -58,6 +58,10 @@ export const NOTIFICATION_TEMPLATES = {
     ],
     finishedAnime: [
         {
+            title: "🎉 Series Completed!",
+            body: "Congratulations! You completed {title}. Ready for your next adventure?"
+        },
+        {
             title: "🎊 Congratulations!",
             body: "You completed {title}. How about rating it?"
         },
@@ -79,11 +83,53 @@ export const NOTIFICATION_TEMPLATES = {
     seasonPremiere: [
         {
             title: "🚀 New Season Begins Today",
-            body: "{title} has officially started!"
+            body: "Your tracked anime {title} has started airing. Watch Episode 1 now."
         },
         {
             title: "✨ Season Premiere Alert",
             body: "The journey begins! {title} starts broadcasting today."
+        }
+    ],
+    seasonFinale: [
+        {
+            title: "🎬 Season Finale!",
+            body: "The finale of {title} (Episode {episode}) is now live. Don't miss it!"
+        },
+        {
+            title: "🏆 The Grand Finale",
+            body: "See how the story ends—{title} Episode {episode} is now live."
+        }
+    ],
+    bingeReminder: [
+        {
+            title: "🍿 Binge Alert!",
+            body: "Looks like it's been a while. Continue watching {title}?"
+        },
+        {
+            title: "📺 Time to catch up",
+            body: "Still with {character}? Episode {episode} is waiting for you in {title}."
+        }
+    ],
+    airingCountdown: [
+        {
+            title: "⏰ Airing in {days} Days",
+            body: "{title} Episode {episode} is airing in {days} days!"
+        },
+        {
+            title: "⏰ {days} Days to Airing",
+            body: "Prepare yourself! {title} Episode {episode} lands in {days} days."
+        },
+        {
+            title: "🔔 Tomorrow: {title}",
+            body: "Episode {episode} of {title} premieres tomorrow. Set your reminders!"
+        },
+        {
+            title: "⏰ {hours} Hours Left",
+            body: "Only {hours} hours until {title} Episode {episode} drops!"
+        },
+        {
+            title: "⚡ {hours} Hour Countdown!",
+            body: "Get ready! {title} Episode {episode} is airing in just {hours} hour."
         }
     ],
     watchStreak: [
@@ -98,6 +144,36 @@ export const NOTIFICATION_TEMPLATES = {
         {
             title: "⚡ Streak Milestone",
             body: "You watched anime for {streak} days straight. Keep it burning!"
+        }
+    ],
+    milestones: [
+        {
+            title: "🎉 WATCH MILESTONE!",
+            body: "You've watched {count} episodes on AnimOrg! Tap to see your stats."
+        },
+        {
+            title: "🏆 HOUR MILESTONE!",
+            body: "Incredible! You've logged {count} watch hours. Tap to view your dashboard."
+        }
+    ],
+    levelUps: [
+        {
+            title: "⭐ Level Up!",
+            body: "Level Up! You've achieved Level {level}. See your new profile badges!"
+        },
+        {
+            title: "⚡ Level {level} Reached!",
+            body: "You've leveled up! Check out your updated rank and rewards."
+        }
+    ],
+    dailyReminder: [
+        {
+            title: "✨ Daily Anime check-in",
+            body: "Don't forget to track your watch progress today. What are we watching?"
+        },
+        {
+            title: "📺 Your Daily Feed",
+            body: "Quick check-in! Update your watchlist today to keep your stats accurate."
         }
     ],
     achievement: [
@@ -135,6 +211,17 @@ export function renderNotificationText(
 
     let title = chosen.title;
     let body = chosen.body;
+
+    if (replacements.weekendPrompt === 'true') {
+        title = "See you this weekend?";
+        body = `Your next episode of ${replacements.title || 'anime'} is ready.`;
+    } else if (replacements.bingePrompt === 'true') {
+        title = "Ready for another episode?";
+        body = `Your next adventure in ${replacements.title || 'anime'} is waiting.`;
+    } else if (replacements.inactivePrompt === 'true') {
+        title = "Whenever you're ready";
+        body = `${replacements.title || 'Your anime'} is waiting.`;
+    }
 
     Object.entries(replacements).forEach(([key, value]) => {
         const replacePattern = new RegExp(`{${key}}`, 'g');

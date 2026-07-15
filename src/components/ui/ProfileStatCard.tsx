@@ -48,7 +48,7 @@ export const ProfileStatCard: React.FC<ProfileStatCardProps> = ({
 
     const handlePressIn = () => {
         Animated.spring(scale, {
-            toValue: 0.95,
+            toValue: 0.97,
             speed: 50,
             bounciness: 4,
             useNativeDriver: true,

@@ -414,7 +414,12 @@ export default function ProfileScreen() {
           hours={Math.round(parseFloat(stats.days) * 24)}
           currentStreak={user?.currentStreak || 0}
           longestStreak={user?.longestStreak || 0}
+          onEpisodesPress={() => router.push({ pathname: '/analytics', params: { type: 'episodes' } })}
+          onHoursPress={() => router.push({ pathname: '/analytics', params: { type: 'hours' } })}
+          onCurrentStreakPress={() => router.push({ pathname: '/analytics', params: { type: 'currentStreak' } })}
+          onLongestStreakPress={() => router.push({ pathname: '/analytics', params: { type: 'longestStreak' } })}
         />
+
 
         {/* --- ACHIEVEMENTS SUMMARY --- */}
         {!isGuest && (

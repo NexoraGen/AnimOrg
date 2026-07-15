@@ -35,7 +35,8 @@ export default function AppSettingsScreen() {
     user, updateProfile,
     isGuest,
     levelUpAnimationsEnabled, setLevelUpAnimationsEnabled,
-    notificationSettings, updateNotificationSettings
+    notificationSettings, updateNotificationSettings,
+    notificationFrequency, updateNotificationFrequency
   } = useAppStore();
 
   const [timezoneModalVisible, setTimezoneModalVisible] = React.useState(false);
@@ -225,12 +226,56 @@ export default function AppSettingsScreen() {
           })}
 
           <View style={(!notificationsEnabled || permissionStatus !== 'granted') && { opacity: 0.5 }} pointerEvents={(!notificationsEnabled || permissionStatus !== 'granted') ? 'none' : 'auto'}>
-            {renderToggle('Episode Releases', 'tv', notificationSettings?.episodeReleases ?? true, () => {
+            <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: themeColors.border }}>
+              <Text style={{ color: themeColors.text, fontSize: 14, fontFamily: 'Outfit-Medium', marginBottom: spacing.xs }}>
+                Notification Frequency
+              </Text>
+              <View style={{ flexDirection: 'row', backgroundColor: themeColors.surfaceVariant, borderRadius: 12, padding: 3 }}>
+                {(['minimal', 'balanced', 'all'] as const).map((freq) => {
+                  const isActive = (notificationFrequency || 'balanced') === freq;
+                  return (
+                    <TouchableOpacity
+                      key={freq}
+                      onPress={() => {
+                        updateNotificationFrequency(freq);
+                        triggerHaptic();
+                      }}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 8,
+                        alignItems: 'center',
+                        borderRadius: 9,
+                        backgroundColor: isActive ? themeColors.primary : 'transparent',
+                      }}
+                    >
+                      <Text style={{
+                        color: isActive ? '#FFFFFF' : themeColors.textDim,
+                        fontFamily: 'Outfit-Medium',
+                        fontSize: 12,
+                        textTransform: 'capitalize'
+                      }}>
+                        {freq === 'all' ? 'All' : freq}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {renderToggle('New Episodes', 'tv', notificationSettings?.episodeReleases ?? true, () => {
               updateNotificationSettings({ episodeReleases: !(notificationSettings?.episodeReleases ?? true) });
+              triggerHaptic();
+            })}
+            {renderToggle('Airing Countdown', 'bell', notificationSettings?.airingCountdown ?? true, () => {
+              updateNotificationSettings({ airingCountdown: !(notificationSettings?.airingCountdown ?? true) });
               triggerHaptic();
             })}
             {renderToggle('Continue Watching', 'clock', notificationSettings?.continueWatching ?? true, () => {
               updateNotificationSettings({ continueWatching: !(notificationSettings?.continueWatching ?? true) });
+              triggerHaptic();
+            })}
+            {renderToggle('Milestones', 'trending-up', notificationSettings?.milestones ?? true, () => {
+              updateNotificationSettings({ milestones: !(notificationSettings?.milestones ?? true) });
               triggerHaptic();
             })}
             {renderToggle('Recommendations', 'aperture', notificationSettings?.recommendations ?? true, () => {
@@ -241,6 +286,14 @@ export default function AppSettingsScreen() {
               updateNotificationSettings({ achievements: !(notificationSettings?.achievements ?? true) });
               triggerHaptic();
             })}
+            {renderToggle('Level Ups', 'star', notificationSettings?.levelUps ?? true, () => {
+              updateNotificationSettings({ levelUps: !(notificationSettings?.levelUps ?? true) });
+              triggerHaptic();
+            })}
+            {renderToggle('Daily Reminder', 'calendar', notificationSettings?.dailyReminder ?? true, () => {
+              updateNotificationSettings({ dailyReminder: !(notificationSettings?.dailyReminder ?? true) });
+              triggerHaptic();
+            })}
             {renderToggle('Weekly Summary', 'list', notificationSettings?.weeklySummary ?? true, () => {
               updateNotificationSettings({ weeklySummary: !(notificationSettings?.weeklySummary ?? true) });
               triggerHaptic();
@@ -249,6 +302,52 @@ export default function AppSettingsScreen() {
               updateNotificationSettings({ news: !(notificationSettings?.news ?? true) });
               triggerHaptic();
             })}
+            {renderToggle('Quiet Hours', 'moon', notificationSettings?.quietHoursEnabled ?? true, () => {
+              updateNotificationSettings({ quietHoursEnabled: !(notificationSettings?.quietHoursEnabled ?? true) });
+              triggerHaptic();
+            })}
+            {(notificationSettings?.quietHoursEnabled ?? true) && (
+              <View style={{ flexDirection: 'row', paddingHorizontal: spacing.md, paddingBottom: spacing.md, gap: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: themeColors.textDim, fontSize: 12, marginBottom: 4 }}>Start Time</Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: themeColors.surfaceVariant,
+                      color: themeColors.text,
+                      padding: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: themeColors.border,
+                      textAlign: 'center',
+                      fontSize: 14
+                    }}
+                    value={notificationSettings?.quietHoursStart || '22:00'}
+                    onChangeText={(val) => updateNotificationSettings({ quietHoursStart: val })}
+                    placeholder="22:00"
+                    placeholderTextColor={themeColors.textDim}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: themeColors.textDim, fontSize: 12, marginBottom: 4 }}>End Time</Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: themeColors.surfaceVariant,
+                      color: themeColors.text,
+                      padding: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: themeColors.border,
+                      textAlign: 'center',
+                      fontSize: 14
+                    }}
+                    value={notificationSettings?.quietHoursEnd || '08:00'}
+                    onChangeText={(val) => updateNotificationSettings({ quietHoursEnd: val })}
+                    placeholder="08:00"
+                    placeholderTextColor={themeColors.textDim}
+                  />
+                </View>
+              </View>
+            )}
           </View>
         </View>
 

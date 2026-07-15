@@ -58,6 +58,8 @@ interface AppState {
   registerNotifications: () => Promise<void>;
   notificationSettings: NotificationCategorySettings;
   updateNotificationSettings: (settings: Partial<NotificationCategorySettings>) => void;
+  notificationFrequency: 'minimal' | 'balanced' | 'all';
+  updateNotificationFrequency: (freq: 'minimal' | 'balanced' | 'all') => void;
 
   // Social State (Phase 4)
   following: string[];
@@ -1159,25 +1161,41 @@ export const useAppStore = create<AppState>()(
       notificationsEnabled: false,
       notificationSettings: {
         episodeReleases: true,
+        airingCountdown: true,
         continueWatching: true,
+        milestones: true,
         recommendations: true,
         achievements: true,
+        levelUps: true,
+        dailyReminder: true,
         weeklySummary: true,
         news: true,
+        quietHoursEnabled: true,
+        quietHoursStart: '22:00',
+        quietHoursEnd: '08:00',
       },
       updateNotificationSettings: (settings) => set((state) => ({
         notificationSettings: {
           ...(state.notificationSettings || {
             episodeReleases: true,
+            airingCountdown: true,
             continueWatching: true,
+            milestones: true,
             recommendations: true,
             achievements: true,
+            levelUps: true,
+            dailyReminder: true,
             weeklySummary: true,
             news: true,
+            quietHoursEnabled: true,
+            quietHoursStart: '22:00',
+            quietHoursEnd: '08:00',
           }),
           ...settings,
         }
       })),
+      notificationFrequency: 'balanced',
+      updateNotificationFrequency: (freq) => set({ notificationFrequency: freq }),
       setNotificationsEnabled: async (enabled) => {
         set({ notificationsEnabled: enabled });
         if (enabled) {
@@ -1398,6 +1416,7 @@ export const useAppStore = create<AppState>()(
         theme: state.theme,
         notificationsEnabled: state.notificationsEnabled,
         notificationSettings: state.notificationSettings,
+        notificationFrequency: state.notificationFrequency,
         pushToken: state.pushToken,
         autoplayTrailer: state.autoplayTrailer,
         reduceHaptics: state.reduceHaptics,

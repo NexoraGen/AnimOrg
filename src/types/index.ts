@@ -313,11 +313,18 @@ export interface PostFollow {
 
 export interface NotificationCategorySettings {
   episodeReleases: boolean;
+  airingCountdown: boolean;
   continueWatching: boolean;
+  milestones: boolean;
   recommendations: boolean;
   achievements: boolean;
+  levelUps: boolean;
+  dailyReminder: boolean;
   weeklySummary: boolean;
   news: boolean;
+  quietHoursEnabled: boolean;
+  quietHoursStart: string; // e.g. "22:00"
+  quietHoursEnd: string;   // e.g. "08:00"
 }
 
 export interface UserCollection {

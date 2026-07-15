@@ -239,6 +239,8 @@ function DetailsScreenInner() {
     return unsubscribe;
   }, [id]);
 
+  const userId = user?.id;
+
   const fetchDetails = React.useCallback(async () => {
     if (!id) {
       setIsLoading(false);
@@ -302,13 +304,13 @@ function DetailsScreenInner() {
         });
 
         // Sync back to Firestore if user is logged in
-        if (user?.id) {
+        if (userId) {
           const updatedTracked = useAppStore.getState().watchlist.find(item => String(item.mediaId) === String(id));
           if (updatedTracked) {
-            firestoreService.addToWatchlist(user.id, updatedTracked).catch(err => {
+            firestoreService.addToWatchlist(userId, updatedTracked).catch(err => {
               console.warn('[Self-Healing] Firestore sync failed:', err);
             });
-            firestoreService.syncTrackedAnime(user.id, updatedTracked).catch(err => {
+            firestoreService.syncTrackedAnime(userId, updatedTracked).catch(err => {
               console.warn('[Self-Healing] Firestore sync status failed:', err);
             });
           }
@@ -319,7 +321,7 @@ function DetailsScreenInner() {
       Promise.allSettled([
         firestoreService.getReviewsForAnime(id),
         firestoreService.getAnimeLikeCount(id),
-        user ? firestoreService.getUserRating(user.id, id) : Promise.resolve(null),
+        userId ? firestoreService.getUserRating(userId, id) : Promise.resolve(null),
         trailerService.resolveTrailerUrl(data.id, data.title, data.trailerData),
         animeApi.getAnimeCharacters(id),
         animeApi.getAnimeRecommendations(id),
@@ -360,7 +362,7 @@ function DetailsScreenInner() {
     } finally {
       setIsLoading(false);
     }
-  }, [id, user, addToRecentlyViewed]);
+  }, [id, userId, addToRecentlyViewed]);
 
   // Phase 23: Sync local rating with store for instant restoration
   useEffect(() => {
