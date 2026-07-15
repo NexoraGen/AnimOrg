@@ -251,6 +251,7 @@ const ResultsListView = React.memo(({
             media={item}
             onPress={handleMediaPress}
             width={cardWidth}
+            height={cardWidth * 1.5}
           />
         </View>
       )}

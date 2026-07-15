@@ -156,6 +156,7 @@ export default function CategoryScreen() {
                   media={item}
                   onPress={handleMediaPress}
                   width={cardWidth}
+                  height={viewMode === 'grid' ? cardWidth * 1.5 : undefined}
                   variant={viewMode === 'list' ? 'list' : 'default'}
                   disableEntryAnimation
                 />

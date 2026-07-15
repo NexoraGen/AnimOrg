@@ -96,6 +96,7 @@ const WatchlistTabFeed: React.FC<WatchlistTabFeedProps> = React.memo(({
               media={mapWatchlistItemToMedia(item)}
               onPress={() => router.push(`/details/${item.mediaId}`)}
               width={cardWidth}
+              height={cardWidth * 1.5}
               showProgress={item.status === 'watching' && percentage > 0}
               progress={percentage}
             />
