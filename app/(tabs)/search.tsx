@@ -74,7 +74,7 @@ const ThemesAndOptionsView = React.memo(({
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 }}>
       {selectedGenres.length === 0 && (
         <>
-          <View style={{ marginBottom: spacing.sm, paddingHorizontal: spacing.md }}>
+          <View style={{ marginBottom: spacing.S, paddingHorizontal: spacing.M }}>
             <Text style={{ color: themeColors.text, fontSize: 18, fontWeight: '800' }}>Anime Themes</Text>
           </View>
           <ScrollView
@@ -335,7 +335,7 @@ export default function SearchScreen() {
   const addToWatchlist = useAppStore(state => state.addToWatchlist);
 
   const numColumns = width > 1024 ? 5 : width > 768 ? 4 : 2;
-  const cardWidth = (width - spacing.md * 2 - spacing.md * (numColumns - 1)) / numColumns;
+  const cardWidth = (width - spacing.M * 2 - spacing.M * (numColumns - 1)) / numColumns;
 
   const triggerHaptic = () => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -550,7 +550,7 @@ export default function SearchScreen() {
     <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
       <GlassHeader title="Discovery" showLogo={true} />
 
-      <View style={[styles.content, { paddingTop: insets.top + HEADER_HEIGHT + spacing.md }]}>
+      <View style={[styles.content, { paddingTop: insets.top + HEADER_HEIGHT + spacing.M }]}>
         <View style={[styles.searchContainer, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <Feather name="search" color={themeColors.primary} size={20} />
           <TextInput
@@ -665,16 +665,16 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.M,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.M,
     height: 52,
     borderWidth: 1.5,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.XL,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    marginLeft: spacing.md,
+    marginLeft: spacing.M,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -694,46 +694,46 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   themeScroll: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.L,
   },
   themeContent: {
-    paddingRight: spacing.xl,
-    paddingLeft: spacing.md,
+    paddingRight: spacing.XL,
+    paddingLeft: spacing.M,
   },
   themeGrid: {
     flexDirection: 'column',
     flexWrap: 'wrap',
     height: 100, // Forces wrapping into 2 rows correctly across horizontal axis
     alignContent: 'flex-start',
-    rowGap: spacing.sm,
-    columnGap: spacing.sm,
+    rowGap: spacing.S,
+    columnGap: spacing.S,
   },
   section: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.XL,
   },
   historyList: {
-    gap: spacing.sm,
+    gap: spacing.S,
   },
   historyItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.S,
   },
   historyText: {
     fontSize: typography.sizes.md,
-    marginLeft: spacing.md,
+    marginLeft: spacing.M,
   },
   trendingGrid: {
     borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.S,
     borderWidth: 1,
     overflow: 'hidden',
   },
   trendingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.M,
+    paddingHorizontal: spacing.S,
     borderBottomWidth: 1,
   },
   trendingRankWrapper: {
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
+    marginRight: spacing.M,
   },
   trendingRank: {
     fontSize: 14,
@@ -815,7 +815,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   listSectionHeader: {
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
+    marginBottom: spacing.S,
+    marginTop: spacing.M,
   }
 });

@@ -28,7 +28,7 @@ interface HorizontalCarouselProps {
   icon?: any;
 }
 
-export const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
+const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
   title,
   data,
   isLoading,
@@ -124,13 +124,15 @@ export const HorizontalCarousel: React.FC<HorizontalCarouselProps> = ({
   );
 };
 
+export const HorizontalCarousel = React.memo(HorizontalCarouselComponent);
+
 const styles = StyleSheet.create({
   container: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.XL,
     marginTop: 0,
   },
   listContent: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.M,
+    paddingBottom: spacing.XS,
   },
 });

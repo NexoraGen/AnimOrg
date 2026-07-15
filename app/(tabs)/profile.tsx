@@ -233,7 +233,7 @@ export default function ProfileScreen() {
           { useNativeDriver: true }
         )}
         scrollEventThrottle={16}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.XXL * 2 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -572,6 +572,7 @@ export default function ProfileScreen() {
               title="Currently Watching"
               data={currentlyWatching}
               onPress={(id) => router.push(`/details/${id}`)}
+              onViewAll={() => router.push('/category/continue-watching')}
             />
           </View>
         )}
@@ -584,6 +585,7 @@ export default function ProfileScreen() {
               subtitle="Your personal scores"
               data={ratedAnime}
               onPress={(id) => router.push(`/details/${id}`)}
+              onViewAll={() => router.push('/category/ratings')}
             />
           </View>
         )}
@@ -598,6 +600,7 @@ export default function ProfileScreen() {
               title="Favorite Anime"
               data={favoriteAnime}
               onPress={(id) => router.push(`/details/${id}`)}
+              onViewAll={() => router.push('/category/favorites')}
             />
           </View>
         )}
@@ -876,24 +879,24 @@ const styles = StyleSheet.create({
   headerActionsStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.md,
+    gap: spacing.M,
+    marginTop: spacing.M,
   },
   actionButton: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.XL,
     height: 36,
     borderRadius: 18,
   },
   section: {
-    paddingHorizontal: spacing.xl,
-    marginBottom: 10,
+    paddingHorizontal: spacing.XL,
+    marginBottom: spacing.M,
   },
   statsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.xl,
-    gap: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.XL,
+    gap: spacing.M,
+    marginTop: spacing.M,
+    marginBottom: spacing.L,
     zIndex: 20,
   },
   focusedStatBox: {
@@ -934,12 +937,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   carouselSection: {
-    marginBottom: spacing.xs,
+    marginBottom: 0,
   },
   listsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: spacing.M,
     marginTop: 0,
   },
   listCard: {
@@ -947,7 +950,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     overflow: 'hidden',
     justifyContent: 'space-between',
-    padding: spacing.xl,
+    padding: spacing.XL,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.05)',
   },

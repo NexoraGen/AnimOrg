@@ -7,7 +7,7 @@ import {
     useWindowDimensions
 } from 'react-native';
 import { Image } from 'expo-image';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { colors, spacing, borderRadius } from '../../theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppStore } from '../../store/useAppStore';
@@ -34,7 +34,7 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
         .map(id => watchlist.find(w => w.mediaId === id))
         .filter(Boolean);
 
-    const cardWidth = (width - (spacing.xl * 2) - spacing.md) / 2;
+    const cardWidth = (width - (spacing.XL * 2) - spacing.M) / 2;
 
     // Render collage of posters
     const renderCollage = () => {
@@ -117,8 +117,8 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
                         onPress={onPinPress}
                         activeOpacity={0.8}
                     >
-                        <Feather
-                            name={"pin" as any}
+                        <FontAwesome
+                            name="thumb-tack"
                             size={12}
                             color={collection.isPinned ? '#000000' : '#FFFFFF'}
                         />
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.xl,
         borderWidth: 1,
         overflow: 'hidden',
-        marginBottom: spacing.md,
+        marginBottom: spacing.M,
     },
     collageContainer: {
         height: 120,
@@ -189,8 +189,8 @@ const styles = StyleSheet.create({
     },
     pinButton: {
         position: 'absolute',
-        top: spacing.sm,
-        right: spacing.sm,
+        top: spacing.S,
+        right: spacing.S,
         width: 26,
         height: 26,
         borderRadius: 13,
@@ -201,8 +201,8 @@ const styles = StyleSheet.create({
     },
     countBadge: {
         position: 'absolute',
-        bottom: spacing.sm,
-        left: spacing.sm,
+        bottom: spacing.S,
+        left: spacing.S,
         backgroundColor: 'rgba(0,0,0,0.7)',
         paddingHorizontal: 8,
         paddingVertical: 3,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     infoContainer: {
-        padding: spacing.md,
+        padding: spacing.M,
     },
     title: {
         fontSize: 14,

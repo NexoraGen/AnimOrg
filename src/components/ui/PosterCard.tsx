@@ -91,7 +91,7 @@ export const PosterCard: React.FC<PosterCardProps> = React.memo(({
       onPress={() => onPress(media.id)}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      style={{ marginHorizontal: spacing.sm }}
+      style={{ marginHorizontal: spacing.S }}
     >
       <Animated.View
         entering={disableEntryAnimation ? undefined : FadeIn.duration(motion.durations.epic).easing(motion.curves.cinematic)}
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: '60%',
     justifyContent: 'flex-end',
-    padding: spacing.sm,
+    padding: spacing.S,
   },
   title: {
     fontSize: 13,
@@ -212,8 +212,8 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
+    top: spacing.XS,
+    right: spacing.XS,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   listContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.sm,
+    padding: spacing.S,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     height: 100,
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     flex: 1,
-    marginLeft: spacing.md,
+    marginLeft: spacing.M,
     justifyContent: 'center',
   },
   listTitle: {
@@ -274,6 +274,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
   },
   listChevron: {
-    marginLeft: spacing.sm,
+    marginLeft: spacing.S,
   }
 });

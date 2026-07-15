@@ -236,13 +236,13 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = React.memo(({
 
 const styles = StyleSheet.create({
     container: {
-        paddingHorizontal: spacing.md,
-        paddingTop: spacing.md,
-        paddingBottom: spacing.sm,
+        paddingHorizontal: spacing.M,
+        paddingTop: spacing.M,
+        paddingBottom: spacing.S,
         borderBottomWidth: 1,
     },
     content: {
-        marginTop: spacing.xs,
+        marginTop: spacing.XS,
     },
     discussionContent: {
         paddingVertical: 2,
@@ -256,15 +256,15 @@ const styles = StyleSheet.create({
     hashtagRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
-        marginTop: spacing.md,
+        gap: spacing.XS,
+        marginTop: spacing.M,
     },
     hashtag: {
         fontSize: 13,
         fontWeight: '700',
     },
     episodeBadge: {
-        marginTop: spacing.sm,
+        marginTop: spacing.S,
         paddingVertical: 8,
         paddingHorizontal: 12,
         borderRadius: 16,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
         height: 180,
         borderRadius: 12,
         overflow: 'hidden',
-        marginBottom: spacing.sm,
+        marginBottom: spacing.S,
     },
     mediaImage: {
         width: '100%',
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
         paddingVertical: 3,
         borderRadius: 8,
         borderWidth: 1,
-        marginBottom: spacing.xs,
+        marginBottom: spacing.XS,
         marginTop: 2,
     },
     categoryBadgeText: {

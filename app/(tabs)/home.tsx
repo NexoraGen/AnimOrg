@@ -277,6 +277,7 @@ export default function HomeScreen() {
             icon="award"
             data={data}
             onPress={handleMediaPress}
+            onViewAll={() => router.push(`/category/${category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)}
           />
         ))}
 
@@ -304,17 +305,17 @@ const styles = StyleSheet.create({
   heroWrapper: {
     position: 'relative',
     overflow: 'hidden',
-    marginHorizontal: spacing.md,
-    marginBottom: 0,
+    marginHorizontal: spacing.M,
+    marginBottom: spacing.L,
     borderTopLeftRadius: borderRadius.lg,
     borderTopRightRadius: borderRadius.lg,
   },
   section: {
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.XL,
   },
   horizontalScroll: {
-    paddingHorizontal: spacing.md,
-    gap: spacing.md,
+    paddingHorizontal: spacing.M,
+    gap: spacing.M,
   },
 });
 

@@ -19,7 +19,7 @@ import { RecommendationService, RecommendationResult } from '../../services/Reco
 import { HorizontalCarousel } from '../ui/HorizontalCarousel';
 import { PosterCard } from '../ui/PosterCard';
 
-export const ForYouSection: React.FC = () => {
+const ForYouSectionComponent: React.FC = () => {
     const router = useRouter();
     const themeColors = useThemeColors();
 
@@ -275,11 +275,11 @@ export const ForYouSection: React.FC = () => {
 
 const styles = StyleSheet.create({
     container: {
-        paddingHorizontal: spacing.md,
-        marginBottom: spacing.xxl,
+        paddingHorizontal: spacing.M,
+        marginBottom: spacing.XL,
     },
     listContainer: {
-        marginBottom: spacing.xxl,
+        marginBottom: 0,
     },
     glowCard: {
         borderRadius: borderRadius.lg,
@@ -420,3 +420,5 @@ const styles = StyleSheet.create({
         textAlign: 'center'
     }
 });
+
+export const ForYouSection = React.memo(ForYouSectionComponent);

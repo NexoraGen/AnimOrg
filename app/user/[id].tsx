@@ -6,7 +6,8 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Dimensions,
-    RefreshControl
+    RefreshControl,
+    ScrollView
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -27,9 +28,101 @@ import { CommunityPostCard } from '../../src/components/features/community/Commu
 import { FeedTabs } from '../../src/components/features/community/FeedTabs';
 import { getAvatarSource } from '../../src/constants/avatars';
 
+import { SwipeableTabs } from '../../src/components/layout/SwipeableTabs';
+
 const { width } = Dimensions.get('window');
 
 const TABS = ['Posts', 'Anime Stats'];
+
+interface UserPostsTabProps {
+    userId: string;
+    userPosts: CommunityPost[];
+    theme: any;
+    setAuthModalVisible: (v: boolean) => void;
+    setUserPosts: React.Dispatch<React.SetStateAction<CommunityPost[]>>;
+}
+
+const UserPostsTab: React.FC<UserPostsTabProps> = ({
+    userId,
+    userPosts,
+    theme,
+    setAuthModalVisible,
+    setUserPosts
+}) => {
+    if (userPosts.length === 0) {
+        return (
+            <View style={styles.emptyContainer}>
+                <Feather name="message-square" size={48} color={theme.textDim} />
+                <Text style={[styles.emptyText, { color: theme.textDim }]}>No posts yet.</Text>
+            </View>
+        );
+    }
+
+    return (
+        <FlashList<CommunityPost>
+            {...{ estimatedItemSize: 200 } as any}
+            data={userPosts}
+            renderItem={({ item }) => (
+                <CommunityPostCard
+                    post={item}
+                    onAuthRequired={() => setAuthModalVisible(true)}
+                    onPostUpdated={(updatedPost) => {
+                        setUserPosts((prev) =>
+                            prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+                        );
+                    }}
+                    onPostDeleted={(postId) => {
+                        setUserPosts((prev) => prev.filter((p) => p.id !== postId));
+                    }}
+                />
+            )}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingBottom: 100 }}
+        />
+    );
+};
+
+interface UserStatsTabProps {
+    stats: any;
+    profile: any;
+    theme: any;
+}
+
+const UserStatsTab: React.FC<UserStatsTabProps> = ({
+    stats,
+    profile,
+    theme
+}) => {
+    return (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100, paddingTop: spacing.md }}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Anime Journey</Text>
+            <View style={styles.statsGrid}>
+                {[
+                    { label: 'Completed', val: stats.totalWatched },
+                    { label: 'Watching', val: stats.currentlyWatching },
+                    { label: 'Episodes', val: stats.totalEpisodes },
+                ].map((stat, i) => (
+                    <View key={i} style={[styles.statBox, { backgroundColor: theme.surfaceVariant }]}>
+                        <Text style={[styles.statVal, { color: theme.text }]}>{stat.val}</Text>
+                        <Text style={[styles.statLab, { color: theme.textDim }]}>{stat.label}</Text>
+                    </View>
+                ))}
+            </View>
+            {profile.favoriteGenres && profile.favoriteGenres.length > 0 && (
+                <View style={styles.section}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Top Genres</Text>
+                    <View style={styles.genreList}>
+                        {profile.favoriteGenres.map((genre: string) => (
+                            <View key={genre} style={[styles.genreItem, { backgroundColor: theme.surfaceVariant }]}>
+                                <Text style={[styles.genreText, { color: theme.text }]}>{genre}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </View>
+            )}
+        </ScrollView>
+    );
+};
 
 export default function UserProfileScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -106,106 +199,6 @@ export default function UserProfileScreen() {
 
     const { profile, stats } = userData;
 
-    const renderHeader = () => (
-        <View style={styles.headerWrapper}>
-            <View style={styles.bannerContainer}>
-                <Image
-                    source={getAvatarSource(profile.avatarUrl)}
-                    style={styles.bannerImage}
-                    blurRadius={40}
-                    contentFit="cover"
-                />
-                <LinearGradient
-                    colors={['transparent', theme.background]}
-                    style={StyleSheet.absoluteFill}
-                />
-            </View>
-
-            <View style={styles.profileInfoContainer}>
-                <View style={styles.topProfileBar}>
-                    <View style={styles.avatarContainer}>
-                        <Image
-                            source={getAvatarSource(profile.avatarUrl)}
-                            style={[styles.avatar, { borderColor: theme.surface }]}
-                            contentFit="cover"
-                        />
-                    </View>
-
-                    {currentUser?.id !== id && (
-                        <TouchableOpacity
-                            style={[
-                                styles.followPill,
-                                {
-                                    backgroundColor: isFollowing ? 'rgba(255,255,255,0.05)' : theme.primary,
-                                    borderColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent'
-                                }
-                            ]}
-                            onPress={handleFollowToggle}
-                        >
-                            <Text style={[styles.followText, { color: isFollowing ? theme.text : '#fff' }]}>
-                                {isFollowing ? 'Following' : 'Follow'}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                <View style={styles.identityContainer}>
-                    <Text style={[styles.displayName, { color: theme.text }]}>{profile.username || 'Anime Enthusiast'}</Text>
-                    <Text style={[styles.usernameHandle, { color: theme.primary }]}>@{profile.username?.toLowerCase() || 'enthusiast'}</Text>
-                </View>
-
-                {profile.bio && (
-                    <Text style={[styles.bio, { color: theme.textDim }]}>{profile.bio}</Text>
-                )}
-
-                <View style={styles.statsRow}>
-                    <View style={styles.statMetric}>
-                        <Text style={[styles.statValue, { color: theme.text }]}>{profile.followersCount || 0}</Text>
-                        <Text style={[styles.statLabel, { color: theme.textDim }]}>Followers</Text>
-                    </View>
-                    <View style={styles.statMetric}>
-                        <Text style={[styles.statValue, { color: theme.text }]}>{profile.followingCount || 0}</Text>
-                        <Text style={[styles.statLabel, { color: theme.textDim }]}>Following</Text>
-                    </View>
-                </View>
-            </View>
-
-            <View style={styles.tabWrapper}>
-                <FeedTabs tabs={TABS} activeTab={activeTab} onTabPress={setActiveTab} />
-            </View>
-
-            {activeTab === 'Anime Stats' && (
-                <View style={styles.animeStatsContainer}>
-                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Anime Journey</Text>
-                    <View style={styles.statsGrid}>
-                        {[
-                            { label: 'Completed', val: stats.totalWatched },
-                            { label: 'Watching', val: stats.currentlyWatching },
-                            { label: 'Episodes', val: stats.totalEpisodes },
-                        ].map((stat, i) => (
-                            <View key={i} style={[styles.statBox, { backgroundColor: theme.surfaceVariant }]}>
-                                <Text style={[styles.statVal, { color: theme.text }]}>{stat.val}</Text>
-                                <Text style={[styles.statLab, { color: theme.textDim }]}>{stat.label}</Text>
-                            </View>
-                        ))}
-                    </View>
-                    {profile.favoriteGenres && profile.favoriteGenres.length > 0 && (
-                        <View style={styles.section}>
-                            <Text style={[styles.sectionTitle, { color: theme.text }]}>Top Genres</Text>
-                            <View style={styles.genreList}>
-                                {profile.favoriteGenres.map((genre: string) => (
-                                    <View key={genre} style={[styles.genreItem, { backgroundColor: theme.surfaceVariant }]}>
-                                        <Text style={[styles.genreText, { color: theme.text }]}>{genre}</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        </View>
-                    )}
-                </View>
-            )}
-        </View>
-    );
-
     return (
         <AnimatedScreen style={[styles.container, { backgroundColor: theme.background }]}>
             <GlassHeader
@@ -217,36 +210,97 @@ export default function UserProfileScreen() {
                 }
             />
 
-            <FlashList<CommunityPost>
-                {...{ estimatedItemSize: 200 } as any}
-                data={activeTab === 'Posts' ? userPosts : []}
-                ListHeaderComponent={renderHeader()}
-                renderItem={({ item }) => (
-                    <CommunityPostCard
-                        post={item}
-                        onAuthRequired={() => setAuthModalVisible(true)}
-                        onPostUpdated={(updatedPost) => {
-                            setUserPosts((prev) =>
-                                prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
-                            );
-                        }}
-                        onPostDeleted={(postId) => {
-                            setUserPosts((prev) => prev.filter((p) => p.id !== postId));
-                        }}
-                    />
-                )}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={[styles.listContent, { paddingTop: insets.top + HEADER_HEIGHT, paddingBottom: insets.bottom + 40 }]}
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + HEADER_HEIGHT }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={theme.primary} progressViewOffset={insets.top + HEADER_HEIGHT} />}
-                ListEmptyComponent={
-                    activeTab === 'Posts' ? (
-                        <View style={styles.emptyContainer}>
-                            <Feather name="message-square" size={48} color={theme.textDim} />
-                            <Text style={[styles.emptyText, { color: theme.textDim }]}>No posts yet.</Text>
+                keyboardShouldPersistTaps="handled"
+            >
+                <View style={styles.headerWrapper}>
+                    <View style={styles.bannerContainer}>
+                        <Image
+                            source={getAvatarSource(profile.avatarUrl)}
+                            style={styles.bannerImage}
+                            blurRadius={40}
+                            contentFit="cover"
+                        />
+                        <LinearGradient
+                            colors={['transparent', theme.background]}
+                            style={StyleSheet.absoluteFill}
+                        />
+                    </View>
+
+                    <View style={styles.profileInfoContainer}>
+                        <View style={styles.topProfileBar}>
+                            <View style={styles.avatarContainer}>
+                                <Image
+                                    source={getAvatarSource(profile.avatarUrl)}
+                                    style={[styles.avatar, { borderColor: theme.surface }]}
+                                    contentFit="cover"
+                                />
+                            </View>
+
+                            {currentUser?.id !== id && (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.followPill,
+                                        {
+                                            backgroundColor: isFollowing ? 'rgba(255,255,255,0.05)' : theme.primary,
+                                            borderColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent'
+                                        }
+                                    ]}
+                                    onPress={handleFollowToggle}
+                                >
+                                    <Text style={[styles.followText, { color: isFollowing ? theme.text : '#fff' }]}>
+                                        {isFollowing ? 'Following' : 'Follow'}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
-                    ) : null
-                }
-            />
+
+                        <View style={styles.identityContainer}>
+                            <Text style={[styles.displayName, { color: theme.text }]}>{profile.username || 'Anime Enthusiast'}</Text>
+                            <Text style={[styles.usernameHandle, { color: theme.primary }]}>@{profile.username?.toLowerCase() || 'enthusiast'}</Text>
+                        </View>
+
+                        {profile.bio && (
+                            <Text style={[styles.bio, { color: theme.textDim }]}>{profile.bio}</Text>
+                        )}
+
+                        <View style={styles.statsRow}>
+                            <View style={styles.statMetric}>
+                                <Text style={[styles.statValue, { color: theme.text }]}>{profile.followersCount || 0}</Text>
+                                <Text style={[styles.statLabel, { color: theme.textDim }]}>Followers</Text>
+                            </View>
+                            <View style={styles.statMetric}>
+                                <Text style={[styles.statValue, { color: theme.text }]}>{profile.followingCount || 0}</Text>
+                                <Text style={[styles.statLabel, { color: theme.textDim }]}>Following</Text>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                <View style={{ flex: 1, minHeight: 450 }}>
+                    <SwipeableTabs
+                        tabs={TABS}
+                        activeTab={activeTab}
+                        onTabChange={setActiveTab}
+                    >
+                        <UserPostsTab
+                            userId={id}
+                            userPosts={userPosts}
+                            theme={theme}
+                            setAuthModalVisible={setAuthModalVisible}
+                            setUserPosts={setUserPosts}
+                        />
+                        <UserStatsTab
+                            stats={stats}
+                            profile={profile}
+                            theme={theme}
+                        />
+                    </SwipeableTabs>
+                </View>
+            </ScrollView>
 
             <AuthModal visible={authModalVisible} onClose={() => setAuthModalVisible(false)} />
         </AnimatedScreen>

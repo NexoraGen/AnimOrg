@@ -91,10 +91,148 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     'continue-watching': {
         title: 'Continue Watching',
         icon: 'play-circle',
-        fetchFn: async () => [], // Handled client-side via local store
-        emptyMessage: "You haven't started tracking any anime yet.",
+        fetchFn: async () => {
+            const { watchlist, animeProgress } = useAppStore.getState();
+            const watching = watchlist.filter(item => {
+                const progress = animeProgress[String(item.mediaId)] || { lastWatchedEpisode: 0 };
+                const totalEpisodes = item.episodes || 0;
+                // Currently watching if marked as watching and not fully completed
+                return item.status === 'watching' && (totalEpisodes === 0 || progress.lastWatchedEpisode < totalEpisodes);
+            });
+            return watching.map(item => ({
+                id: item.mediaId,
+                title: item.title || 'Unknown',
+                posterPath: item.posterPath || '',
+                rating: item.rating,
+                genres: item.genres || [],
+                description: '',
+                backdropPath: '',
+                releaseYear: 0,
+                type: 'anime',
+            }));
+        },
+        emptyMessage: "You don't have any ongoing anime in your watchlist.",
         emptyIcon: 'play-circle',
         analyticsName: 'continue_watching',
+        supportsPagination: false,
+        supportsFilters: false,
+    },
+    'plan-to-watch': {
+        title: 'Plan to Watch',
+        icon: 'clock',
+        fetchFn: async () => {
+            const { watchlist } = useAppStore.getState();
+            const planToWatch = watchlist.filter(item => item.status === 'plan-to-watch');
+            return planToWatch.map(item => ({
+                id: item.mediaId,
+                title: item.title || 'Unknown',
+                posterPath: item.posterPath || '',
+                rating: item.rating,
+                genres: item.genres || [],
+                description: '',
+                backdropPath: '',
+                releaseYear: 0,
+                type: 'anime',
+            }));
+        },
+        emptyMessage: "You don't have any anime planned to watch.",
+        emptyIcon: 'clock',
+        analyticsName: 'plan_to_watch',
+        supportsPagination: false,
+        supportsFilters: false,
+    },
+    'completed': {
+        title: 'Completed Anime',
+        icon: 'check-circle',
+        fetchFn: async () => {
+            const { watchlist } = useAppStore.getState();
+            const completed = watchlist.filter(item => item.status === 'completed');
+            return completed.map(item => ({
+                id: item.mediaId,
+                title: item.title || 'Unknown',
+                posterPath: item.posterPath || '',
+                rating: item.rating,
+                genres: item.genres || [],
+                description: '',
+                backdropPath: '',
+                releaseYear: 0,
+                type: 'anime',
+            }));
+        },
+        emptyMessage: "You haven't completed any anime yet.",
+        emptyIcon: 'check-circle',
+        analyticsName: 'completed',
+        supportsPagination: false,
+        supportsFilters: false,
+    },
+    'dropped': {
+        title: 'Dropped Anime',
+        icon: 'x-circle',
+        fetchFn: async () => {
+            const { watchlist } = useAppStore.getState();
+            const dropped = watchlist.filter(item => item.status === 'dropped');
+            return dropped.map(item => ({
+                id: item.mediaId,
+                title: item.title || 'Unknown',
+                posterPath: item.posterPath || '',
+                rating: item.rating,
+                genres: item.genres || [],
+                description: '',
+                backdropPath: '',
+                releaseYear: 0,
+                type: 'anime',
+            }));
+        },
+        emptyMessage: "No dropped anime.",
+        emptyIcon: 'x-circle',
+        analyticsName: 'dropped',
+        supportsPagination: false,
+        supportsFilters: false,
+    },
+    ratings: {
+        title: 'My Ratings',
+        icon: 'star',
+        fetchFn: async () => {
+            const { userRatings } = useAppStore.getState();
+            return (userRatings || []).map(r => ({
+                id: r.animeId,
+                title: r.title,
+                posterPath: r.posterPath,
+                rating: r.score,
+                type: 'anime',
+                genres: [],
+                description: '',
+                backdropPath: '',
+                releaseYear: 0
+            }));
+        },
+        emptyMessage: "You haven't rated any anime yet.",
+        emptyIcon: 'star',
+        analyticsName: 'ratings',
+        supportsPagination: false,
+        supportsFilters: false,
+    },
+    favorites: {
+        title: 'Favorite Anime',
+        icon: 'heart',
+        fetchFn: async () => {
+            const { watchlist } = useAppStore.getState();
+            const favorites = watchlist.filter(item => item.isFavorite);
+            return favorites.map(item => ({
+                id: item.mediaId,
+                title: item.title || 'Unknown',
+                posterPath: item.posterPath || '',
+                rating: item.rating,
+                genres: item.genres || [],
+                description: '',
+                backdropPath: '',
+                releaseYear: 0,
+                type: 'anime',
+            }));
+        },
+        emptyMessage: "You don't have any favorite anime yet.",
+        emptyIcon: 'heart',
+        analyticsName: 'favorites',
         supportsPagination: false,
         supportsFilters: false,
     },
@@ -161,10 +299,45 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     },
 };
 
+const CURATED_LISTS = [
+    'All-Time Legends',
+    'Modern Masterpieces',
+    'Must Watch Shonen',
+    'Dark Masterpieces',
+    'Psychological Peaks',
+    'Best Storytelling',
+    'Highest Rated Anime',
+    'Fan Favorites',
+    'Beginner Essentials',
+    'Anime Hall of Fame'
+];
+
+const getCuratedListNameBySlug = (slug: string) => {
+    const slugified = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    return CURATED_LISTS.find(name => slugified(name) === slug);
+};
+
 /**
  * Resolve category config, returning a sensible fallback for unknown types.
  */
 export const getCategoryConfig = (type: string): CategoryConfig => {
+    // Check if the type is a slug of a curated list
+    const curatedListName = getCuratedListNameBySlug(type);
+    if (curatedListName) {
+        return {
+            title: curatedListName,
+            icon: 'award',
+            fetchFn: async (page) => {
+                return animeApi.getCuratedList(curatedListName);
+            },
+            emptyMessage: 'No anime found in this curated list.',
+            emptyIcon: 'award',
+            analyticsName: `curated_${type.replace(/-/g, '_')}`,
+            supportsPagination: false,
+            supportsFilters: false,
+        };
+    }
+
     return CATEGORY_CONFIG[type] || {
         title: type.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
         icon: 'list',

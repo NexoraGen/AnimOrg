@@ -55,8 +55,8 @@ export default function CategoryScreen() {
 
   const numColumns = viewMode === 'grid' ? (width > 1024 ? 5 : width > 768 ? 4 : 2) : 1;
   const cardWidth = viewMode === 'grid'
-    ? (width - spacing.md * 2 - spacing.md * (numColumns - 1)) / numColumns
-    : width - spacing.md * 2;
+    ? (width - spacing.M * 2 - spacing.M * (numColumns - 1)) / numColumns
+    : width - spacing.M * 2;
 
   useEffect(() => {
     initialFetch();
@@ -138,7 +138,7 @@ export default function CategoryScreen() {
                 key={i}
                 width={cardWidth}
                 height={viewMode === 'grid' ? cardWidth * 1.5 : 100}
-                style={{ marginBottom: spacing.md, borderRadius: 12 }}
+                style={{ marginBottom: spacing.M, borderRadius: 12 }}
               />
             ))}
           </View>
@@ -200,11 +200,11 @@ const styles = StyleSheet.create({
   filterBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.M,
+    paddingVertical: spacing.S,
   },
   filterScroll: {
-    gap: 8,
+    gap: spacing.XS,
   },
   filterChip: {
     paddingHorizontal: 12,
@@ -218,25 +218,25 @@ const styles = StyleSheet.create({
   },
   resultCount: {
     fontSize: 10,
-    marginLeft: spacing.md,
+    marginLeft: spacing.M,
   },
   gridContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.M,
     justifyContent: 'space-between',
   },
   listContent: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.M,
+    paddingTop: spacing.S,
   },
   cardContainer: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.M,
   },
   footerLoader: {
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.XL,
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.XS,
   },
   loadingMoreText: {
     fontSize: 12,
@@ -246,8 +246,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 100,
+    paddingHorizontal: spacing.XL,
+    paddingBottom: spacing.XXL * 2,
   },
   emptyIconCircle: {
     width: 80,
@@ -255,12 +255,12 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.L,
   },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '800',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.S,
     textAlign: 'center',
   },
   emptyMessage: {

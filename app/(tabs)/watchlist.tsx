@@ -19,8 +19,115 @@ import { useRouter } from 'expo-router';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useState } from 'react';
 import { WatchlistItem, Media } from '../../src/types';
+import { SwipeableTabs } from '../../src/components/layout/SwipeableTabs';
 
+interface WatchlistTabFeedProps {
+  tabId: string;
+  filteredWatchlist: WatchlistItem[];
+  animeProgress: any;
+  numColumns: number;
+  cardWidth: number;
+  router: any;
+  themeColors: any;
+}
 
+const mapWatchlistItemToMedia = (item: WatchlistItem): Media => ({
+  id: item.mediaId,
+  title: item.title || 'Unknown Title',
+  posterPath: item.posterPath || '',
+  rating: item.rating,
+  description: '',
+  backdropPath: '',
+  releaseYear: 0,
+  genres: item.genres || [],
+  type: 'anime',
+});
+
+const WatchlistTabFeed: React.FC<WatchlistTabFeedProps> = React.memo(({
+  tabId,
+  filteredWatchlist,
+  animeProgress,
+  numColumns,
+  cardWidth,
+  router,
+  themeColors
+}) => {
+  if (filteredWatchlist.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <View style={[styles.emptyIconCircle, { backgroundColor: themeColors.surfaceVariant }]}>
+          <Feather name="bookmark" size={48} color={themeColors.textDim} />
+          <View style={[styles.emptyIconBadge, { backgroundColor: themeColors.primary }]}>
+            <Feather name="plus" size={16} color="#FFF" />
+          </View>
+        </View>
+        <Text style={[styles.emptyTitle, { color: themeColors.text }]}>Your Library is Empty</Text>
+        <Text style={[styles.emptySubtitle, { color: themeColors.textMuted }]}>
+          {tabId === 'favorites'
+            ? "You haven't added any favorites to your collection yet."
+            : "Discover masterpieces and track your progress in real-time."}
+        </Text>
+        <Button
+          title="Start Discovering"
+          onPress={() => router.push('/(tabs)/home')}
+          style={styles.emptyButton}
+          variant="primary"
+        />
+      </View>
+    );
+  }
+
+  return (
+    <FlashList<WatchlistItem>
+      data={filteredWatchlist}
+      keyExtractor={(item) => item.mediaId}
+      numColumns={numColumns}
+      contentContainerStyle={styles.listContent}
+      {...{ estimatedItemSize: 180 } as any}
+      renderItem={({ item }) => {
+        const progressRec = animeProgress[item.mediaId];
+        const watchedCount = progressRec ? Object.values(progressRec.watchedEpisodes).filter(v => v).length : 0;
+        const total = item.episodes || 0;
+        const percentage = total > 0 ? watchedCount / total : 0;
+
+        return (
+          <View style={[styles.cardContainer, { width: cardWidth }]}>
+            <PosterCard
+              media={mapWatchlistItemToMedia(item)}
+              onPress={() => router.push(`/details/${item.mediaId}`)}
+              width={cardWidth}
+              showProgress={item.status === 'watching' && percentage > 0}
+              progress={percentage}
+            />
+          </View>
+        );
+      }}
+    />
+  );
+}, (prevProps, nextProps) => {
+  if (prevProps.tabId !== nextProps.tabId) return false;
+  if (prevProps.numColumns !== nextProps.numColumns) return false;
+  if (prevProps.cardWidth !== nextProps.cardWidth) return false;
+  if (prevProps.themeColors !== nextProps.themeColors) return false;
+
+  // Verify list array references
+  if (prevProps.filteredWatchlist !== nextProps.filteredWatchlist) {
+    if (prevProps.filteredWatchlist.length !== nextProps.filteredWatchlist.length) return false;
+    for (let i = 0; i < prevProps.filteredWatchlist.length; i++) {
+      if (prevProps.filteredWatchlist[i].mediaId !== nextProps.filteredWatchlist[i].mediaId) return false;
+      if (prevProps.filteredWatchlist[i].isFavorite !== nextProps.filteredWatchlist[i].isFavorite) return false;
+      if (prevProps.filteredWatchlist[i].status !== nextProps.filteredWatchlist[i].status) return false;
+    }
+  }
+
+  // Verify progress states only for loaded list items
+  for (const item of prevProps.filteredWatchlist) {
+    const id = item.mediaId;
+    if (prevProps.animeProgress[id] !== nextProps.animeProgress[id]) return false;
+  }
+
+  return true;
+});
 
 export default function WatchlistScreen() {
   const router = useRouter();
@@ -43,92 +150,44 @@ export default function WatchlistScreen() {
     { id: 'dropped', label: 'Dropped' },
   ];
 
-  const filteredWatchlist = watchlist.filter(item => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'favorites') return item.isFavorite;
-    return item.status === activeTab;
-  });
-
-  const mapWatchlistItemToMedia = (item: WatchlistItem): Media => ({
-    id: item.mediaId,
-    title: item.title || 'Unknown Title',
-    posterPath: item.posterPath || '',
-    rating: item.rating,
-    description: '',
-    backdropPath: '',
-    releaseYear: 0,
-    genres: item.genres || [],
-    type: 'anime',
-  });
+  const filteredListMap = React.useMemo(() => {
+    return {
+      all: watchlist,
+      favorites: watchlist.filter(item => item.isFavorite),
+      watching: watchlist.filter(item => item.status === 'watching'),
+      completed: watchlist.filter(item => item.status === 'completed'),
+      'plan-to-watch': watchlist.filter(item => item.status === 'plan-to-watch'),
+      dropped: watchlist.filter(item => item.status === 'dropped'),
+    };
+  }, [watchlist]);
 
   return (
     <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
       <GlassHeader title="My Watchlist" showLogo={true} />
 
-      <View style={[styles.tabsContainer, { paddingTop: insets.top + HEADER_HEIGHT + 20 }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
-          {TABS.map(tab => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tab, activeTab === tab.id && styles.activeTab]}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-
-      {filteredWatchlist.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <View style={[styles.emptyIconCircle, { backgroundColor: themeColors.surfaceVariant }]}>
-            <Feather name="bookmark" size={48} color={themeColors.textDim} />
-            <View style={[styles.emptyIconBadge, { backgroundColor: themeColors.primary }]}>
-              <Feather name="plus" size={16} color="#FFF" />
-            </View>
-          </View>
-          <Text style={[styles.emptyTitle, { color: themeColors.text }]}>Your Library is Empty</Text>
-          <Text style={[styles.emptySubtitle, { color: themeColors.textMuted }]}>
-            {activeTab === 'favorites'
-              ? "You haven't added any favorites to your collection yet."
-              : "Discover masterpieces and track your progress in real-time."}
-          </Text>
-          <Button
-            title="Start Discovering"
-            onPress={() => router.push('/(tabs)/home')}
-            style={styles.emptyButton}
-            variant="primary"
-          />
-        </View>
-      ) : (
-        <FlashList
-          data={filteredWatchlist}
-          keyExtractor={(item) => item.mediaId}
-          numColumns={numColumns}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => {
-            const progressRec = animeProgress[item.mediaId];
-            const watchedCount = progressRec ? Object.values(progressRec.watchedEpisodes).filter(v => v).length : 0;
-            const total = item.episodes || 0;
-            const percentage = total > 0 ? watchedCount / total : 0;
-
-            return (
-              <View style={[styles.cardContainer, { width: cardWidth }]}>
-                <PosterCard
-                  media={mapWatchlistItemToMedia(item)}
-                  onPress={() => router.push(`/details/${item.mediaId}`)}
-                  width={cardWidth}
-                  showProgress={item.status === 'watching' && percentage > 0}
-                  progress={percentage}
-                />
-              </View>
-            );
+      <View style={{ flex: 1, paddingTop: insets.top + HEADER_HEIGHT }}>
+        <SwipeableTabs
+          tabs={TABS.map(t => t.label)}
+          activeTab={TABS.find(t => t.id === activeTab)?.label || 'All'}
+          onTabChange={(label) => {
+            const found = TABS.find(t => t.label === label);
+            if (found) setActiveTab(found.id);
           }}
-        />
-      )}
-
+        >
+          {TABS.map(tab => (
+            <WatchlistTabFeed
+              key={tab.id}
+              tabId={tab.id}
+              filteredWatchlist={filteredListMap[tab.id as keyof typeof filteredListMap] || []}
+              animeProgress={animeProgress}
+              numColumns={numColumns}
+              cardWidth={cardWidth}
+              router={router}
+              themeColors={themeColors}
+            />
+          ))}
+        </SwipeableTabs>
+      </View>
     </AnimatedScreen>
   );
 }
@@ -168,6 +227,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
     paddingBottom: 100,
   },
   cardContainer: {

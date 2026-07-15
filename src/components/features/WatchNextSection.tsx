@@ -348,6 +348,7 @@ export const WatchNextSection: React.FC = React.memo(() => {
                     <SectionHeader
                         title="Continue Watching"
                         subtitle="Pick up where you left off"
+                        onViewAll={() => router.push('/category/continue-watching')}
                     />
                     <FlashList
                         data={continueWatchingList}
@@ -418,6 +419,7 @@ export const WatchNextSection: React.FC = React.memo(() => {
                     <SectionHeader
                         title="Awaiting Next Episode"
                         subtitle="Caught up ongoing scheduled broadcasts"
+                        onViewAll={() => router.push('/category/schedule')}
                     />
                     <FlashList
                         data={awaitingList}
@@ -453,6 +455,7 @@ export const WatchNextSection: React.FC = React.memo(() => {
                     <SectionHeader
                         title="Upcoming Seasons"
                         subtitle="New confirmed sequel releases"
+                        onViewAll={() => router.push('/category/upcoming')}
                     />
                     <FlashList
                         data={upcomingList}
@@ -515,7 +518,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     sectionWrapper: {
-        marginBottom: spacing.xxl,
+        marginBottom: spacing.XL,
     },
     scrollContent: {
         paddingHorizontal: spacing.md,

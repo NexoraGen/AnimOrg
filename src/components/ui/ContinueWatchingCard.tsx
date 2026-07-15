@@ -143,9 +143,9 @@ const styles = StyleSheet.create({
   },
   content: {
     position: 'absolute',
-    bottom: spacing.md,
-    left: spacing.md,
-    right: spacing.md,
+    bottom: spacing.M,
+    left: spacing.M,
+    right: spacing.M,
   },
   title: {
     color: '#FFFFFF',

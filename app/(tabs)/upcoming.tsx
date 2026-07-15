@@ -28,12 +28,154 @@ import { getNextEpisode, getLocalAiringInfo } from '../../src/utils/releaseHelpe
 import { AiringAnimeCard } from '../../src/components/features/AiringAnimeCard';
 import { useAppStore } from '../../src/store/useAppStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SwipeableTabs } from '../../src/components/layout/SwipeableTabs';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const DAY_SHORT: Record<string, string> = {
     Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed',
     Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun'
 };
+
+import { FlashList } from '@shopify/flash-list';
+
+interface UpcomingDayFeedProps {
+    day: string;
+    dayAnime: any[];
+    animeProgress: any;
+    numColumns: number;
+    cardWidth: number;
+    edgePadding: number;
+    itemGap: number;
+    router: any;
+    themeColors: any;
+    refreshing: boolean;
+    onRefresh: () => void;
+    totalTracked: number;
+    totalAiringCount: number;
+}
+
+const UpcomingDayFeed: React.FC<UpcomingDayFeedProps> = React.memo(({
+    day,
+    dayAnime,
+    animeProgress,
+    numColumns,
+    cardWidth,
+    edgePadding,
+    itemGap,
+    router,
+    themeColors,
+    refreshing,
+    onRefresh,
+    totalTracked,
+    totalAiringCount
+}) => {
+    if (dayAnime.length === 0) {
+        return (
+            <ScrollView
+                contentContainerStyle={{ flexGrow: 1 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+            >
+                <View style={styles.emptyDay}>
+                    <View style={[styles.emptyDayIcon, { backgroundColor: `${colors.primary}12` }]}>
+                        <Feather name="calendar" size={36} color={colors.primary} />
+                    </View>
+                    <Text style={[styles.emptyDayTitle, { color: themeColors.text }]}>
+                        No Anime on {day}
+                    </Text>
+                    <Text style={[styles.emptyDaySub, { color: themeColors.textDim }]}>
+                        Check other days for scheduled releases
+                    </Text>
+                </View>
+            </ScrollView>
+        );
+    }
+
+    return (
+        <FlashList<any>
+            data={dayAnime}
+            numColumns={numColumns}
+            keyExtractor={item => item.id}
+            contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: 120, paddingHorizontal: edgePadding }}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+            {...{ estimatedItemSize: 220 } as any}
+            renderItem={({ item }) => {
+                const progress = animeProgress[item.id] || { lastWatchedEpisode: 0 };
+                const nextEp = getNextEpisode(item, progress.lastWatchedEpisode);
+                return (
+                    <View style={[styles.gridItem, { width: cardWidth, marginRight: itemGap }]}>
+                        <AiringAnimeCard
+                            anime={item}
+                            width={cardWidth}
+                            nextEpisode={`Episode ${nextEp}`}
+                            onPress={(id) => router.push(`/details/${id}`)}
+                        />
+                    </View>
+                );
+            }}
+            ListFooterComponent={() => (
+                <View style={styles.footerStatsContainer}>
+                    <LinearGradient
+                        colors={['rgba(229, 9, 20, 0.08)', 'rgba(229, 9, 20, 0.02)']}
+                        style={styles.footerStatsCard}
+                    >
+                        <View style={[styles.footerBorderLine, { backgroundColor: colors.primary }]} />
+                        <View style={styles.heroStats}>
+                            <View style={styles.heroStat}>
+                                <Text style={[styles.heroStatNum, { color: colors.primary }]}>
+                                    {totalAiringCount}
+                                </Text>
+                                <Text style={[styles.heroStatSub, { color: themeColors.textDim }]}>airing</Text>
+                            </View>
+                            <View style={[styles.heroStatDivider, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+                            <View style={styles.heroStat}>
+                                <Text style={[styles.heroStatNum, { color: '#4CD964' }]}>
+                                    {dayAnime.length}
+                                </Text>
+                                <Text style={[styles.heroStatSub, { color: themeColors.textDim }]}>today</Text>
+                            </View>
+                            <View style={[styles.heroStatDivider, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
+                            <View style={styles.heroStat}>
+                                <Text style={[styles.heroStatNum, { color: '#FFD700' }]}>
+                                    {totalTracked}
+                                </Text>
+                                <Text style={[styles.heroStatSub, { color: themeColors.textDim }]}>tracked</Text>
+                            </View>
+                        </View>
+                    </LinearGradient>
+                    <Text style={[styles.footerCopyright, { color: themeColors.textDim }]}>
+                        AnimOrg Release Hub • Updated Live
+                    </Text>
+                </View>
+            )}
+        />
+    );
+}, (prevProps, nextProps) => {
+    if (prevProps.day !== nextProps.day) return false;
+    if (prevProps.numColumns !== nextProps.numColumns) return false;
+    if (prevProps.cardWidth !== nextProps.cardWidth) return false;
+    if (prevProps.edgePadding !== nextProps.edgePadding) return false;
+    if (prevProps.itemGap !== nextProps.itemGap) return false;
+    if (prevProps.refreshing !== nextProps.refreshing) return false;
+    if (prevProps.totalTracked !== nextProps.totalTracked) return false;
+    if (prevProps.totalAiringCount !== nextProps.totalAiringCount) return false;
+    if (prevProps.themeColors !== nextProps.themeColors) return false;
+
+    // Check if dayAnime lists are shallowly identical
+    if (prevProps.dayAnime !== nextProps.dayAnime) {
+        if (prevProps.dayAnime.length !== nextProps.dayAnime.length) return false;
+        for (let i = 0; i < prevProps.dayAnime.length; i++) {
+            if (prevProps.dayAnime[i].id !== nextProps.dayAnime[i].id) return false;
+            if (prevProps.dayAnime[i].nextAiringEpisode?.episode !== nextProps.dayAnime[i].nextAiringEpisode?.episode) return false;
+        }
+    }
+
+    // Check progress of items in this specific day
+    for (const anime of prevProps.dayAnime) {
+        if (prevProps.animeProgress[anime.id] !== nextProps.animeProgress[anime.id]) return false;
+    }
+
+    return true;
+});
 
 export default function UpcomingScreen() {
     const themeColors = useThemeColors();
@@ -256,17 +398,24 @@ export default function UpcomingScreen() {
         return c;
     }, [enrichedAnimeList]);
 
-    const sortedDayAnime = useMemo(() => {
-        const filtered = enrichedAnimeList.filter(a => a.localDay === selectedDay);
-        return [...filtered].sort((a, b) => {
-            if (a.localTime && b.localTime) { const t = a.localTime.localeCompare(b.localTime); if (t !== 0) return t; }
-            else if (a.localTime && !b.localTime) return -1;
-            else if (!a.localTime && b.localTime) return 1;
-            const popDiff = (a.popularity || 999999) - (b.popularity || 999999);
-            if (popDiff !== 0) return popDiff;
-            return (b.score || 0) - (a.score || 0);
+    const dayAnimeMap = useMemo(() => {
+        const map: Record<string, any[]> = {};
+        DAYS.forEach(d => { map[d] = []; });
+        enrichedAnimeList.forEach(a => {
+            if (map[a.localDay]) map[a.localDay].push(a);
         });
-    }, [enrichedAnimeList, selectedDay]);
+        DAYS.forEach(day => {
+            map[day].sort((a: any, b: any) => {
+                if (a.localTime && b.localTime) { const t = a.localTime.localeCompare(b.localTime); if (t !== 0) return t; }
+                else if (a.localTime && !b.localTime) return -1;
+                else if (!a.localTime && b.localTime) return 1;
+                const popDiff = (a.popularity || 999999) - (b.popularity || 999999);
+                if (popDiff !== 0) return popDiff;
+                return (b.score || 0) - (a.score || 0);
+            });
+        });
+        return map;
+    }, [enrichedAnimeList]);
 
     const totalTracked = releasingSoon.length + thisWeek.length + upcomingSeasons.length;
 
@@ -308,170 +457,60 @@ export default function UpcomingScreen() {
         );
     };
 
-    // ═══════════════════════════════════════════════════════
-    //  RENDER
-    // ═══════════════════════════════════════════════════════
     return (
         <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
             <StreamingHeader
                 showAvatar={false}
             />
-            <FlatList
-                data={sortedDayAnime}
-                numColumns={numColumns}
-                key={numColumns}
-                columnWrapperStyle={{ paddingHorizontal: edgePadding, gap: itemGap }}
-                keyExtractor={item => item.id}
-                ListHeaderComponent={() => (
-                    <View style={{ paddingTop: spacing.md }}>
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ flexGrow: 1 }}
+                keyboardShouldPersistTaps="handled"
+            >
+                {/* ═══ MY ANIMES ═══ */}
+                <SectionHeader title="My Animes" icon="bookmark" />
 
-                        {/* ═══ MY ANIMES ═══ */}
-                        <SectionHeader title="My Animes" icon="bookmark" />
-
-                        {!isAuthenticated || (releasingSoon.length === 0 && thisWeek.length === 0 && upcomingSeasons.length === 0 && awaitingSchedule.length === 0) ? (
-                            <EmptyTrackedState />
-                        ) : (
-                            <View style={styles.myAnimesWrap}>
-                                {renderTrackedGroup(releasingSoon, 'zap', colors.primary, 'Releasing Soon', 'soon')}
-                                {renderTrackedGroup(thisWeek, 'calendar', '#4CD964', 'This Week', 'week')}
-                                {renderTrackedGroup(upcomingSeasons, 'star', '#FFD700', 'Upcoming Seasons', 'up')}
-                                {renderTrackedGroup(awaitingSchedule, 'clock', themeColors.textDim, 'Awaiting Schedule', 'await')}
-                            </View>
-                        )}
-
-                        {/* ═══ AIRING SCHEDULE ═══ */}
-                        <SectionHeader title="Airing Schedule" icon="tv" />
-
-                        {/* Day Tabs — matching Search page chip style */}
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.dayTabsScroll}
-                            scrollEventThrottle={16}
-                            keyboardShouldPersistTaps="handled"
-                            decelerationRate="normal"
-                        >
-                            {DAYS.map(day => {
-                                const sel = selectedDay === day;
-                                const isToday = todayName === day;
-                                const count = dayCounts[day] || 0;
-                                return (
-                                    <TouchableOpacity key={day} activeOpacity={0.7}
-                                        onPress={() => setSelectedDay(day)}
-                                        style={[
-                                            styles.dayChip,
-                                            {
-                                                backgroundColor: sel ? colors.primary : 'rgba(255,255,255,0.03)',
-                                                borderColor: sel ? colors.primary : 'rgba(255,255,255,0.04)',
-                                                shadowOpacity: sel ? 0.25 : 0,
-                                                elevation: sel ? 4 : 0,
-                                            }
-                                        ]}>
-                                        <Text style={[
-                                            styles.dayChipText,
-                                            { color: sel ? '#FFF' : themeColors.textDim },
-                                            sel && { fontWeight: '800' }
-                                        ]}>
-                                            {DAY_SHORT[day]}
-                                        </Text>
-                                        {count > 0 && (
-                                            <Text style={[
-                                                styles.dayChipCount,
-                                                { color: sel ? 'rgba(255,255,255,0.8)' : themeColors.textDim }
-                                            ]}>{count}</Text>
-                                        )}
-                                        {isToday && !sel && <View style={styles.todayDot} />}
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </ScrollView>
-
-                        {/* Day label */}
-                        <View style={styles.dayLabel}>
-                            <Text style={[styles.dayLabelText, { color: themeColors.text }]}>{selectedDay}</Text>
-                            {todayName === selectedDay && (
-                                <View style={[styles.todayBadge, { backgroundColor: `${colors.primary}20` }]}>
-                                    <Text style={[styles.todayBadgeText, { color: colors.primary }]}>TODAY</Text>
-                                </View>
-                            )}
-                            <Text style={[styles.dayCount, { color: themeColors.textDim }]}>
-                                {sortedDayAnime.length} anime
-                            </Text>
-                        </View>
+                {!isAuthenticated || (releasingSoon.length === 0 && thisWeek.length === 0 && upcomingSeasons.length === 0 && awaitingSchedule.length === 0) ? (
+                    <EmptyTrackedState />
+                ) : (
+                    <View style={styles.myAnimesWrap}>
+                        {renderTrackedGroup(releasingSoon, 'zap', colors.primary, 'Releasing Soon', 'soon')}
+                        {renderTrackedGroup(thisWeek, 'calendar', '#4CD964', 'This Week', 'week')}
+                        {renderTrackedGroup(upcomingSeasons, 'star', '#FFD700', 'Upcoming Seasons', 'up')}
+                        {renderTrackedGroup(awaitingSchedule, 'clock', themeColors.textDim, 'Awaiting Schedule', 'await')}
                     </View>
                 )}
-                renderItem={({ item }) => {
-                    const progress = animeProgress[item.id] || { lastWatchedEpisode: 0 };
-                    const nextEp = getNextEpisode(item, progress.lastWatchedEpisode);
-                    return (
-                        <View style={styles.gridItem}>
-                            <AiringAnimeCard anime={item} width={cardWidth}
-                                nextEpisode={`Episode ${nextEp}`}
-                                onPress={(id) => router.push(`/details/${id}`)} />
-                        </View>
-                    );
-                }}
-                contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 55 }]}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-                ListFooterComponent={() => (
-                    <View style={styles.footerStatsContainer}>
-                        <LinearGradient
-                            colors={['rgba(229, 9, 20, 0.08)', 'rgba(229, 9, 20, 0.02)']}
-                            style={styles.footerStatsCard}
-                        >
-                            <View style={[styles.footerBorderLine, { backgroundColor: colors.primary }]} />
-                            <View style={styles.heroStats}>
-                                <View style={styles.heroStat}>
-                                    <Text style={[styles.heroStatNum, { color: colors.primary }]}>
-                                        {loading ? '—' : enrichedAnimeList.length}
-                                    </Text>
-                                    <Text style={[styles.heroStatSub, { color: themeColors.textDim }]}>airing</Text>
-                                </View>
-                                <View style={[styles.heroStatDivider, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
-                                <View style={styles.heroStat}>
-                                    <Text style={[styles.heroStatNum, { color: '#4CD964' }]}>
-                                        {dayCounts[todayName] || 0}
-                                    </Text>
-                                    <Text style={[styles.heroStatSub, { color: themeColors.textDim }]}>today</Text>
-                                </View>
-                                <View style={[styles.heroStatDivider, { backgroundColor: 'rgba(255,255,255,0.08)' }]} />
-                                <View style={styles.heroStat}>
-                                    <Text style={[styles.heroStatNum, { color: '#FFD700' }]}>
-                                        {totalTracked}
-                                    </Text>
-                                    <Text style={[styles.heroStatSub, { color: themeColors.textDim }]}>tracked</Text>
-                                </View>
-                            </View>
-                        </LinearGradient>
-                        <Text style={[styles.footerCopyright, { color: themeColors.textDim }]}>
-                            AnimOrg Release Hub • Updated Live
-                        </Text>
-                    </View>
-                )}
-                ListEmptyComponent={
-                    loading ? (
-                        <View style={styles.skeletonGrid}>
-                            {[...Array(numColumns * 2)].map((_, i) => (
-                                <View key={i} style={[styles.skeletonItem, { width: cardWidth }]}>
-                                    <SkeletonLoader height="100%" borderRadius={borderRadius.lg} />
-                                </View>
-                            ))}
-                        </View>
-                    ) : (
-                        <View style={styles.emptyDay}>
-                            <View style={[styles.emptyDayIcon, { backgroundColor: `${colors.primary}12` }]}>
-                                <Feather name="calendar" size={36} color={colors.primary} />
-                            </View>
-                            <Text style={[styles.emptyDayTitle, { color: themeColors.text }]}>
-                                No Anime on {selectedDay}
-                            </Text>
-                            <Text style={[styles.emptyDaySub, { color: themeColors.textDim }]}>
-                                Check other days for scheduled releases
-                            </Text>
-                        </View>
-                    )
-                }
-            />
+
+                {/* ═══ AIRING SCHEDULE ═══ */}
+                <SectionHeader title="Airing Schedule" icon="tv" />
+
+                <View style={{ flex: 1, minHeight: 450 }}>
+                    <SwipeableTabs
+                        tabs={DAYS}
+                        activeTab={selectedDay}
+                        onTabChange={setSelectedDay}
+                    >
+                        {DAYS.map(day => (
+                            <UpcomingDayFeed
+                                key={day}
+                                day={day}
+                                dayAnime={dayAnimeMap[day] || []}
+                                animeProgress={animeProgress}
+                                numColumns={numColumns}
+                                cardWidth={cardWidth}
+                                edgePadding={edgePadding}
+                                itemGap={itemGap}
+                                router={router}
+                                themeColors={themeColors}
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                totalTracked={totalTracked}
+                                totalAiringCount={enrichedAnimeList.length}
+                            />
+                        ))}
+                    </SwipeableTabs>
+                </View>
+            </ScrollView>
         </AnimatedScreen>
     );
 }

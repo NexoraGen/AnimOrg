@@ -1084,7 +1084,7 @@ function DetailsScreenInner() {
             title="Done"
             variant="outline"
             onPress={() => setCollectionModalVisible(false)}
-            style={{ width: '100%', height: 46, marginTop: spacing.md }}
+            style={{ width: '100%', height: 46, marginTop: spacing.M }}
           />
         </View>
       </CinematicModal>
@@ -1107,7 +1107,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.M,
   },
   backButton: {
     width: 44,
@@ -1154,8 +1154,8 @@ const styles = StyleSheet.create({
   posterOverlay: {
     position: 'absolute',
     bottom: -60,
-    left: spacing.md,
-    right: spacing.md,
+    left: spacing.M,
+    right: spacing.M,
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
@@ -1167,13 +1167,13 @@ const styles = StyleSheet.create({
   },
   mainInfo: {
     flex: 1,
-    marginLeft: spacing.md,
-    marginBottom: spacing.sm,
+    marginLeft: spacing.M,
+    marginBottom: spacing.S,
   },
   title: {
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold as any,
-    marginBottom: 8,
+    marginBottom: spacing.XS,
   },
   metaRow: {
     flexDirection: 'row',
@@ -1181,32 +1181,32 @@ const styles = StyleSheet.create({
   },
   year: {
     fontSize: typography.sizes.sm,
-    marginRight: 10,
+    marginRight: spacing.S,
   },
   ratingBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: spacing.XS,
+    paddingVertical: spacing.XXS,
     borderRadius: 6,
   },
   ratingText: {
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.bold as any,
-    marginLeft: 4,
+    marginLeft: spacing.XXS,
   },
   detailsContent: {
-    paddingTop: 80,
-    paddingHorizontal: spacing.md,
+    paddingTop: spacing.XXL + spacing.XL,
+    paddingHorizontal: spacing.M,
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.XL,
   },
   trailerButton: {
     flex: 1,
-    marginRight: spacing.md,
+    marginRight: spacing.M,
   },
   actionIcon: {
     width: 64,
@@ -1215,12 +1215,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    marginLeft: spacing.sm,
+    marginLeft: spacing.S,
   },
   actionIconLabel: {
     fontSize: 10,
     fontWeight: '800' as any,
-    marginTop: 4,
+    marginTop: spacing.XXS,
   },
   posterWrapper: {
     shadowOffset: { width: 0, height: 10 },
@@ -1229,38 +1229,38 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   ratingSection: {
-    padding: spacing.md,
+    padding: spacing.M,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.XL,
   },
   ratingLabel: {
     fontSize: typography.sizes.sm,
     fontWeight: 'bold',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.S,
   },
   ratingSubtext: {
     fontSize: 12,
-    marginTop: 8,
+    marginTop: spacing.XS,
   },
   genresRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.XL,
   },
   sectionTitle: {
     fontSize: typography.sizes.lg,
     fontWeight: typography.weights.bold as any,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.S,
   },
   description: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.XL,
   },
   infoGrid: {
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.M,
     borderWidth: 1,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.XL,
   },
   infoRow: {
     flexDirection: 'row',
@@ -1270,14 +1270,14 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 10,
-    marginBottom: 4,
+    marginBottom: spacing.XXS,
   },
   infoValue: {
     fontSize: typography.sizes.md,
     fontWeight: 'bold' as any,
   },
   section: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.XL,
   },
   emptyReviews: {
     width: 280,
@@ -1285,19 +1285,19 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.md,
+    padding: spacing.M,
   },
   emptyReviewsText: {
     fontSize: 12,
-    marginTop: 8,
+    marginTop: spacing.XS,
     textAlign: 'center',
   },
   modalInner: {
-    padding: spacing.lg,
+    padding: spacing.L,
   },
   modalHeader: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.L,
   },
   modalTitle: {
     fontSize: typography.sizes.lg,
@@ -1307,17 +1307,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.M,
+    paddingHorizontal: spacing.M,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.S,
   },
   statusOptionText: {
     fontSize: typography.sizes.md,
   },
   removeOption: {
-    marginTop: spacing.md,
-    paddingVertical: spacing.md,
+    marginTop: spacing.M,
+    paddingVertical: spacing.M,
     alignItems: 'center',
   },
   removeOptionText: {
@@ -1330,13 +1330,13 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   errorText: {
-    marginBottom: 20,
+    marginBottom: spacing.L,
   },
   loginPrompt: {
-    padding: spacing.xl,
+    padding: spacing.XL,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.L,
   },
   loginPromptText: {
     fontSize: 16,
@@ -1345,15 +1345,15 @@ const styles = StyleSheet.create({
   toastContainer: {
     position: 'absolute',
     bottom: 50,
-    left: spacing.xl,
-    right: spacing.xl,
+    left: spacing.XL,
+    right: spacing.XL,
     zIndex: 1000,
   },
   toastBlur: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: spacing.S,
+    paddingHorizontal: spacing.M,
     borderRadius: 25,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1363,19 +1363,19 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: 'bold',
-    marginLeft: 10,
+    marginLeft: spacing.S,
   },
   reviewsList: {
-    marginTop: spacing.md,
+    marginTop: spacing.M,
   },
   starsRow: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.M,
   },
   decimalInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.M,
   },
   decimalInput: {
     width: 64,
@@ -1385,32 +1385,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: typography.sizes.md,
     fontWeight: 'bold',
-    paddingVertical: 0, // prevents vertical shift in android
+    paddingVertical: 0,
   },
   slashTen: {
     fontSize: typography.sizes.md,
     fontWeight: 'bold',
-    marginLeft: spacing.sm,
+    marginLeft: spacing.S,
   },
   collectionModalContent: {
-    paddingTop: spacing.xs,
+    paddingTop: spacing.XS,
     alignItems: 'center',
     width: '100%',
   },
   collectionModalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: spacing.xs,
+    marginBottom: spacing.XS,
   },
   collectionModalSubtitle: {
     fontSize: 12,
-    marginBottom: spacing.md,
+    marginBottom: spacing.M,
     textAlign: 'center',
   },
   collectionListScroll: {
     width: '100%',
     maxHeight: 200,
-    marginBottom: spacing.md,
+    marginBottom: spacing.M,
   },
   collectionItemRow: {
     flexDirection: 'row',
@@ -1423,11 +1423,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: spacing.md,
+    marginRight: spacing.M,
   },
   collectionItemEmoji: {
     fontSize: 18,
-    marginRight: 10,
+    marginRight: spacing.S,
   },
   collectionItemName: {
     fontSize: 14,
@@ -1436,34 +1436,34 @@ const styles = StyleSheet.create({
   noCollectionsText: {
     fontSize: 12,
     textAlign: 'center',
-    marginVertical: spacing.md,
+    marginVertical: spacing.M,
   },
   inlineAddBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    padding: 10,
+    padding: spacing.S,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderStyle: 'dashed',
-    marginTop: spacing.xs,
+    marginTop: spacing.XS,
   },
   inlineCreateBox: {
     width: '100%',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+    gap: spacing.S,
+    marginTop: spacing.XS,
   },
   inlineInput: {
     borderWidth: 1,
     borderRadius: borderRadius.md,
     height: 38,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.M,
     fontSize: 13,
   },
   inlineActions: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.S,
     justifyContent: 'flex-end',
   },
   inlineActionBtn: {
