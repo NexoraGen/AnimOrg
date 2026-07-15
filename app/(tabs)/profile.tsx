@@ -29,6 +29,7 @@ import {
   SectionHeader,
   ProfileStatsStrip,
   AnimatedPressable,
+  ProfileStatsGrid,
 } from '../../src/components/ui';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useAppStore } from '../../src/store/useAppStore';
@@ -407,112 +408,78 @@ export default function ProfileScreen() {
           onPostsPress={() => { }}
         />
 
-        {/* --- PREMIUM COMPACT STATS GRID --- */}
-        <View style={styles.statsContainer}>
-          <View style={[styles.focusedStatBox, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
-            <View style={styles.statHeaderRow}>
-              <View style={[styles.statIconCircle, { backgroundColor: `${themeColors.primary}12` }]}>
-                <Feather name="play" size={16} color={themeColors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: 'white' }]}>{stats.episodes.toLocaleString()}</Text>
-            </View>
-            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>Episodes Watched</Text>
-          </View>
-
-          <View style={[styles.focusedStatBox, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
-            <View style={styles.statHeaderRow}>
-              <View style={[styles.statIconCircle, { backgroundColor: `${themeColors.primary}12` }]}>
-                <Feather name="clock" size={16} color={themeColors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: 'white' }]}>{Math.round(parseFloat(stats.days) * 24).toLocaleString()}h</Text>
-            </View>
-            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>Hours Watched</Text>
-          </View>
-
-          <View style={[styles.focusedStatBox, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
-            <View style={styles.statHeaderRow}>
-              <View style={[styles.statIconCircle, { backgroundColor: `${themeColors.primary}12` }]}>
-                <Feather name="zap" size={16} color={themeColors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: 'white' }]}>{user?.currentStreak || 0}d</Text>
-            </View>
-            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>Current Streak</Text>
-          </View>
-
-          <View style={[styles.focusedStatBox, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
-            <View style={styles.statHeaderRow}>
-              <View style={[styles.statIconCircle, { backgroundColor: `${themeColors.primary}12` }]}>
-                <Feather name="award" size={16} color={themeColors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: 'white' }]}>{user?.longestStreak || 0}d</Text>
-            </View>
-            <Text style={[styles.statLabel, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={1}>Longest Streak</Text>
-          </View>
-        </View>
+        {/* --- PROFILE STATISTICS GRID --- */}
+        <ProfileStatsGrid
+          episodes={stats.episodes}
+          hours={Math.round(parseFloat(stats.days) * 24)}
+          currentStreak={user?.currentStreak || 0}
+          longestStreak={user?.longestStreak || 0}
+        />
 
         {/* --- ACHIEVEMENTS SUMMARY --- */}
         {!isGuest && (
-          <View style={styles.section}>
+          <>
             <SectionHeader
               title="Achievements"
               onViewAll={() => router.push('/achievements' as any)}
             />
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={[styles.achievementSummaryCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}
+                onPress={() => router.push('/achievements' as any)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.achievementSummaryHeader}>
+                  <View style={styles.badgeCountContainer}>
+                    <Text style={[styles.badgeCountValue, { color: 'white' }]}>
+                      {user?.badges?.length || 0}
+                    </Text>
+                    <Text style={[styles.badgeCountLabel, { color: 'rgba(255,255,255,0.5)' }]}>
+                      / {ACHIEVEMENTS.length} Badges Earned
+                    </Text>
+                  </View>
 
-            <TouchableOpacity
-              style={[styles.achievementSummaryCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}
-              onPress={() => router.push('/achievements' as any)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.achievementSummaryHeader}>
-                <View style={styles.badgeCountContainer}>
-                  <Text style={[styles.badgeCountValue, { color: 'white' }]}>
-                    {user?.badges?.length || 0}
-                  </Text>
-                  <Text style={[styles.badgeCountLabel, { color: 'rgba(255,255,255,0.5)' }]}>
-                    / {ACHIEVEMENTS.length} Badges Earned
-                  </Text>
+                  <View style={styles.badgeProgressCompact}>
+                    <Text style={[styles.badgeProgressPct, { color: themeColors.primary }]}>
+                      {Math.round(((user?.badges?.length || 0) / ACHIEVEMENTS.length) * 100)}% Complete
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={styles.badgeProgressCompact}>
-                  <Text style={[styles.badgeProgressPct, { color: themeColors.primary }]}>
-                    {Math.round(((user?.badges?.length || 0) / ACHIEVEMENTS.length) * 100)}% Complete
-                  </Text>
+                <View style={styles.badgeIconShowcase}>
+                  {ACHIEVEMENTS.slice(0, 5).map((badge) => {
+                    const isUnlocked = user?.badges?.includes(badge.id);
+                    return (
+                      <View
+                        key={badge.id}
+                        style={[
+                          styles.badgeIconBubble,
+                          {
+                            backgroundColor: isUnlocked ? `${themeColors.primary}15` : 'rgba(255,255,255,0.02)',
+                            borderColor: isUnlocked ? `${themeColors.primary}30` : 'rgba(255,255,255,0.04)'
+                          }
+                        ]}
+                      >
+                        <Feather
+                          name={(badge.icon || "award") as any}
+                          size={18}
+                          color={isUnlocked ? themeColors.primary : 'rgba(255,255,255,0.2)'}
+                        />
+                      </View>
+                    );
+                  })}
+                  <View style={styles.viewMoreBubble}>
+                    <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.6)" />
+                  </View>
                 </View>
-              </View>
-
-              <View style={styles.badgeIconShowcase}>
-                {ACHIEVEMENTS.slice(0, 5).map((badge) => {
-                  const isUnlocked = user?.badges?.includes(badge.id);
-                  return (
-                    <View
-                      key={badge.id}
-                      style={[
-                        styles.badgeIconBubble,
-                        {
-                          backgroundColor: isUnlocked ? `${themeColors.primary}15` : 'rgba(255,255,255,0.02)',
-                          borderColor: isUnlocked ? `${themeColors.primary}30` : 'rgba(255,255,255,0.04)'
-                        }
-                      ]}
-                    >
-                      <Feather
-                        name={(badge.icon || "award") as any}
-                        size={18}
-                        color={isUnlocked ? themeColors.primary : 'rgba(255,255,255,0.2)'}
-                      />
-                    </View>
-                  );
-                })}
-                <View style={styles.viewMoreBubble}>
-                  <Feather name="arrow-right" size={16} color="rgba(255,255,255,0.6)" />
-                </View>
-              </View>
-            </TouchableOpacity>
-          </View>
+              </TouchableOpacity>
+            </View>
+          </>
         )}
 
         {/* --- MY LISTS --- */}
+        <SectionHeader title="My Lists" onViewAll={() => router.push('/watchlist')} />
         <View style={styles.section}>
-          <SectionHeader title="My Lists" onViewAll={() => router.push('/watchlist')} />
           <View style={styles.listsGrid}>
             {[
               { title: 'Watching', count: currentlyWatching.length, icon: 'play', image: WATCHING_SILHOUETTE },
@@ -553,9 +520,9 @@ export default function ProfileScreen() {
         </View>
 
         {/* --- CUSTOM COLLECTIONS --- */}
-        <View style={styles.section}>
-          <SectionHeader title="Custom Collections" onViewAll={() => router.push('/collections')} />
-          {collections.length === 0 ? (
+        <SectionHeader title="Custom Collections" onViewAll={() => router.push('/collections')} />
+        {collections.length === 0 ? (
+          <View style={styles.section}>
             <TouchableOpacity
               style={[styles.emptyCollectionsCard, { borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' }]}
               onPress={() => router.push('/collections')}
@@ -565,32 +532,33 @@ export default function ProfileScreen() {
                 Create custom lists to group your favorites!
               </Text>
             </TouchableOpacity>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: spacing.md, paddingVertical: 4 }}
-            >
-              {collections.map(col => (
-                <TouchableOpacity
-                  key={col.id}
-                  style={[styles.miniCollectionCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}
-                  onPress={() => router.push(`/collections/${col.id}`)}
-                >
-                  <Text style={{ fontSize: 20 }}>{col.emoji || '📂'}</Text>
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }} numberOfLines={1}>
-                      {col.name}
-                    </Text>
-                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>
-                      {col.animeIds.length} titles
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          )}
-        </View>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: 4 }}
+          >
+            {collections.map(col => (
+              <TouchableOpacity
+                key={col.id}
+                style={[styles.miniCollectionCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}
+                onPress={() => router.push(`/collections/${col.id}`)}
+              >
+                <Text style={{ fontSize: 20 }}>{col.emoji || '📂'}</Text>
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 13 }} numberOfLines={1}>
+                    {col.name}
+                  </Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>
+                    {col.animeIds.length} titles
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
 
         {/* --- SHOWS (Currently Watching) --- */}
         {currentlyWatching.length > 0 && (
@@ -630,8 +598,8 @@ export default function ProfileScreen() {
         )}
 
         {/* --- GENRE AFFINITY --- */}
+        <SectionHeader title="Genre Affinity" />
         <View style={styles.section}>
-          <SectionHeader title="Genre Affinity" />
           <View style={styles.genreList}>
             {(getFavoriteGenres() || []).slice(0, 6).map((genre) => (
               <View key={genre} style={[styles.genreAffinityItem, { backgroundColor: `${themeColors.primary}15`, borderColor: `${themeColors.primary}30` }]}>
@@ -643,27 +611,29 @@ export default function ProfileScreen() {
 
         {/* --- TASTE INSIGHT --- */}
         {!isGuest && (
-          <View style={[styles.tasteInsightCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-              <Feather name="heart" size={18} color={themeColors.primary} />
-              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>Otaku Taste Insights</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }}>
-              <View>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>TOP GENRE</Text>
-                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>{topGenre}</Text>
+          <View style={styles.section}>
+            <View style={[styles.tasteInsightCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)', marginHorizontal: 0 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Feather name="heart" size={18} color={themeColors.primary} />
+                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>Otaku Taste Insights</Text>
               </View>
-              <View>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>COMPLETED</Text>
-                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
-                  {(watchlist || []).filter(item => item.status === 'completed').length} Shows
-                </Text>
-              </View>
-              <View>
-                <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>NEXT LEVEL</Text>
-                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
-                  {levelInfo.xpForNextLevel - levelInfo.currentXp} XP to go
-                </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }}>
+                <View>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>TOP GENRE</Text>
+                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>{topGenre}</Text>
+                </View>
+                <View>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>COMPLETED</Text>
+                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
+                    {(watchlist || []).filter(item => item.status === 'completed').length} Shows
+                  </Text>
+                </View>
+                <View>
+                  <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}>NEXT LEVEL</Text>
+                  <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14, marginTop: 2 }}>
+                    {levelInfo.xpForNextLevel - levelInfo.currentXp} XP to go
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
@@ -671,10 +641,10 @@ export default function ProfileScreen() {
 
         {/* --- ACHIEVEMENTS / BADGES GRID --- */}
         {!isGuest && (
-          <View style={styles.section}>
+          <>
             <SectionHeader
               title={`Unlocked Achievements (${(user?.badges || []).length}/${ACHIEVEMENTS.length})`}
-              onViewAll={undefined}
+              onViewAll={() => router.push('/achievements' as any)}
             />
             {user?.badges && user.badges.length > 0 ? (
               <ScrollView
@@ -719,15 +689,18 @@ export default function ProfileScreen() {
                 })}
               </ScrollView>
             ) : (
-              <View style={[styles.emptyBadgesCard, { borderColor: 'rgba(255,255,255,0.05)' }]}>
-                <Feather name="award" size={24} color="rgba(255,255,255,0.2)" />
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
-                  No achievements unlocked yet. Track anime to earn badges!
-                </Text>
+              <View style={styles.section}>
+                <View style={[styles.emptyBadgesCard, { borderColor: 'rgba(255,255,255,0.05)' }]}>
+                  <Feather name="award" size={24} color="rgba(255,255,255,0.2)" />
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
+                    No achievements unlocked yet. Track anime to earn badges!
+                  </Text>
+                </View>
               </View>
             )}
-          </View>
+          </>
         )}
+
 
         <LevelUpModal
           visible={levelUpModalVisible}

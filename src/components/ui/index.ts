@@ -27,3 +27,6 @@ export * from './NotificationPermissionDialog';
 export * from './TrackingNotificationPrompt';
 export * from './CollectionCard';
 export * from './CreateCollectionModal';
+export * from './ProfileStatCard';
+export * from './ProfileStatsGrid';
+
