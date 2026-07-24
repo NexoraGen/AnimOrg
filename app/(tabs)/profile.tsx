@@ -310,31 +310,23 @@ export default function ProfileScreen() {
                     </View>
                   )}
                 </View>
-                {!isGuest && (
-                  <View style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <TouchableOpacity
-                      onPress={() => setRankModalVisible(true)}
-                      activeOpacity={0.7}
-                      style={styles.rankRowTouch}
-                    >
-                      <Text style={styles.rankPrefixIcon}>{levelInfo.rankIcon}</Text>
-                      <Text style={[styles.rankTextTitle, { color: themeColors.primary }]}>
-                        {levelInfo.rankTitle}
-                      </Text>
-                    </TouchableOpacity>
-                    {levelInfo.nextRankTitle && (
-                      <Text style={[styles.nextRankPromo, { color: themeColors.textDim }]}>
-                        Next Rank: {levelInfo.nextRankTitle} (Level {levelInfo.nextRankMinLevel})
-                      </Text>
-                    )}
-                  </View>
-                )}
-                <View style={styles.badgeRow}>
+                <TouchableOpacity
+                  onPress={() => setRankModalVisible(true)}
+                  activeOpacity={0.7}
+                  style={styles.badgeRow}
+                >
                   <View style={[styles.levelBadge, { backgroundColor: `${themeColors.primary}20`, borderColor: themeColors.primary }]}>
                     <Text style={[styles.levelText, { color: themeColors.primary }]}>LVL {levelInfo.level}</Text>
                   </View>
-                  <Text style={[styles.levelTitle, { color: 'rgba(255,255,255,0.8)' }]}>{levelInfo.title}</Text>
-                </View>
+                  <Text style={[styles.levelTitle, { color: 'white' }]}>{levelInfo.rankTitle}</Text>
+                  <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.4)" style={{ marginLeft: 2 }} />
+                </TouchableOpacity>
+
+                {!isGuest && levelInfo.nextRankTitle && (
+                  <Text style={[styles.nextRankPromo, { color: themeColors.textDim, marginTop: 4 }]}>
+                    Next Rank: {levelInfo.nextRankTitle} (Level {levelInfo.nextRankMinLevel})
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -841,9 +833,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   levelTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    opacity: 0.8,
+    fontSize: 13,
+    fontWeight: '700',
   },
   bioContainer: {
     marginTop: spacing.xs,
