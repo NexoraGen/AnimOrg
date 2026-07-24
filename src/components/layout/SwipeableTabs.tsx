@@ -28,6 +28,7 @@ interface SwipeableTabsProps {
     onTabChange: (tab: string) => void;
     children: React.ReactNode[];
     lazy?: boolean;
+    variant?: 'underline' | 'pills';
 }
 
 export const SwipeableTabs: React.FC<SwipeableTabsProps> = ({
@@ -36,6 +37,7 @@ export const SwipeableTabs: React.FC<SwipeableTabsProps> = ({
     onTabChange,
     children,
     lazy = true,
+    variant = 'pills',
 }) => {
     const theme = useThemeColors();
     const { width: screenWidth } = useWindowDimensions();
@@ -190,11 +192,20 @@ export const SwipeableTabs: React.FC<SwipeableTabsProps> = ({
         };
     });
 
+    const isPill = variant === 'pills';
+
     return (
         <View style={styles.container}>
             {/* Header tab switcher bar with blur overlay */}
             <View
-                style={[styles.headerContainer, { backgroundColor: theme.background + 'F2', borderBottomColor: 'rgba(255,255,255,0.05)' }]}
+                style={[
+                    styles.headerContainer,
+                    {
+                        backgroundColor: theme.background + 'F2',
+                        borderBottomColor: 'rgba(255,255,255,0.05)',
+                        borderBottomWidth: isPill ? 0 : 1
+                    }
+                ]}
                 onLayout={(e) => setHeaderWidth(e.nativeEvent.layout.width)}
             >
                 <BlurView intensity={80} tint={theme.background === '#0B0B0B' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
@@ -202,14 +213,26 @@ export const SwipeableTabs: React.FC<SwipeableTabsProps> = ({
                     ref={tabHeaderScrollRef}
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.scrollContent}
+                    contentContainerStyle={[
+                        styles.scrollContent,
+                        isPill && styles.pillScrollContent
+                    ]}
                 >
                     {tabs.map((tab, idx) => {
                         const isActive = activeTab === tab;
                         return (
                             <TouchableOpacity
                                 key={tab}
-                                style={styles.tab}
+                                style={[
+                                    styles.tab,
+                                    isPill && [
+                                        styles.pillTab,
+                                        {
+                                            borderColor: isActive ? theme.primary : 'rgba(255,255,255,0.12)',
+                                            backgroundColor: isActive ? `${theme.primary}12` : 'transparent',
+                                        }
+                                    ]
+                                ]}
                                 activeOpacity={0.7}
                                 onLayout={(e) => {
                                     const { width, x } = e.nativeEvent.layout;
@@ -235,16 +258,18 @@ export const SwipeableTabs: React.FC<SwipeableTabsProps> = ({
                     })}
 
                     {/* Animated Sliding Underline Indicator */}
-                    <Animated.View
-                        style={[
-                            styles.indicator,
-                            {
-                                backgroundColor: theme.primary,
-                                shadowColor: colors.primary || theme.primary
-                            },
-                            indicatorStyle
-                        ]}
-                    />
+                    {!isPill && (
+                        <Animated.View
+                            style={[
+                                styles.indicator,
+                                {
+                                    backgroundColor: theme.primary,
+                                    shadowColor: colors.primary || theme.primary
+                                },
+                                indicatorStyle
+                            ]}
+                        />
+                    )}
                 </ScrollView>
             </View>
 
@@ -280,7 +305,6 @@ const styles = StyleSheet.create({
     headerContainer: {
         height: 50,
         width: '100%',
-        borderBottomWidth: 1,
         zIndex: 90,
     },
     scrollContent: {
@@ -288,10 +312,22 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         position: 'relative',
     },
+    pillScrollContent: {
+        paddingVertical: 8,
+    },
     tab: {
         paddingHorizontal: spacing.md,
         height: '100%',
         justifyContent: 'center',
+    },
+    pillTab: {
+        height: 34,
+        borderRadius: 17,
+        borderWidth: 1,
+        paddingHorizontal: 16,
+        marginHorizontal: 4,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     tabText: {
         fontSize: 14,
