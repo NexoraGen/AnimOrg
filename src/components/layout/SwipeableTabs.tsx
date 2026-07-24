@@ -258,7 +258,7 @@ export const SwipeableTabs: React.FC<SwipeableTabsProps> = ({
                                 <View key={idx} style={{ width: screenWidth, flex: 1 }}>
                                     {lazy && !isVisible ? (
                                         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                                            <Text style={{ color: theme.textDim, fontFamily: 'Outfit-Regular' }}>Loading section...</Text>
+                                            <Text style={{ color: theme.textDim }}>Loading section...</Text>
                                         </View>
                                     ) : (
                                         children[idx]
@@ -297,11 +297,9 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
         letterSpacing: 0.5,
-        fontFamily: 'Outfit-Medium',
     },
     activeTabText: {
         fontWeight: '800',
-        fontFamily: 'Outfit-Bold',
     },
     indicator: {
         position: 'absolute',

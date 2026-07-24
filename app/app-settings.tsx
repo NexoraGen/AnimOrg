@@ -227,7 +227,7 @@ export default function AppSettingsScreen() {
 
           <View style={(!notificationsEnabled || permissionStatus !== 'granted') && { opacity: 0.5 }} pointerEvents={(!notificationsEnabled || permissionStatus !== 'granted') ? 'none' : 'auto'}>
             <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: themeColors.border }}>
-              <Text style={{ color: themeColors.text, fontSize: 14, fontFamily: 'Outfit-Medium', marginBottom: spacing.xs }}>
+              <Text style={{ color: themeColors.text, fontSize: 14, fontWeight: '600', marginBottom: spacing.xs }}>
                 Notification Frequency
               </Text>
               <View style={{ flexDirection: 'row', backgroundColor: themeColors.surfaceVariant, borderRadius: 12, padding: 3 }}>
@@ -250,7 +250,7 @@ export default function AppSettingsScreen() {
                     >
                       <Text style={{
                         color: isActive ? '#FFFFFF' : themeColors.textDim,
-                        fontFamily: 'Outfit-Medium',
+                        fontWeight: '600',
                         fontSize: 12,
                         textTransform: 'capitalize'
                       }}>
