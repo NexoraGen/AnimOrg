@@ -1,4 +1,5 @@
 export interface RankDefinition {
+    id: string;
     minimumLevel: number;
     maximumLevel: number;
     title: string;
@@ -8,6 +9,7 @@ export interface RankDefinition {
 
 export const RANKS: RankDefinition[] = [
     {
+        id: 'rookie',
         minimumLevel: 1,
         maximumLevel: 4,
         title: 'AnimOrg Rookie',
@@ -15,6 +17,7 @@ export const RANKS: RankDefinition[] = [
         description: 'Welcome to AnimOrg! Starting your premier tracking journey.'
     },
     {
+        id: 'explorer',
         minimumLevel: 5,
         maximumLevel: 9,
         title: 'AnimOrg Explorer',
@@ -22,6 +25,7 @@ export const RANKS: RankDefinition[] = [
         description: 'Diving into anime catalogs and setting up your first watchlist.'
     },
     {
+        id: 'scout',
         minimumLevel: 10,
         maximumLevel: 14,
         title: 'AnimOrg Scout',
@@ -29,6 +33,7 @@ export const RANKS: RankDefinition[] = [
         description: 'Deeper tracking of seasonal titles, episodes, and reviews.'
     },
     {
+        id: 'enthusiast',
         minimumLevel: 15,
         maximumLevel: 24,
         title: 'AnimOrg Enthusiast',
@@ -36,6 +41,7 @@ export const RANKS: RankDefinition[] = [
         description: 'Expressing passion through reviews, ratings, and genre tags.'
     },
     {
+        id: 'veteran',
         minimumLevel: 25,
         maximumLevel: 39,
         title: 'AnimOrg Veteran',
@@ -43,6 +49,7 @@ export const RANKS: RankDefinition[] = [
         description: 'A solid track record of watching classics and creating collections.'
     },
     {
+        id: 'elite',
         minimumLevel: 40,
         maximumLevel: 59,
         title: 'AnimOrg Elite',
@@ -50,6 +57,7 @@ export const RANKS: RankDefinition[] = [
         description: 'Commanding extensive database lists, rating insights, and scores.'
     },
     {
+        id: 'master',
         minimumLevel: 60,
         maximumLevel: 79,
         title: 'AnimOrg Master',
@@ -57,6 +65,7 @@ export const RANKS: RankDefinition[] = [
         description: 'Deep dedication with hundreds of watched episodes cataloged.'
     },
     {
+        id: 'legend',
         minimumLevel: 80,
         maximumLevel: 99,
         title: 'AnimOrg Legend',
@@ -64,6 +73,7 @@ export const RANKS: RankDefinition[] = [
         description: 'A mythic presence in the community, logging milestones effortlessly.'
     },
     {
+        id: 'grandmaster',
         minimumLevel: 100,
         maximumLevel: 9999,
         title: 'AnimOrg Grandmaster',

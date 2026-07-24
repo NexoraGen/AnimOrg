@@ -322,6 +322,16 @@ export default function ProfileScreen() {
                   <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.4)" style={{ marginLeft: 2 }} />
                 </TouchableOpacity>
 
+                <TouchableOpacity
+                  onPress={() => router.push('/ranks')}
+                  activeOpacity={0.7}
+                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 }}
+                >
+                  <Feather name="award" size={12} color={themeColors.primary} />
+                  <Text style={{ color: themeColors.primary, fontSize: 12, fontWeight: '700' }}>View All Ranks</Text>
+                  <Feather name="chevron-right" size={12} color={themeColors.primary} />
+                </TouchableOpacity>
+
                 {!isGuest && levelInfo.nextRankTitle && (
                   <Text style={[styles.nextRankPromo, { color: themeColors.textDim, marginTop: 4 }]}>
                     Next Rank: {levelInfo.nextRankTitle} (Level {levelInfo.nextRankMinLevel})

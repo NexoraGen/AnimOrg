@@ -1,6 +1,13 @@
 import { RANKS, RankDefinition } from '../config/ranks';
 import { getXpForLevel } from '../config/levelConfig';
 
+export interface RankProgressItem extends RankDefinition {
+    xpRequired: number;
+    status: 'unlocked' | 'current' | 'locked';
+    progressPercentage: number;
+    xpNeededToUnlock: number;
+}
+
 export const RankService = {
     /**
      * Returns current rank configuration based on player level
@@ -40,6 +47,49 @@ export const RankService = {
             levelsToGo,
             xpRemaining,
         };
+    },
+
+    /**
+     * Returns all ranks enriched with user progression state (unlocked, current, locked)
+     */
+    getAllRanksWithProgress: (level: number, currentXp: number): RankProgressItem[] => {
+        const currentRank = RankService.getRankByLevel(level);
+
+        return RANKS.map(rank => {
+            const xpRequired = getXpForLevel(rank.minimumLevel);
+            let status: 'unlocked' | 'current' | 'locked' = 'locked';
+
+            if (level > rank.maximumLevel) {
+                status = 'unlocked';
+            } else if (level >= rank.minimumLevel && level <= rank.maximumLevel) {
+                status = 'current';
+            } else {
+                status = 'locked';
+            }
+
+            let progressPercentage = 0;
+            if (status === 'unlocked') {
+                progressPercentage = 100;
+            } else if (status === 'current') {
+                const startXp = getXpForLevel(rank.minimumLevel);
+                const nextRankXp = rank.maximumLevel < 9999 ? getXpForLevel(rank.maximumLevel + 1) : startXp + 5000;
+                const span = Math.max(1, nextRankXp - startXp);
+                progressPercentage = Math.min(100, Math.max(0, ((currentXp - startXp) / span) * 100));
+            } else {
+                progressPercentage = 0;
+            }
+
+            const xpNeededToUnlock = Math.max(0, xpRequired - currentXp);
+
+            return {
+                ...rank,
+                xpRequired,
+                status,
+                progressPercentage,
+                xpNeededToUnlock,
+            };
+        });
     }
 };
+
 export type RankUtils = typeof RankService;

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import Animated, { FadeIn, FadeOut, FadeInUp, FadeOutDown } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { typography, spacing, borderRadius } from '../../theme';
 import { LevelInfo } from '../../services/LevelService';
@@ -15,11 +16,17 @@ interface RankDetailsModalProps {
 
 export const RankDetailsModal: React.FC<RankDetailsModalProps> = ({ visible, onClose, levelInfo }) => {
     const themeColors = useThemeColors();
+    const router = useRouter();
 
     if (!visible) return null;
 
     const xpForNextRank = levelInfo.nextRankMinLevel ? getXpForLevel(levelInfo.nextRankMinLevel) : 0;
     const xpNeededForNextRank = Math.max(0, xpForNextRank - levelInfo.currentXp);
+
+    const handleViewAllRanks = () => {
+        onClose();
+        router.push('/ranks');
+    };
 
     return (
         <Modal
@@ -50,7 +57,7 @@ export const RankDetailsModal: React.FC<RankDetailsModalProps> = ({ visible, onC
 
                     <View style={styles.rankBadgeRow}>
                         <Text style={styles.rankIcon}>{levelInfo.rankIcon}</Text>
-                        <View>
+                        <View style={{ flex: 1 }}>
                             <Text style={[styles.rankTitle, { color: themeColors.primary }]}>{levelInfo.rankTitle}</Text>
                             <Text style={[styles.levelSubtitle, { color: themeColors.textDim }]}>Level {levelInfo.level} • {levelInfo.currentXp} XP</Text>
                         </View>
@@ -88,10 +95,18 @@ export const RankDetailsModal: React.FC<RankDetailsModalProps> = ({ visible, onC
 
                     <TouchableOpacity
                         style={[styles.btn, { backgroundColor: themeColors.primary }]}
+                        onPress={handleViewAllRanks}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.btnText}>View All Ranks</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.secondaryBtn, { backgroundColor: 'rgba(255,255,255,0.06)' }]}
                         onPress={onClose}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.btnText}>Got It</Text>
+                        <Text style={[styles.secondaryBtnText, { color: themeColors.textDim }]}>Close</Text>
                     </TouchableOpacity>
                 </Animated.View>
             </View>
@@ -202,5 +217,17 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 14,
         fontWeight: 'bold',
+    },
+    secondaryBtn: {
+        width: '100%',
+        height: 40,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: spacing.sm,
+    },
+    secondaryBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
 });

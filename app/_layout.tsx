@@ -186,6 +186,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
             <Stack.Screen name="details/[id]" options={{ presentation: Platform.OS === 'web' ? 'card' : 'modal' }} />
             <Stack.Screen name="category/[type]" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
+            <Stack.Screen name="ranks" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
             <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
             <Stack.Screen name="create-post" options={{ animation: 'slide_from_bottom' }} />
           </Stack>
