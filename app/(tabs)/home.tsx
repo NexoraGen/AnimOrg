@@ -93,39 +93,61 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchHomeData = useCallback(async () => {
-    setIsLoading(true);
     try {
       const { user, watchlist, getFavoriteGenres } = useAppStore.getState();
 
-      const [trending, top, seasonal, upcoming] = await Promise.all([
-        animeApi.getTrendingAnime(1, setTrendingAnime).catch(err => {
-          console.warn("Failed to fetch trending:", err);
-          return [] as Media[];
-        }),
-        animeApi.getTopAnime(1, setTopRated).catch(err => {
-          console.warn("Failed to fetch top rated:", err);
-          return [] as Media[];
-        }),
-        animeApi.getSeasonalAnime(1, setSeasonalAnime).catch(err => {
-          console.warn("Failed to fetch seasonal:", err);
-          return [] as Media[];
-        }),
-        animeApi.getUpcomingAnime(1, setUpcomingAnime).catch(err => {
-          console.warn("Failed to fetch upcoming:", err);
-          return [] as Media[];
-        }),
-      ]);
+      // Launch all 4 primary feeds concurrently; update state as soon as each stream arrives
+      const pTrending = animeApi.getTrendingAnime(1, (fresh) => {
+        setTrendingAnime(fresh);
+        setIsLoading(false);
+      }).then(data => {
+        if (data && data.length > 0) {
+          setTrendingAnime(data);
+          setIsLoading(false);
+        }
+      }).catch(err => console.warn("Failed to fetch trending:", err));
 
-      setTrendingAnime(trending);
-      setTopRated(top);
-      setSeasonalAnime(seasonal);
-      setUpcomingAnime(upcoming);
+      const pTop = animeApi.getTopAnime(1, (fresh) => {
+        setTopRated(fresh);
+        setIsLoading(false);
+      }).then(data => {
+        if (data && data.length > 0) {
+          setTopRated(data);
+          setIsLoading(false);
+        }
+      }).catch(err => console.warn("Failed to fetch top rated:", err));
 
-      // Phase 3: Check for airing alerts for "Watching" anime
+      const pSeasonal = animeApi.getSeasonalAnime(1, (fresh) => {
+        setSeasonalAnime(fresh);
+        setIsLoading(false);
+      }).then(data => {
+        if (data && data.length > 0) {
+          setSeasonalAnime(data);
+          setIsLoading(false);
+        }
+      }).catch(err => console.warn("Failed to fetch seasonal:", err));
+
+      const pUpcoming = animeApi.getUpcomingAnime(1, (fresh) => {
+        setUpcomingAnime(fresh);
+        setIsLoading(false);
+      }).then(data => {
+        if (data && data.length > 0) {
+          setUpcomingAnime(data);
+          setIsLoading(false);
+        }
+      }).catch(err => console.warn("Failed to fetch upcoming:", err));
+
+      // Wait for primary feeds to settle so notification checking and curated lists can prepare
+      await Promise.allSettled([pTrending, pTop, pSeasonal, pUpcoming]);
+
+      // Ensure loading spinner is turned off if any data exists
+      setIsLoading(false);
+
+      // Check for airing alerts for "Watching" anime
       const { notificationsEnabled } = useAppStore.getState();
       if (notificationsEnabled) {
         const watchingAnime = watchlist.filter(item => item.status === 'watching');
-        notificationService.checkAndScheduleAiringAlerts(watchingAnime, seasonal);
+        notificationService.checkAndScheduleAiringAlerts(watchingAnime, seasonalAnime);
       }
 
       // Premium Curated Curation Engine
@@ -165,24 +187,16 @@ export default function HomeScreen() {
       // Keep only unique elements avoiding duplication
       finalCategories = [...new Set(finalCategories)].slice(0, 4);
 
-      const premiumData: Record<string, Media[]> = {};
-
-      await Promise.all(finalCategories.map(async (category) => {
-        try {
-          const data = await animeApi.getCuratedList(category, (freshCurated) => {
-            setCuratedAnime(prev => ({ ...prev, [category]: freshCurated }));
-          });
+      // Load curated lists progressively without blocking main view
+      finalCategories.forEach(category => {
+        animeApi.getCuratedList(category, (freshCurated) => {
+          setCuratedAnime(prev => ({ ...prev, [category]: freshCurated }));
+        }).then(data => {
           if (data && data.length > 0) {
-            premiumData[category] = data;
+            setCuratedAnime(prev => ({ ...prev, [category]: data }));
           }
-        } catch (err) {
-          console.warn(`Failed to fetch curated list for ${category}:`, err);
-        }
-      }));
-
-      setCuratedAnime(premiumData);
-
-
+        }).catch(err => console.warn(`Failed to fetch curated list for ${category}:`, err));
+      });
 
     } catch (error) {
       console.error('Error fetching home data:', error);
