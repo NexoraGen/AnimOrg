@@ -464,7 +464,7 @@ export default function UpcomingScreen() {
             />
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ flexGrow: 1 }}
+                contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 70 }}
                 keyboardShouldPersistTaps="handled"
             >
                 {/* ═══ MY ANIMES ═══ */}
