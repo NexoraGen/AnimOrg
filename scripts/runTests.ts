@@ -41,12 +41,11 @@ Module.prototype.require = function (id: string) {
 // ============================================================================
 // SAFE DYNAMIC IMPORTS
 // ============================================================================
-import { resolveAnimeTrackingStatus, getLocalAiringInfo } from '../src/utils/releaseHelper';
-import { RecommendationService } from '../src/services/RecommendationService';
-import { autoDetectTimezone, searchTimezones } from '../src/utils/timezoneHelper';
+const { resolveAnimeTrackingStatus, getLocalAiringInfo } = require('../src/utils/releaseHelper');
+import type { Media, WatchlistItem, UserRating } from '../src/types/index';
+const { RecommendationService } = require('../src/services/RecommendationService');
+const { autoDetectTimezone, searchTimezones } = require('../src/utils/timezoneHelper');
 const { animeApi } = require('../src/services/animeApi');
-
-import { Media, WatchlistItem, UserRating } from '../src/types/index';
 
 // ============================================================================
 // COLORFUL LOGGING HELPERS FOR NODE CONSOLE

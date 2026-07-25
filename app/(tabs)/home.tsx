@@ -89,68 +89,86 @@ export default function HomeScreen() {
   const [upcomingAnime, setUpcomingAnime] = useState<Media[]>([]);
   const [curatedAnime, setCuratedAnime] = useState<Record<string, Media[]>>({});
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isTrendingLoading, setIsTrendingLoading] = useState(true);
+  const [isTopLoading, setIsTopLoading] = useState(true);
+  const [isSeasonalLoading, setIsSeasonalLoading] = useState(true);
+  const [isUpcomingLoading, setIsUpcomingLoading] = useState(true);
+  const [curatedLoading, setCuratedLoading] = useState<Record<string, boolean>>({});
+
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchHomeData = useCallback(async () => {
     try {
       const { user, watchlist, getFavoriteGenres } = useAppStore.getState();
 
+      setIsTrendingLoading(true);
+      setIsTopLoading(true);
+      setIsSeasonalLoading(true);
+      setIsUpcomingLoading(true);
+
       // Launch all 4 primary feeds concurrently; update state as soon as each stream arrives
       const pTrending = animeApi.getTrendingAnime(1, (fresh) => {
         setTrendingAnime(fresh);
-        setIsLoading(false);
+        setIsTrendingLoading(false);
       }).then(data => {
         if (data && data.length > 0) {
           setTrendingAnime(data);
-          setIsLoading(false);
         }
-      }).catch(err => console.warn("Failed to fetch trending:", err));
+        setIsTrendingLoading(false);
+      }).catch(err => {
+        console.warn("Failed to fetch trending:", err);
+        setIsTrendingLoading(false);
+      });
 
       const pTop = animeApi.getTopAnime(1, (fresh) => {
         setTopRated(fresh);
-        setIsLoading(false);
+        setIsTopLoading(false);
       }).then(data => {
         if (data && data.length > 0) {
           setTopRated(data);
-          setIsLoading(false);
         }
-      }).catch(err => console.warn("Failed to fetch top rated:", err));
+        setIsTopLoading(false);
+      }).catch(err => {
+        console.warn("Failed to fetch top rated:", err);
+        setIsTopLoading(false);
+      });
 
       const pSeasonal = animeApi.getSeasonalAnime(1, (fresh) => {
         setSeasonalAnime(fresh);
-        setIsLoading(false);
+        setIsSeasonalLoading(false);
       }).then(data => {
         if (data && data.length > 0) {
           setSeasonalAnime(data);
-          setIsLoading(false);
         }
-      }).catch(err => console.warn("Failed to fetch seasonal:", err));
+        setIsSeasonalLoading(false);
+      }).catch(err => {
+        console.warn("Failed to fetch seasonal:", err);
+        setIsSeasonalLoading(false);
+      });
 
       const pUpcoming = animeApi.getUpcomingAnime(1, (fresh) => {
         setUpcomingAnime(fresh);
-        setIsLoading(false);
+        setIsUpcomingLoading(false);
       }).then(data => {
         if (data && data.length > 0) {
           setUpcomingAnime(data);
-          setIsLoading(false);
         }
-      }).catch(err => console.warn("Failed to fetch upcoming:", err));
+        setIsUpcomingLoading(false);
+      }).catch(err => {
+        console.warn("Failed to fetch upcoming:", err);
+        setIsUpcomingLoading(false);
+      });
 
-      // Wait for primary feeds to settle so notification checking and curated lists can prepare
-      await Promise.allSettled([pTrending, pTop, pSeasonal, pUpcoming]);
+      // Airing alerts schedules after seasonal data completes
+      pSeasonal.then(() => {
+        const { notificationsEnabled } = useAppStore.getState();
+        if (notificationsEnabled) {
+          const watchingAnime = watchlist.filter(item => item.status === 'watching');
+          notificationService.checkAndScheduleAiringAlerts(watchingAnime, seasonalAnime);
+        }
+      });
 
-      // Ensure loading spinner is turned off if any data exists
-      setIsLoading(false);
-
-      // Check for airing alerts for "Watching" anime
-      const { notificationsEnabled } = useAppStore.getState();
-      if (notificationsEnabled) {
-        const watchingAnime = watchlist.filter(item => item.status === 'watching');
-        notificationService.checkAndScheduleAiringAlerts(watchingAnime, seasonalAnime);
-      }
-
-      // Premium Curated Curation Engine
+      // Premium Curated Curation Engine based on genre taste
       const baseCategories = ['All-Time Legends', 'Modern Masterpieces'];
       const tasteCategories: Record<string, string[]> = {
         'Action': ['Must Watch Shonen', 'Dark Masterpieces'],
@@ -171,10 +189,7 @@ export default function HomeScreen() {
         }
       });
 
-      // Deduplicate matched arrays
       matchedCategories = [...new Set(matchedCategories)];
-
-      // Pick 2 random from matched categories, or use strict fallbacks
       const shuffle = (array: any[]) => array.sort(() => 0.5 - Math.random());
 
       let finalCategories = [...baseCategories];
@@ -184,24 +199,27 @@ export default function HomeScreen() {
         finalCategories.push('Must Watch Shonen', 'Psychological Peaks');
       }
 
-      // Keep only unique elements avoiding duplication
       finalCategories = [...new Set(finalCategories)].slice(0, 4);
 
-      // Load curated lists progressively without blocking main view
+      // Load curated lists progressively in background
       finalCategories.forEach(category => {
+        setCuratedLoading(prev => ({ ...prev, [category]: true }));
         animeApi.getCuratedList(category, (freshCurated) => {
           setCuratedAnime(prev => ({ ...prev, [category]: freshCurated }));
+          setCuratedLoading(prev => ({ ...prev, [category]: false }));
         }).then(data => {
           if (data && data.length > 0) {
             setCuratedAnime(prev => ({ ...prev, [category]: data }));
           }
-        }).catch(err => console.warn(`Failed to fetch curated list for ${category}:`, err));
+          setCuratedLoading(prev => ({ ...prev, [category]: false }));
+        }).catch(err => {
+          console.warn(`Failed to fetch curated list for ${category}:`, err);
+          setCuratedLoading(prev => ({ ...prev, [category]: false }));
+        });
       });
 
     } catch (error) {
       console.error('Error fetching home data:', error);
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
@@ -210,6 +228,24 @@ export default function HomeScreen() {
       fetchHomeData();
     }
   }, [user?.id, hasHydrated]);
+
+  // Background prefetch during idle times
+  useEffect(() => {
+    if (trendingAnime.length > 0 || seasonalAnime.length > 0) {
+      const idsToPrefetch = [
+        ...trendingAnime.slice(0, 3).map(a => String(a.id)),
+        ...seasonalAnime.slice(0, 3).map(a => String(a.id)),
+      ];
+      // Deduplicate
+      const uniqueIds = [...new Set(idsToPrefetch)];
+      try {
+        const { PrefetchManager } = require('../../src/services/api/PrefetchManager');
+        PrefetchManager.prefetchMultiple(uniqueIds);
+      } catch (err) {
+        console.warn('[Home Prefetch] Failed to initialize PrefetchManager:', err);
+      }
+    }
+  }, [trendingAnime, seasonalAnime]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -223,7 +259,7 @@ export default function HomeScreen() {
 
   const isDesktop = width > 1024;
 
-  if ((isLoading || !hasHydrated) && !refreshing) {
+  if (!hasHydrated && !refreshing) {
     return (
       <View style={[styles.container, { backgroundColor: themeColors.background }]}>
         <StreamingHeader avatarUrl={user?.avatarUrl} />
@@ -262,7 +298,13 @@ export default function HomeScreen() {
           />
         }
       >
-        <RotatingHeroBanner topRated={topRated} onPress={handleMediaPress} />
+        {isTopLoading ? (
+          <View style={styles.heroWrapper}>
+            <SkeletonLoader width="100%" height={420} style={{ borderRadius: borderRadius.lg }} />
+          </View>
+        ) : (
+          <RotatingHeroBanner topRated={topRated} onPress={handleMediaPress} />
+        )}
 
         <WatchNextSection />
 
@@ -270,6 +312,7 @@ export default function HomeScreen() {
           title="Trending Now"
           icon="zap"
           data={trendingAnime}
+          isLoading={isTrendingLoading}
           onPress={handleMediaPress}
           onViewAll={() => router.push('/category/trending')}
         />
@@ -280,6 +323,7 @@ export default function HomeScreen() {
           title="Airing This Season"
           icon="activity"
           data={seasonalAnime}
+          isLoading={isSeasonalLoading}
           onPress={handleMediaPress}
           onViewAll={() => router.push('/category/current-season')}
         />
@@ -290,6 +334,7 @@ export default function HomeScreen() {
             title={category}
             icon="award"
             data={data}
+            isLoading={curatedLoading[category] ?? (data.length === 0)}
             onPress={handleMediaPress}
             onViewAll={() => router.push(`/category/${category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)}
           />
@@ -299,6 +344,7 @@ export default function HomeScreen() {
           title="Upcoming Hype"
           icon="calendar"
           data={upcomingAnime}
+          isLoading={isUpcomingLoading}
           onPress={handleMediaPress}
           onViewAll={() => router.push('/category/upcoming')}
         />

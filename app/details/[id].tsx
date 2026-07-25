@@ -201,6 +201,8 @@ function DetailsScreenInner() {
   const [likeCount, setLikeCount] = useState(0);
   const [userRating, setUserRating] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCharactersLoading, setIsCharactersLoading] = useState(true);
+  const [isRecommendationsLoading, setIsRecommendationsLoading] = useState(true);
   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
   const [isPostingReview, setIsPostingReview] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -244,10 +246,14 @@ function DetailsScreenInner() {
   const fetchDetails = React.useCallback(async () => {
     if (!id) {
       setIsLoading(false);
+      setIsCharactersLoading(false);
+      setIsRecommendationsLoading(false);
       return;
     }
 
     setIsLoading(true);
+    setIsCharactersLoading(true);
+    setIsRecommendationsLoading(true);
     try {
       // 1. MUST FETCH METADATA FIRST
       const data = await animeApi.getAnimeDetails(id, (updatedData) => {
@@ -274,6 +280,8 @@ function DetailsScreenInner() {
       if (!data) {
         console.warn(`Detail data was null for ID: ${id}`);
         setIsLoading(false);
+        setIsCharactersLoading(false);
+        setIsRecommendationsLoading(false);
         return;
       }
 
@@ -339,8 +347,15 @@ function DetailsScreenInner() {
           setMedia(curr => curr ? { ...curr, trailerUrl } : null);
         }
 
-        if (results[4].status === 'fulfilled') setCharacters(results[4].value as Character[]);
-        if (results[5].status === 'fulfilled') setRecommendations(results[5].value as Media[]);
+        if (results[4].status === 'fulfilled') {
+          setCharacters(results[4].value as Character[]);
+        }
+        setIsCharactersLoading(false);
+
+        if (results[5].status === 'fulfilled') {
+          setRecommendations(results[5].value as Media[]);
+        }
+        setIsRecommendationsLoading(false);
 
         // Handle global episode total
         if (results[6].status === 'fulfilled' && results[6].value) {
@@ -355,10 +370,14 @@ function DetailsScreenInner() {
         }
       }).catch(err => {
         console.warn('Non-critical secondary fetch error:', err);
+        setIsCharactersLoading(false);
+        setIsRecommendationsLoading(false);
       });
 
     } catch (error) {
       console.error('Critical detail fetch error:', error);
+      setIsCharactersLoading(false);
+      setIsRecommendationsLoading(false);
     } finally {
       setIsLoading(false);
     }
@@ -806,7 +825,25 @@ function DetailsScreenInner() {
             </View>
 
             <SectionGuard>
-              {characters.length > 0 && (
+              {isCharactersLoading ? (
+                <View style={styles.section}>
+                  <SectionHeader title="Characters" />
+                  <FlatList
+                    data={[1, 2, 3, 4, 5]}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(item) => `char-skeleton-${item}`}
+                    renderItem={() => (
+                      <View style={{ marginHorizontal: spacing.sm, alignItems: 'center' }}>
+                        <SkeletonLoader circle width={80} height={80} style={{ marginBottom: spacing.xs }} />
+                        <SkeletonLoader width={70} height={12} style={{ marginBottom: 4 }} />
+                        <SkeletonLoader width={50} height={10} />
+                      </View>
+                    )}
+                    contentContainerStyle={{ paddingHorizontal: spacing.md }}
+                  />
+                </View>
+              ) : characters.length > 0 ? (
                 <View style={styles.section}>
                   <SectionHeader title="Characters" />
                   <FlatList
@@ -825,7 +862,7 @@ function DetailsScreenInner() {
                     getItemLayout={(data, index) => ({ length: 156, offset: 156 * index, index })}
                   />
                 </View>
-              )}
+              ) : null}
             </SectionGuard>
 
             {/* Reviews Section (Phase 4.5) */}
@@ -875,10 +912,11 @@ function DetailsScreenInner() {
             </View>
 
             <SectionGuard>
-              {recommendations.length > 0 && (
+              {(isRecommendationsLoading || recommendations.length > 0) && (
                 <HorizontalCarousel
                   title="You May Also Like"
                   data={recommendations}
+                  isLoading={isRecommendationsLoading}
                   onPress={(id) => router.push(`/details/${id}`)}
                 />
               )}

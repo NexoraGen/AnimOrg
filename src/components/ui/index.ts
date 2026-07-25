@@ -29,4 +29,6 @@ export * from './CollectionCard';
 export * from './CreateCollectionModal';
 export * from './ProfileStatCard';
 export * from './ProfileStatsGrid';
+export * from './AnimatedLoader';
+
 

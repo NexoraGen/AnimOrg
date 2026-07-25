@@ -28,7 +28,7 @@ if (Platform.OS !== 'web') {
 }
 
 import { CinematicOverlay } from '../src/components/ui/CinematicOverlay';
-import { NotificationPermissionDialog } from '../src/components/ui';
+import { NotificationPermissionDialog, AnimatedLoader } from '../src/components/ui';
 import { notificationPermission } from '../src/services/notificationPermission';
 import { AchievementUnlockModal } from '../src/components/ui/AchievementUnlockModal';
 
@@ -260,7 +260,7 @@ function CinematicStartupSplash({ isReady }: { isReady: boolean }) {
         style={StyleSheet.absoluteFillObject}
       />
       <Animated.View style={[splashStyles.content, { transform: [{ scale: pulseAnim }] }]}>
-        <ActivityIndicator color={colors.primary} size="large" />
+        <AnimatedLoader size={80} />
         <Text style={splashStyles.brand}>AnimOrg</Text>
       </Animated.View>
     </Animated.View>

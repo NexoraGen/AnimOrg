@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -317,6 +317,8 @@ export default function SearchScreen() {
   const [recommendationResult, setRecommendationResult] = useState<RecommendationResult | null>(null);
   const [nextRecommendationMode, setNextRecommendationMode] = useState<'personalized' | 'community'>('personalized');
   const [showRecModal, setShowRecModal] = useState(false);
+  const [isAddingToWatchlist, setIsAddingToWatchlist] = useState(false);
+  const [isAddedToWatchlist, setIsAddedToWatchlist] = useState(false);
 
   // Keep reference of active abort controller to cancel in-flight queries
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -338,22 +340,22 @@ export default function SearchScreen() {
   const numColumns = width > 1024 ? 5 : width > 768 ? 4 : 2;
   const cardWidth = (width - spacing.M * 2 - spacing.M * (numColumns - 1)) / numColumns;
 
-  const triggerHaptic = () => {
+  const triggerHaptic = useCallback(() => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
+  }, []);
 
-  const handleInputChange = (text: string) => {
+  const handleInputChange = useCallback((text: string) => {
     lastKeystrokeTimeRef.current = Date.now();
     setInputText(text);
-  };
+  }, []);
 
-  const toggleGenre = (id: number) => {
+  const toggleGenre = useCallback((id: number) => {
     setSelectedGenres(prev =>
       prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]
     );
-  };
+  }, []);
 
-  const handleDiscover = async () => {
+  const handleDiscover = useCallback(async () => {
     triggerHaptic();
     setIsRecLoading(true);
     setShowRecModal(true);
@@ -381,14 +383,14 @@ export default function SearchScreen() {
     } finally {
       setIsRecLoading(false);
     }
-  };
+  }, [watchlist, userRatings, getFavoriteGenres, notInterested, recommendationHistory, nextRecommendationMode, triggerHaptic]);
 
-  const handleNotInterested = async (id: string) => {
+  const handleNotInterested = useCallback(async (id: string) => {
     await addToNotInterested(id);
     setShowRecModal(false);
-  };
+  }, [addToNotInterested]);
 
-  const handleAddToWatchlist = async (media: Media) => {
+  const handleAddToWatchlist = useCallback(async (media: Media) => {
     if (isAddedToWatchlist) return;
 
     setIsAddingToWatchlist(true);
@@ -407,10 +409,8 @@ export default function SearchScreen() {
     } finally {
       setIsAddingToWatchlist(false);
     }
-  };
+  }, [isAddedToWatchlist, addToWatchlist, triggerHaptic, router]);
 
-  const [isAddingToWatchlist, setIsAddingToWatchlist] = useState(false);
-  const [isAddedToWatchlist, setIsAddedToWatchlist] = useState(false);
 
   useEffect(() => {
     if (showRecModal) {
@@ -512,27 +512,51 @@ export default function SearchScreen() {
     };
   }, [debouncedQuery, selectedGenres, minScore, status]);
 
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     if (isMoreLoading || !hasNextPage || isLoading || isDiscoverMode) return;
 
     setIsMoreLoading(true);
     const nextPage = page + 1;
+    const controller = abortControllerRef.current || new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const response = await animeApi.searchAnime(debouncedQuery, nextPage, selectedGenres, undefined, 'score', 'desc');
-      setResults(prev => [...prev, ...response.data]);
+      const response = await animeApi.searchAnime(
+        debouncedQuery,
+        nextPage,
+        selectedGenres,
+        undefined,
+        'score',
+        'desc',
+        undefined,
+        controller.signal
+      );
+
+      const newResults = [...results, ...response.data];
+      setResults(newResults);
       setPage(nextPage);
       setHasNextPage(response.hasNextPage);
-    } catch (error) {
+
+      const cacheKey = `q:${debouncedQuery.trim().toLowerCase()}_g:${selectedGenres.slice().sort().join(',')}`;
+      SEARCH_SESSION_CACHE.set(cacheKey, {
+        results: newResults,
+        hasNextPage: response.hasNextPage
+      });
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log(`[Search] Load more cancelled.`);
+        return;
+      }
       console.error('Load more error:', error);
     } finally {
       setIsMoreLoading(false);
     }
-  };
+  }, [isMoreLoading, hasNextPage, isLoading, isDiscoverMode, page, debouncedQuery, selectedGenres, results]);
 
-  const handleMediaPress = (id: string) => {
+  const handleMediaPress = useCallback((id: string) => {
     if (inputText.trim()) addToSearchHistory(inputText.trim());
     router.push(`/details/${id}`);
-  };
+  }, [inputText, addToSearchHistory, router]);
 
 
 

@@ -44,7 +44,12 @@ class CacheManagerImpl {
             if (this.activeRequests.has(cacheKey)) {
                 try {
                     const freshData = await this.activeRequests.get(cacheKey);
-                    if (onUpdate) onUpdate(freshData);
+                    if (onUpdate) {
+                        const isIdentical = existingStaleData !== undefined && JSON.stringify(existingStaleData) === JSON.stringify(freshData);
+                        if (!isIdentical) {
+                            onUpdate(freshData);
+                        }
+                    }
                 } catch (e) {
                     console.warn(`[CacheManager] Background deduplicated refresh failed:`, e);
                 }
@@ -57,7 +62,12 @@ class CacheManagerImpl {
                     this.setMemoryCache(cacheKey, freshData);
                     AsyncStorage.setItem(cacheKey, JSON.stringify({ data: freshData, timestamp: Date.now() }))
                         .catch(err => console.warn(`[CacheManager] L2 Write Error on refresh for ${cacheKey}:`, err));
-                    if (onUpdate) onUpdate(freshData);
+                    if (onUpdate) {
+                        const isIdentical = existingStaleData !== undefined && JSON.stringify(existingStaleData) === JSON.stringify(freshData);
+                        if (!isIdentical) {
+                            onUpdate(freshData);
+                        }
+                    }
                     return freshData;
                 } catch (error) {
                     console.warn(`[CacheManager] Background refresh failed for ${cacheKey}:`, error);

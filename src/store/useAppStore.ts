@@ -599,7 +599,48 @@ export const useAppStore = create<AppState>()(
                   userProfile = backupProfile;
                 }
 
-                // 3. Fetch data once with background retries and cached values as ultimate fallbacks
+                if (userProfile && !userProfile.timezone) {
+                  try {
+                    const { autoDetectTimezone } = require('../utils/timezoneHelper');
+                    const detected = autoDetectTimezone();
+                    userProfile.timezone = detected.id;
+                    userProfile.timezoneLabel = detected.label;
+                    userProfile.country = detected.country;
+                    firestoreService.updateUserProfile(userId, {
+                      timezone: detected.id,
+                      timezoneLabel: detected.label,
+                      country: detected.country
+                    }).catch((e: any) => console.warn('Failed to auto-save detected timezone on signup:', e));
+                  } catch (e) {
+                    console.warn('Failed to auto-detect timezone during initialization:', e);
+                  }
+                }
+
+                // Resolve primary authentication and profile info to let splash screen hide instantly
+                set({
+                  user: userProfile || get().user,
+                  collections: userProfile?.collections || get().collections || [],
+                  isAppInitializing: false,
+                  isLoadingAuth: false
+                });
+
+                // Check daily login XP
+                const currentUser = get().user;
+                if (currentUser) {
+                  const loginResult = XPService.processXPEvent(currentUser, 'DAILY_LOGIN');
+                  if (loginResult.xpAdded > 0) {
+                    set({ user: { ...currentUser, ...loginResult.updatedProfile } });
+                    firestoreService.updateUserProfile(currentUser.id, loginResult.updatedProfile).catch(e => {
+                      console.warn('Failed to save daily login XP:', e);
+                    });
+                  }
+                }
+
+                if (get().notificationsEnabled) {
+                  get().registerNotifications();
+                }
+
+                // 2. Fetch other user metadata silently in the background
                 const [history, activity, allProgress, ratings, notInterested, followingList, followersList] = await Promise.all([
                   fetchWithRetry(() => {
                     return firestoreService.getContinueWatching(userId);
@@ -645,25 +686,7 @@ export const useAppStore = create<AppState>()(
                   });
                 }
 
-                if (userProfile && !userProfile.timezone) {
-                  try {
-                    const { autoDetectTimezone } = require('../utils/timezoneHelper');
-                    const detected = autoDetectTimezone();
-                    userProfile.timezone = detected.id;
-                    userProfile.timezoneLabel = detected.label;
-                    userProfile.country = detected.country;
-                    firestoreService.updateUserProfile(userId, {
-                      timezone: detected.id,
-                      timezoneLabel: detected.label,
-                      country: detected.country
-                    }).catch((e: any) => console.warn('Failed to auto-save detected timezone on signup:', e));
-                  } catch (e) {
-                    console.warn('Failed to auto-detect timezone during initialization:', e);
-                  }
-                }
-
                 set({
-                  user: userProfile || get().user,
                   continueWatching: history || [],
                   activityFeed: activity || [],
                   animeProgress: progressMap,
@@ -671,26 +694,8 @@ export const useAppStore = create<AppState>()(
                   notInterested: notInterested || [],
                   following: followingList || [],
                   followers: followersList || [],
-                  collections: userProfile?.collections || get().collections || [],
-                  isAppInitializing: false, // Background tasks finished, mark init complete if not done
-                  isLoadingAuth: false
                 });
 
-                // Check daily login XP
-                const currentUser = get().user;
-                if (currentUser) {
-                  const loginResult = XPService.processXPEvent(currentUser, 'DAILY_LOGIN');
-                  if (loginResult.xpAdded > 0) {
-                    set({ user: { ...currentUser, ...loginResult.updatedProfile } });
-                    firestoreService.updateUserProfile(currentUser.id, loginResult.updatedProfile).catch(e => {
-                      console.warn('Failed to save daily login XP:', e);
-                    });
-                  }
-                }
-
-                if (get().notificationsEnabled) {
-                  get().registerNotifications();
-                }
               } catch (bgError) {
                 console.warn("[useAppStore] Background initial fetch warning:", bgError);
                 set({
