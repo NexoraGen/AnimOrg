@@ -255,7 +255,7 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
                 styles.listContent,
-                { paddingTop: insets.top + HEADER_HEIGHT + 60 }
+                { paddingTop: spacing.M }
             ]}
             onEndReached={onLoadMore}
             onEndReachedThreshold={0.5}
@@ -264,7 +264,7 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                     refreshing={refreshing}
                     onRefresh={onRefresh}
                     tintColor={theme.primary}
-                    progressViewOffset={insets.top + HEADER_HEIGHT + 50}
+                    progressViewOffset={10}
                 />
             }
             ListEmptyComponent={
