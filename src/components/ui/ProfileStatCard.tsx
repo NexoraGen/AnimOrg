@@ -2,6 +2,8 @@ import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { spacing, borderRadius } from '../../theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 
@@ -12,6 +14,7 @@ interface ProfileStatCardProps {
     index: number;
     onPress?: () => void;
     helperText?: string;
+    bgImage?: any;
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -22,7 +25,8 @@ export const ProfileStatCard: React.FC<ProfileStatCardProps> = ({
     icon,
     index,
     onPress,
-    helperText
+    helperText,
+    bgImage
 }) => {
     const themeColors = useThemeColors();
     const scale = useRef(new Animated.Value(1)).current;
@@ -76,13 +80,23 @@ export const ProfileStatCard: React.FC<ProfileStatCardProps> = ({
             style={[
                 styles.card,
                 {
-                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    backgroundColor: bgImage ? themeColors.background : 'rgba(255, 255, 255, 0.03)',
                     borderColor: 'rgba(255, 255, 255, 0.05)',
                     opacity,
                     transform: [{ scale }, { translateY }],
                 }
             ]}
         >
+            {bgImage && (
+                <>
+                    <Image source={bgImage} style={styles.cardBg} contentFit="cover" />
+                    <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.75)']}
+                        style={styles.cardOverlay}
+                    />
+                </>
+            )}
+
             {/* Centered glowing red circular background for icon */}
             <View style={[styles.glowContainer, { backgroundColor: `${themeColors.primary}12`, borderColor: `${themeColors.primary}25` }]}>
                 <Feather name={icon} size={24} color={themeColors.primary} />
@@ -122,6 +136,14 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 8,
         elevation: 2,
+        overflow: 'hidden',
+    },
+    cardBg: {
+        ...StyleSheet.absoluteFillObject,
+        opacity: 0.6,
+    },
+    cardOverlay: {
+        ...StyleSheet.absoluteFillObject,
     },
     glowContainer: {
         width: 56,

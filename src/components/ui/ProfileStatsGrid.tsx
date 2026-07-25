@@ -3,6 +3,11 @@ import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { spacing } from '../../theme';
 import { ProfileStatCard } from './ProfileStatCard';
 
+const WATCHING_SILHOUETTE = require('../../../assets/list-watching.png');
+const COMPLETED_SILHOUETTE = require('../../../assets/list-completed.png');
+const PLANNED_SILHOUETTE = require('../../../assets/list-planned.png');
+const DROPPED_SILHOUETTE = require('../../../assets/list-dropped.png');
+
 interface ProfileStatsGridProps {
     episodes: number;
     hours: number;
@@ -34,12 +39,14 @@ export const ProfileStatsGrid: React.FC<ProfileStatsGridProps> = ({
             value: episodes.toLocaleString(),
             icon: 'play' as const,
             onPress: onEpisodesPress,
+            bgImage: WATCHING_SILHOUETTE,
         },
         {
             label: 'Watch Hours',
             value: `${hours.toLocaleString()}h`,
             icon: 'clock' as const,
             onPress: onHoursPress,
+            bgImage: COMPLETED_SILHOUETTE,
         },
         {
             label: 'Current Streak',
@@ -47,6 +54,7 @@ export const ProfileStatsGrid: React.FC<ProfileStatsGridProps> = ({
             icon: 'zap' as const,
             onPress: onCurrentStreakPress,
             helperText: currentStreak > 0 ? 'Keep it up! 🔥' : 'Start tracking today!',
+            bgImage: PLANNED_SILHOUETTE,
         },
         {
             label: 'Longest Streak',
@@ -54,6 +62,7 @@ export const ProfileStatsGrid: React.FC<ProfileStatsGridProps> = ({
             icon: 'award' as const,
             onPress: onLongestStreakPress,
             helperText: 'Personal record 🏅',
+            bgImage: DROPPED_SILHOUETTE,
         },
     ];
 
@@ -69,6 +78,7 @@ export const ProfileStatsGrid: React.FC<ProfileStatsGridProps> = ({
                             index={idx}
                             onPress={item.onPress}
                             helperText={'helperText' in item ? item.helperText : undefined}
+                            bgImage={item.bgImage}
                         />
                     </View>
                 ))}
