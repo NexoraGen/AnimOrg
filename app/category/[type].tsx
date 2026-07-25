@@ -105,28 +105,30 @@ export default function CategoryScreen() {
       <View style={{ flex: 1, paddingTop: insets.top + HEADER_HEIGHT }}>
         {/* Sort filter bar */}
         <View style={styles.filterBar}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-            {SORT_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.id}
-                style={[
-                  styles.filterChip,
-                  { backgroundColor: themeColors.surfaceVariant },
-                  sortBy === opt.id && { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
-                ]}
-                onPress={() => setSortBy(opt.id)}
-              >
-                <Text style={[
-                  styles.filterText,
-                  { color: themeColors.textMuted },
-                  sortBy === opt.id && { color: '#FFF', fontWeight: 'bold' }
-                ]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <Text style={[styles.resultCount, { color: themeColors.textDim }]}>
+          {type !== 'upcoming' && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+              {SORT_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    styles.filterChip,
+                    { backgroundColor: themeColors.surfaceVariant },
+                    sortBy === opt.id && { backgroundColor: themeColors.primary, borderColor: themeColors.primary }
+                  ]}
+                  onPress={() => setSortBy(opt.id)}
+                >
+                  <Text style={[
+                    styles.filterText,
+                    { color: themeColors.textMuted },
+                    sortBy === opt.id && { color: '#FFF', fontWeight: 'bold' }
+                  ]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+          <Text style={[styles.resultCount, { color: themeColors.textDim }, type === 'upcoming' && { marginLeft: 0 }]}>
             {data.length > 0 ? `${data.length}+ anime` : ''}
           </Text>
         </View>
