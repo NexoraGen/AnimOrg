@@ -34,7 +34,13 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
       <View style={styles.leftSection}>
         <View style={styles.titleRow}>
           {icon && <View style={styles.iconContainer}>{renderIcon()}</View>}
-          <Text style={[styles.title, { color: themeColors.text }]}>{title}</Text>
+          <Text
+            style={[styles.title, { color: themeColors.text }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {title}
+          </Text>
         </View>
         {subtitle && (
           <Text style={[styles.subtitle, { color: themeColors.textDim }]}>{subtitle}</Text>
@@ -55,13 +61,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: spacing.xl,
     marginBottom: spacing.md,
     marginTop: spacing.sm,
   },
   leftSection: {
     flex: 1,
+    marginRight: spacing.md,
   },
   titleRow: {
     flexDirection: 'row',
@@ -71,6 +78,7 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   title: {
+    flex: 1,
     fontSize: 28,
     fontWeight: '900' as any,
     letterSpacing: -1,
@@ -85,6 +93,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     paddingBottom: 4,
+    flexShrink: 0,
   },
   viewAllText: {
     fontSize: 14,
