@@ -108,48 +108,90 @@ export const firestoreService = {
     if (!auth.currentUser) {
       return { posts: [], lastDoc: null };
     }
+    const postsRef = collection(db, 'posts');
+    let constraints: any[] = [];
+
+    // Always push 'where' constraints first, before any 'orderBy' clauses
+    if (options.category && options.category !== 'Latest' && options.category !== 'Trending' && options.category !== 'Following') {
+      constraints.push(where('category', '==', options.category));
+    }
+
+    if (options.userId) {
+      constraints.push(where('userId', '==', options.userId));
+    }
+
+    // Then push 'orderBy' constraints
+    if (options.category === 'Trending') {
+      constraints.push(orderBy('engagementScore', 'desc'));
+      constraints.push(orderBy('createdAt', 'desc'));
+    } else {
+      constraints.push(orderBy('createdAt', 'desc'));
+    }
+
+    // Then cursor constraint
+    if (options.lastDoc) {
+      constraints.push(startAfter(options.lastDoc));
+    }
+
+    // Finally limit constraint
+    constraints.push(limit(options.pageSize || 10));
+
     try {
-      const postsRef = collection(db, 'posts');
-      let constraints: any[] = [];
-
-      // Always push 'where' constraints first, before any 'orderBy' clauses
-      if (options.category && options.category !== 'Latest' && options.category !== 'Trending' && options.category !== 'Following') {
-        constraints.push(where('category', '==', options.category));
-      }
-
-      if (options.userId) {
-        constraints.push(where('userId', '==', options.userId));
-      }
-
-      // Then push 'orderBy' constraints
-      if (options.category === 'Trending') {
-        constraints.push(orderBy('engagementScore', 'desc'));
-        constraints.push(orderBy('createdAt', 'desc'));
-      } else {
-        constraints.push(orderBy('createdAt', 'desc'));
-      }
-
-      // Then cursor constraint
-      if (options.lastDoc) {
-        constraints.push(startAfter(options.lastDoc));
-      }
-
-      // Finally limit constraint
-      constraints.push(limit(options.pageSize || 10));
-
       const q = query(postsRef, ...constraints);
       const snap = await getDocs(q);
       const posts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityPost));
 
-      const resolvedPosts = auth.currentUser
+      const resolvedLikes = auth.currentUser
         ? await firestoreService.resolveLikesForPosts(auth.currentUser.uid, posts)
         : posts.map(p => ({ ...p, isLiked: false }));
 
+      const resolvedFinal = auth.currentUser
+        ? await firestoreService.resolveSavesForPosts(auth.currentUser.uid, resolvedLikes)
+        : resolvedLikes.map(p => ({ ...p, isSaved: false }));
+
       return {
-        posts: resolvedPosts,
+        posts: resolvedFinal,
         lastDoc: snap.docs[snap.docs.length - 1]
       };
-    } catch (error) {
+    } catch (error: any) {
+      // If composite index is missing, handle fallback query gracefully without orderBy
+      if (options.userId && (error.code === 'failed-precondition' || String(error).includes('failed-precondition') || String(error).includes('index'))) {
+        console.warn('[FirestoreService] Composite index missing for userId, falling back to in-memory sort.');
+        try {
+          const fallbackConstraints: any[] = [];
+          if (options.category && options.category !== 'Latest' && options.category !== 'Trending' && options.category !== 'Following') {
+            fallbackConstraints.push(where('category', '==', options.category));
+          }
+          fallbackConstraints.push(where('userId', '==', options.userId));
+          fallbackConstraints.push(limit(options.pageSize || 50));
+
+          const fallbackQuery = query(postsRef, ...fallbackConstraints);
+          const snap = await getDocs(fallbackQuery);
+          const posts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityPost));
+
+          // Sort in-memory descending by createdAt
+          posts.sort((a, b) => {
+            const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+            return timeB - timeA;
+          });
+
+          const resolvedLikes = auth.currentUser
+            ? await firestoreService.resolveLikesForPosts(auth.currentUser.uid, posts)
+            : posts.map(p => ({ ...p, isLiked: false }));
+
+          const resolvedFinal = auth.currentUser
+            ? await firestoreService.resolveSavesForPosts(auth.currentUser.uid, resolvedLikes)
+            : resolvedLikes.map(p => ({ ...p, isSaved: false }));
+
+          return {
+            posts: resolvedFinal,
+            lastDoc: snap.docs[snap.docs.length - 1]
+          };
+        } catch (fallbackError) {
+          console.error('[FirestoreService] Fallback query failed:', fallbackError);
+        }
+      }
       console.error('[FirestoreService] Error getting feed:', error);
       return { posts: [], lastDoc: null };
     }
@@ -266,6 +308,96 @@ export const firestoreService = {
     } else {
       await setDoc(saveRef, { postId, savedAt: serverTimestamp() });
       return true;
+    }
+  },
+
+  resolveSavesForPosts: async (userId: string, posts: CommunityPost[]): Promise<CommunityPost[]> => {
+    if (!userId || !posts || posts.length === 0) {
+      return posts.map(p => ({ ...p, isSaved: false }));
+    }
+    try {
+      const savedPostIds = new Set<string>();
+      const savedPostsRef = collection(db, 'users', userId, 'savedPosts');
+      const snap = await getDocs(savedPostsRef);
+      snap.docs.forEach(docSnap => {
+        savedPostIds.add(docSnap.id);
+      });
+      return posts.map(p => ({
+        ...p,
+        isSaved: savedPostIds.has(p.id)
+      }));
+    } catch (e) {
+      console.error('[FirestoreService] Error resolving saved posts:', e);
+      return posts.map(p => ({ ...p, isSaved: false }));
+    }
+  },
+
+  getSavedPosts: async (userId: string): Promise<CommunityPost[]> => {
+    try {
+      const savedRef = collection(db, 'users', userId, 'savedPosts');
+      const savedSnap = await getDocs(savedRef);
+      const postIds = savedSnap.docs.map(d => d.id);
+
+      if (postIds.length === 0) return [];
+
+      const postsRef = collection(db, 'posts');
+      const posts: CommunityPost[] = [];
+      const chunks: string[][] = [];
+      for (let i = 0; i < postIds.length; i += 30) {
+        chunks.push(postIds.slice(i, i + 30));
+      }
+
+      await Promise.all(chunks.map(async (chunk) => {
+        const q = query(postsRef, where('__name__', 'in', chunk));
+        const snap = await getDocs(q);
+        snap.docs.forEach(docSnap => {
+          posts.push({ id: docSnap.id, ...docSnap.data() } as CommunityPost);
+        });
+      }));
+
+      posts.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        return timeB - timeA;
+      });
+
+      const resolvedLikes = await firestoreService.resolveLikesForPosts(userId, posts);
+      const resolvedSaves = await firestoreService.resolveSavesForPosts(userId, resolvedLikes);
+      return resolvedSaves;
+    } catch (e) {
+      console.error('[FirestoreService] Error getting saved posts:', e);
+      return [];
+    }
+  },
+
+  incrementPostShare: async (postId: string): Promise<void> => {
+    try {
+      const postRef = doc(db, 'posts', postId);
+      await updateDoc(postRef, {
+        shares: increment(1),
+        engagementScore: increment(1)
+      });
+    } catch (e) {
+      console.error('[FirestoreService] Error incrementing post share:', e);
+    }
+  },
+
+  deletePostComment: async (postId: string, commentId: string): Promise<void> => {
+    try {
+      const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+      const postRef = doc(db, 'posts', postId);
+
+      const batch = writeBatch(db);
+      batch.delete(commentRef);
+      batch.update(postRef, {
+        comments: increment(-1),
+        engagementScore: increment(-2)
+      });
+
+      await batch.commit();
+    } catch (e) {
+      console.error('[FirestoreService] Error deleting comment:', e);
+      throw e;
     }
   },
 
@@ -1102,6 +1234,26 @@ export const firestoreService = {
       });
     } catch (error) {
       console.error(`[FirestoreService] Error setting push token for ${userId}:`, error);
+    }
+  },
+
+  getUserPushSettings: async (userId: string) => {
+    try {
+      const userRef = doc(db, 'users', userId);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        return {
+          pushToken: data.pushToken || null,
+          notificationsEnabled: data.notificationsEnabled !== false,
+          notificationSettings: data.notificationSettings || null,
+          notificationFrequency: data.notificationFrequency || 'balanced',
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error(`[FirestoreService] Error getting push settings for ${userId}:`, error);
+      return null;
     }
   },
 

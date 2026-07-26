@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { spacing, colors } from '../../../theme';
@@ -8,15 +8,17 @@ import { PostComment } from '../../../types';
 import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
 import { getAvatarSource } from '../../../constants/avatars';
+import { notificationService } from '../../../services/notifications';
 import { formatDistanceToNow } from 'date-fns';
 
 interface CommentItemProps {
     comment: PostComment;
     onReply: (comment: PostComment) => void;
+    onDelete: (commentId: string) => void;
     postId: string;
 }
 
-export const CommentItem: React.FC<CommentItemProps> = ({ comment, onReply, postId }) => {
+export const CommentItem: React.FC<CommentItemProps> = ({ comment, onReply, onDelete, postId }) => {
     const theme = useThemeColors();
     const user = useAppStore(state => state.user);
     const [isLiked, setIsLiked] = useState(comment.isLiked || false);
@@ -40,9 +42,44 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, onReply, post
                     targetId: postId,
                     targetPreview: comment.text.substring(0, 50),
                 });
+                // Dispatch push notification to comment author
+                notificationService.dispatchSocialPush(
+                    comment.userId,
+                    `${user.username} liked your comment`,
+                    comment.text.substring(0, 80),
+                    { type: 'like', targetId: postId }
+                ).catch(e => console.warn('[CommentItem] Push dispatch failed:', e));
             }
         } catch (error) {
             console.error(error);
+        }
+    };
+
+    const handleDelete = () => {
+        const performDelete = async () => {
+            try {
+                await firestoreService.deletePostComment(postId, comment.id);
+                onDelete(comment.id);
+            } catch (error) {
+                console.error('[CommentItem] Failed to delete comment:', error);
+                Alert.alert('Error', 'Failed to delete comment. Please try again.');
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            const confirmed = window.confirm('Are you sure you want to delete this comment?');
+            if (confirmed) {
+                performDelete();
+            }
+        } else {
+            Alert.alert(
+                'Delete Comment',
+                'Are you sure you want to permanently delete this comment?',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', onPress: performDelete, style: 'destructive' }
+                ]
+            );
         }
     };
 
@@ -50,6 +87,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, onReply, post
 
     const commentAvatar = getAvatarSource(comment.userId === user?.id && user?.avatarUrl ? user.avatarUrl : comment.userAvatar);
     const commentUsername = comment.userId === user?.id && user?.username ? user.username : comment.username;
+    const isOwner = user && comment.userId === user.id;
 
     return (
         <View style={[styles.container, { marginLeft: indent }]}>
@@ -82,6 +120,12 @@ export const CommentItem: React.FC<CommentItemProps> = ({ comment, onReply, post
                         <Feather name="message-square" size={14} color={theme.textDim} />
                         <Text style={[styles.actionText, { color: theme.textDim }]}>Reply</Text>
                     </TouchableOpacity>
+
+                    {isOwner && (
+                        <TouchableOpacity onPress={handleDelete} style={[styles.actionBtn, { marginLeft: 'auto' }]}>
+                            <Feather name="trash-2" size={14} color={theme.textDim} />
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         </View>

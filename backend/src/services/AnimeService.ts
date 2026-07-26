@@ -52,6 +52,39 @@ class AnimeService {
         }
     }
 
+    private sortJikanResponse(res: any, sortBy?: string): any {
+        if (!res || !Array.isArray(res.data) || !sortBy || sortBy === 'default' || sortBy === 'none') {
+            return res;
+        }
+
+        const sortedData = [...res.data];
+        if (sortBy === 'score') {
+            sortedData.sort((a, b) => (b.score || 0) - (a.score || 0));
+        } else if (sortBy === 'popularity') {
+            sortedData.sort((a, b) => {
+                const membersA = a.members ?? 0;
+                const membersB = b.members ?? 0;
+                if (membersA !== membersB) {
+                    return membersB - membersA;
+                }
+                const popA = a.popularity ?? Infinity;
+                const popB = b.popularity ?? Infinity;
+                return popA - popB;
+            });
+        } else if (sortBy === 'newest') {
+            sortedData.sort((a, b) => {
+                const dateA = a.aired?.from ? new Date(a.aired.from).getTime() : 0;
+                const dateB = b.aired?.from ? new Date(b.aired.from).getTime() : 0;
+                return dateB - dateA;
+            });
+        }
+
+        return {
+            ...res,
+            data: sortedData
+        };
+    }
+
     async getAnime(id: string, config?: { timeout?: number }) {
         const key = `${CACHE_KEYS.ANIME}_${id}`;
         return this.executeWithCache(key, CACHE_TTL.ANIME_DETAILS, () =>
@@ -71,8 +104,8 @@ class AnimeService {
     ) {
         const queryLower = query.toLowerCase();
         const key = `${CACHE_KEYS.SEARCH}_q:${queryLower}_p:${page || 1}_g:${genres || "all"}_s:${minScore || "any"}_ob:${orderBy || "default"}_so:${sort || "default"}_l:${limit || "default"}`;
-        return this.executeWithCache(key, CACHE_TTL.SEARCH_QUERY, () =>
-            JikanProvider.searchAnime({
+        return this.executeWithCache(key, CACHE_TTL.SEARCH_QUERY, async () => {
+            const raw = await JikanProvider.searchAnime({
                 q: query,
                 page,
                 genres,
@@ -80,37 +113,42 @@ class AnimeService {
                 order_by: orderBy,
                 sort,
                 limit
-            }, config)
-        );
+            }, config);
+            return this.sortJikanResponse(raw, orderBy);
+        });
     }
 
-    async getTopAnime(page?: number, filter?: string, limit?: number, config?: { timeout?: number }) {
-        const key = `${CACHE_KEYS.TOP}_p:${page || 1}_f:${filter || "all"}_l:${limit || "default"}`;
-        return this.executeWithCache(key, CACHE_TTL.TOP_ANIME, () =>
-            JikanProvider.getTopAnime({ page, filter, limit }, config)
-        );
+    async getTopAnime(page?: number, filter?: string, limit?: number, sortBy?: string, config?: { timeout?: number }) {
+        const key = `${CACHE_KEYS.TOP}_p:${page || 1}_f:${filter || "all"}_l:${limit || "default"}_s:${sortBy || "none"}`;
+        return this.executeWithCache(key, CACHE_TTL.TOP_ANIME, async () => {
+            const raw = await JikanProvider.getTopAnime({ page, filter, limit }, config);
+            return this.sortJikanResponse(raw, sortBy);
+        });
     }
 
-    async getTrendingAnime(page?: number, limit?: number, config?: { timeout?: number }) {
+    async getTrendingAnime(page?: number, limit?: number, sortBy?: string, config?: { timeout?: number }) {
         // Airing top anime represents trending
-        const key = `${CACHE_KEYS.HOME}_trending_p:${page || 1}_l:${limit || "default"}`;
-        return this.executeWithCache(key, CACHE_TTL.TOP_ANIME, () =>
-            JikanProvider.getTopAnime({ page, filter: "airing", limit }, config)
-        );
+        const key = `${CACHE_KEYS.HOME}_trending_p:${page || 1}_l:${limit || "default"}_s:${sortBy || "none"}`;
+        return this.executeWithCache(key, CACHE_TTL.TOP_ANIME, async () => {
+            const raw = await JikanProvider.getTopAnime({ page, filter: "airing", limit }, config);
+            return this.sortJikanResponse(raw, sortBy);
+        });
     }
 
-    async getCurrentSeason(page?: number, limit?: number, config?: { timeout?: number }) {
-        const key = `${CACHE_KEYS.SEASON}_p:${page || 1}_l:${limit || "default"}`;
-        return this.executeWithCache(key, CACHE_TTL.SEASONAL, () =>
-            JikanProvider.getCurrentSeason({ page, limit }, config)
-        );
+    async getCurrentSeason(page?: number, limit?: number, sortBy?: string, config?: { timeout?: number }) {
+        const key = `${CACHE_KEYS.SEASON}_p:${page || 1}_l:${limit || "default"}_s:${sortBy || "none"}`;
+        return this.executeWithCache(key, CACHE_TTL.SEASONAL, async () => {
+            const raw = await JikanProvider.getCurrentSeason({ page, limit }, config);
+            return this.sortJikanResponse(raw, sortBy);
+        });
     }
 
-    async getUpcomingAnime(page?: number, limit?: number, config?: { timeout?: number }) {
-        const key = `${CACHE_KEYS.UPCOMING}_p:${page || 1}_l:${limit || "default"}`;
-        return this.executeWithCache(key, CACHE_TTL.SEASONAL, () =>
-            JikanProvider.getUpcomingAnime({ page, limit }, config)
-        );
+    async getUpcomingAnime(page?: number, limit?: number, sortBy?: string, config?: { timeout?: number }) {
+        const key = `${CACHE_KEYS.UPCOMING}_p:${page || 1}_l:${limit || "default"}_s:${sortBy || "none"}`;
+        return this.executeWithCache(key, CACHE_TTL.SEASONAL, async () => {
+            const raw = await JikanProvider.getUpcomingAnime({ page, limit }, config);
+            return this.sortJikanResponse(raw, sortBy);
+        });
     }
 
     async getSchedule(filter?: string, page?: number, limit?: number, config?: { timeout?: number }) {
@@ -163,11 +201,12 @@ class AnimeService {
         );
     }
 
-    async getAnimeByGenre(genreId: number, page?: number, config?: { timeout?: number }) {
-        const key = `${CACHE_KEYS.SEARCH}_genre:${genreId}_p:${page || 1}`;
-        return this.executeWithCache(key, CACHE_TTL.ANIME_DETAILS, () =>
-            JikanProvider.getAnimeByGenre(genreId, page, config)
-        );
+    async getAnimeByGenre(genreId: number, page?: number, sortBy?: string, config?: { timeout?: number }) {
+        const key = `${CACHE_KEYS.SEARCH}_genre:${genreId}_p:${page || 1}_s:${sortBy || "none"}`;
+        return this.executeWithCache(key, CACHE_TTL.ANIME_DETAILS, async () => {
+            const raw = await JikanProvider.getAnimeByGenre(genreId, page, config);
+            return this.sortJikanResponse(raw, sortBy);
+        });
     }
 }
 

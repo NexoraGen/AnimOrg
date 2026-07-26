@@ -6,7 +6,7 @@ import { RecommendationService } from '../services/RecommendationService';
 export interface CategoryConfig {
     title: string;
     icon: string;
-    fetchFn: (page: number) => Promise<Media[]>;
+    fetchFn: (page: number, sortBy?: string) => Promise<Media[]>;
     emptyMessage: string;
     emptyIcon: string;
     analyticsName: string;
@@ -22,7 +22,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     trending: {
         title: 'Trending Now',
         icon: 'trending-up',
-        fetchFn: (page) => animeApi.getTrendingAnime(page),
+        fetchFn: (page, sortBy) => animeApi.getTrendingAnime(page, sortBy),
         emptyMessage: 'No trending anime available right now.',
         emptyIcon: 'trending-up',
         analyticsName: 'trending',
@@ -32,7 +32,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     top: {
         title: 'Top Rated',
         icon: 'award',
-        fetchFn: (page) => animeApi.getTopAnime(page),
+        fetchFn: (page, sortBy) => animeApi.getTopAnime(page, sortBy),
         emptyMessage: 'No top-rated anime found.',
         emptyIcon: 'award',
         analyticsName: 'top_rated',
@@ -42,7 +42,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     'current-season': {
         title: 'Airing This Season',
         icon: 'activity',
-        fetchFn: (page) => animeApi.getSeasonalAnime(page),
+        fetchFn: (page, sortBy) => animeApi.getSeasonalAnime(page, sortBy),
         emptyMessage: 'No seasonal anime available.',
         emptyIcon: 'tv',
         analyticsName: 'current_season',
@@ -52,7 +52,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     upcoming: {
         title: 'Upcoming Anime',
         icon: 'calendar',
-        fetchFn: (page) => animeApi.getUpcomingAnime(page),
+        fetchFn: (page, sortBy) => animeApi.getUpcomingAnime(page, sortBy),
         emptyMessage: 'No upcoming anime found.',
         emptyIcon: 'calendar',
         analyticsName: 'upcoming',
@@ -62,7 +62,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     popular: {
         title: 'Popular',
         icon: 'star',
-        fetchFn: (page) => animeApi.getTopAnime(page),
+        fetchFn: (page, sortBy) => animeApi.getTopAnime(page, sortBy),
         emptyMessage: 'No popular anime found.',
         emptyIcon: 'star',
         analyticsName: 'popular',
@@ -260,7 +260,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     action: {
         title: 'Action Anime',
         icon: 'zap',
-        fetchFn: (page) => animeApi.getAnimeByGenre(1, page),
+        fetchFn: (page, sortBy) => animeApi.getAnimeByGenre(1, page, sortBy),
         emptyMessage: 'No action anime found.',
         emptyIcon: 'zap',
         analyticsName: 'genre_action',
@@ -270,7 +270,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     romance: {
         title: 'Romance Anime',
         icon: 'heart',
-        fetchFn: (page) => animeApi.getAnimeByGenre(22, page),
+        fetchFn: (page, sortBy) => animeApi.getAnimeByGenre(22, page, sortBy),
         emptyMessage: 'No romance anime found.',
         emptyIcon: 'heart',
         analyticsName: 'genre_romance',
@@ -280,7 +280,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     fantasy: {
         title: 'Fantasy Anime',
         icon: 'feather',
-        fetchFn: (page) => animeApi.getAnimeByGenre(10, page),
+        fetchFn: (page, sortBy) => animeApi.getAnimeByGenre(10, page, sortBy),
         emptyMessage: 'No fantasy anime found.',
         emptyIcon: 'feather',
         analyticsName: 'genre_fantasy',
@@ -290,7 +290,7 @@ export const CATEGORY_CONFIG: Record<string, CategoryConfig> = {
     comedy: {
         title: 'Comedy Anime',
         icon: 'smile',
-        fetchFn: (page) => animeApi.getAnimeByGenre(4, page),
+        fetchFn: (page, sortBy) => animeApi.getAnimeByGenre(4, page, sortBy),
         emptyMessage: 'No comedy anime found.',
         emptyIcon: 'smile',
         analyticsName: 'genre_comedy',
@@ -327,7 +327,7 @@ export const getCategoryConfig = (type: string): CategoryConfig => {
         return {
             title: curatedListName,
             icon: 'award',
-            fetchFn: async (page) => {
+            fetchFn: async (page, sortBy) => {
                 return animeApi.getCuratedList(curatedListName);
             },
             emptyMessage: 'No anime found in this curated list.',

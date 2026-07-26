@@ -46,8 +46,9 @@ export const getTopAnime = async (req: Request, res: Response, next: NextFunctio
         const page = req.query.page ? Number(req.query.page) : undefined;
         const filter = req.query.filter as string | undefined;
         const limit = req.query.limit ? Number(req.query.limit) : undefined;
+        const sortBy = req.query.sortBy as string | undefined;
 
-        const data = await AnimeService.getTopAnime(page, filter, limit);
+        const data = await AnimeService.getTopAnime(page, filter, limit, sortBy);
         res.json(data);
     } catch (error) {
         next(error);
@@ -58,8 +59,9 @@ export const getCurrentSeason = async (req: Request, res: Response, next: NextFu
     try {
         const page = req.query.page ? Number(req.query.page) : undefined;
         const limit = req.query.limit ? Number(req.query.limit) : undefined;
+        const sortBy = req.query.sortBy as string | undefined;
 
-        const data = await AnimeService.getCurrentSeason(page, limit);
+        const data = await AnimeService.getCurrentSeason(page, limit, sortBy);
         res.json(data);
     } catch (error) {
         next(error);
@@ -70,8 +72,9 @@ export const getUpcomingAnime = async (req: Request, res: Response, next: NextFu
     try {
         const page = req.query.page ? Number(req.query.page) : undefined;
         const limit = req.query.limit ? Number(req.query.limit) : undefined;
+        const sortBy = req.query.sortBy as string | undefined;
 
-        const data = await AnimeService.getUpcomingAnime(page, limit);
+        const data = await AnimeService.getUpcomingAnime(page, limit, sortBy);
         res.json(data);
     } catch (error) {
         next(error);

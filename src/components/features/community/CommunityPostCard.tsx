@@ -176,6 +176,9 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = React.memo(({
                 <CommentSection
                     post={post}
                     onClose={() => setShowComments(false)}
+                    onCommentCountChange={(newCount) => {
+                        onPostUpdated?.({ ...post, comments: newCount });
+                    }}
                 />
             </CinematicModal>
 

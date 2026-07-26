@@ -64,10 +64,14 @@ export const mapAniListToMedia = (item: any): Media => {
         airing_start: item.startDate ? `${item.startDate.year}-${String(item.startDate.month || 1).padStart(2, '0')}-${String(item.startDate.day || 1).padStart(2, '0')}` : undefined,
         synopsis_full: item.description?.replace(/<[^>]*>/g, '') || undefined,
         durationMinutes: item.duration || 24,
-        trailerUrl: item.trailer?.site === 'youtube' ? `https://www.youtube.com/watch?v=${item.trailer.id}` : undefined,
+        trailerUrl: item.trailer?.site === 'youtube'
+            ? `https://www.youtube.com/watch?v=${item.trailer.id}`
+            : item.trailer?.id
+                ? `https://${item.trailer.site}.com/video/${item.trailer.id}`
+                : undefined,
         trailerData: item.trailer?.id ? {
-            url: item.trailer.site === 'youtube' ? `https://www.youtube.com/watch?v=${item.trailer.id}` : undefined,
-            youtubeId: item.trailer.id,
+            url: item.trailer.site === 'youtube' ? `https://www.youtube.com/watch?v=${item.trailer.id}` : `https://${item.trailer.site}.com/video/${item.trailer.id}`,
+            youtubeId: item.trailer.site === 'youtube' ? item.trailer.id : undefined,
             embedUrl: item.trailer.site === 'youtube' ? `https://www.youtube.com/embed/${item.trailer.id}` : undefined,
         } : undefined,
         nextAiringEpisode: item.nextAiringEpisode ? {
@@ -149,7 +153,7 @@ export const mapJikanToMedia = (item: any): Media => {
         type: 'anime',
         format: item.type, // e.g: "TV", "Movie"
         episodes: item.episodes,
-        trailerUrl: item.trailer?.url,
+        trailerUrl: item.trailer?.url || (item.trailer?.youtube_id ? `https://www.youtube.com/watch?v=${item.trailer.youtube_id}` : undefined),
         status: mapJikanStatusToUnified(item.status),
         popularity: item.popularity,
         rank: item.rank,
@@ -168,9 +172,9 @@ export const mapJikanToMedia = (item: any): Media => {
             string: item.broadcast.string,
         } : undefined,
         trailerData: item.trailer ? {
-            url: item.trailer.url,
-            youtubeId: item.trailer.youtube_id,
-            embedUrl: item.trailer.embed_url,
+            url: item.trailer.url || (item.trailer.youtube_id ? `https://www.youtube.com/watch?v=${item.trailer.youtube_id}` : undefined),
+            youtubeId: item.trailer.youtube_id || undefined,
+            embedUrl: item.trailer.embed_url || (item.trailer.youtube_id ? `https://www.youtube.com/embed/${item.trailer.youtube_id}` : undefined),
         } : undefined
     };
 

@@ -22,13 +22,15 @@ import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
 import { CommentItem } from './CommentItem';
 import { CommunityNotification } from '../../../types';
+import { notificationService } from '../../../services/notifications';
 
 interface CommentSectionProps {
     post: CommunityPost;
     onClose: () => void;
+    onCommentCountChange?: (newCount: number) => void;
 }
 
-export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose }) => {
+export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose, onCommentCountChange }) => {
     const theme = useThemeColors();
     const user = useAppStore(state => state.user);
     const router = useRouter();
@@ -39,6 +41,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose })
     const [isPosting, setIsPosting] = useState(false);
     const [text, setText] = useState('');
     const [replyTo, setReplyTo] = useState<PostComment | null>(null);
+    const [localCommentsCount, setLocalCommentsCount] = useState(post.comments || 0);
 
     useEffect(() => {
         loadComments();
@@ -90,10 +93,23 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose })
                     targetId: post.id,
                     targetPreview: text.trim().substring(0, 50),
                 });
+                // Dispatch push notification to recipient
+                const pushType = replyTo ? 'reply' : 'comment';
+                notificationService.dispatchSocialPush(
+                    recipientId,
+                    `${user.username} ${replyTo ? 'replied to your comment' : 'commented on your post'}`,
+                    text.trim().substring(0, 80),
+                    { type: pushType, targetId: post.id }
+                ).catch(e => console.warn('[CommentSection] Push dispatch failed:', e));
             }
 
             setText('');
             setReplyTo(null);
+
+            const newCount = localCommentsCount + 1;
+            setLocalCommentsCount(newCount);
+            onCommentCountChange?.(newCount);
+
             loadComments(true);
             if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } catch (error) {
@@ -103,10 +119,17 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose })
         }
     };
 
+    const handleDeleteComment = (commentId: string) => {
+        setComments(prev => prev.filter(c => c.id !== commentId));
+        const newCount = Math.max(localCommentsCount - 1, 0);
+        setLocalCommentsCount(newCount);
+        onCommentCountChange?.(newCount);
+    };
+
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
             <View style={[styles.header, { borderBottomColor: theme.border }]}>
-                <Text style={[styles.title, { color: theme.text }]}>Comments ({post.comments})</Text>
+                <Text style={[styles.title, { color: theme.text }]}>Comments ({localCommentsCount})</Text>
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                     <Feather name="x" size={24} color={theme.text} />
                 </TouchableOpacity>
@@ -124,6 +147,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose })
                                 setReplyTo(c);
                                 if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             }}
+                            onDelete={handleDeleteComment}
                             postId={post.id}
                         />
                     ))

@@ -38,6 +38,7 @@ import { firebaseAuthService } from '../../src/services/firebase/auth';
 import { calculateUserLevel } from '../../src/utils/levelSystem';
 import { CommunityPostCard } from '../../src/components/features/community/CommunityPostCard';
 import { CommunityPost } from '../../src/types';
+import { APP_VERSION_DISPLAY } from '../../src/constants/version';
 import { firestoreService } from '../../src/services/firebase/firestore';
 import { getAvatarSource } from '../../src/constants/avatars';
 import { LevelService } from '../../src/services/LevelService';
@@ -683,7 +684,7 @@ export default function ProfileScreen() {
               icon={<Feather name="log-out" color={themeColors.error} size={20} />}
             />
           )}
-          <Text style={[styles.versionText, { color: themeColors.textDim }]}>AnimOrg v1.0.11</Text>
+          <Text style={[styles.versionText, { color: themeColors.textDim }]}>{APP_VERSION_DISPLAY}</Text>
         </View>
       </Animated.ScrollView>
     </AnimatedScreen>

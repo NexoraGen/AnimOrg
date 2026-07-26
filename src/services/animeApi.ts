@@ -38,36 +38,36 @@ const executeWithPrimaryAndFallback = async <T>(
  * It manages primary/fallback orchestration, caching, and retry logic internally.
  */
 export const animeApi = {
-  getTrendingAnime: async (page = 1, onUpdate?: (data: Media[]) => void): Promise<Media[]> => {
+  getTrendingAnime: async (page = 1, sortBy = 'popularity', onUpdate?: (data: Media[]) => void): Promise<Media[]> => {
     return CacheManager.fetchWithCache(
-      `trending_p${page}`,
+      `trending_p${page}_s${sortBy}`,
       () => executeWithPrimaryAndFallback(
-        () => AniListAdapter.getTrendingAnime(page),
-        () => JikanAdapter.getTrendingAnime(page)
+        () => AniListAdapter.getTrendingAnime(page, sortBy),
+        () => JikanAdapter.getTrendingAnime(page, sortBy)
       ),
       TTL.TRENDING,
       onUpdate
     );
   },
 
-  getTopAnime: async (page = 1, onUpdate?: (data: Media[]) => void): Promise<Media[]> => {
+  getTopAnime: async (page = 1, sortBy = 'score', onUpdate?: (data: Media[]) => void): Promise<Media[]> => {
     return CacheManager.fetchWithCache(
-      `top_p${page}`,
+      `top_p${page}_s${sortBy}`,
       () => executeWithPrimaryAndFallback(
-        () => AniListAdapter.getTopAnime(page),
-        () => JikanAdapter.getTopAnime(page)
+        () => AniListAdapter.getTopAnime(page, sortBy),
+        () => JikanAdapter.getTopAnime(page, sortBy)
       ),
       TTL.TOP_RATED,
       onUpdate
     );
   },
 
-  getSeasonalAnime: async (page = 1, onUpdate?: (data: Media[]) => void): Promise<Media[]> => {
+  getSeasonalAnime: async (page = 1, sortBy = 'popularity', onUpdate?: (data: Media[]) => void): Promise<Media[]> => {
     return CacheManager.fetchWithCache(
-      `seasonal_p${page}`,
+      `seasonal_p${page}_s${sortBy}`,
       () => executeWithPrimaryAndFallback(
-        () => AniListAdapter.getSeasonalAnime(page),
-        () => JikanAdapter.getSeasonalAnime(page)
+        () => AniListAdapter.getSeasonalAnime(page, sortBy),
+        () => JikanAdapter.getSeasonalAnime(page, sortBy)
       ),
       TTL.SEASONAL,
       onUpdate
@@ -85,12 +85,12 @@ export const animeApi = {
     );
   },
 
-  getUpcomingAnime: async (page = 1, onUpdate?: (data: Media[]) => void): Promise<Media[]> => {
+  getUpcomingAnime: async (page = 1, sortBy = 'popularity', onUpdate?: (data: Media[]) => void): Promise<Media[]> => {
     return CacheManager.fetchWithCache(
-      `upcoming_p${page}`,
+      `upcoming_p${page}_s${sortBy}`,
       () => executeWithPrimaryAndFallback(
-        () => AniListAdapter.getUpcomingAnime(page),
-        () => JikanAdapter.getUpcomingAnime(page)
+        () => AniListAdapter.getUpcomingAnime(page, sortBy),
+        () => JikanAdapter.getUpcomingAnime(page, sortBy)
       ),
       TTL.SEASONAL,
       onUpdate
@@ -260,13 +260,13 @@ export const animeApi = {
 
 
 
-  getAnimeByGenre: async (genre: number | string, page = 1): Promise<Media[]> => {
+  getAnimeByGenre: async (genre: number | string, page = 1, sortBy = 'popularity'): Promise<Media[]> => {
     const genreStr = typeof genre === 'number' ? JIKAN_GENRE_MAP[genre] : genre;
     return CacheManager.fetchWithCache(
-      `genre_${genreStr}_p${page}`,
+      `genre_${genreStr}_p${page}_s${sortBy}`,
       () => executeWithPrimaryAndFallback(
-        () => AniListAdapter.getAnimeByGenre(genreStr, page),
-        () => JikanAdapter.getAnimeByGenre(typeof genre === 'number' ? genre : 1, page)
+        () => AniListAdapter.getAnimeByGenre(genreStr, page, sortBy),
+        () => JikanAdapter.getAnimeByGenre(typeof genre === 'number' ? genre : 1, page, sortBy)
       ),
       TTL.SEARCH
     );

@@ -167,6 +167,42 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch(() => { });
   }, []);
 
+  // Register notification response listener for deep-linking on notification taps
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    let responseSubscription: any;
+    try {
+      const Notifications = require('expo-notifications');
+
+      // Handle notification taps (foreground, background, or cold start)
+      responseSubscription = Notifications.addNotificationResponseReceivedListener(
+        (response: any) => {
+          const data = response?.notification?.request?.content?.data;
+          if (!data) return;
+
+          const { type, targetId } = data;
+          try {
+            if (type === 'animeRelease' && targetId) {
+              router.push(`/details/${targetId}` as any);
+            } else if (type === 'like' || type === 'comment' || type === 'reply') {
+              router.push('/(tabs)/community' as any);
+            } else if (type === 'follow') {
+              router.push('/(tabs)/profile' as any);
+            }
+          } catch (navError) {
+            console.warn('[Layout] Notification deep-link navigation failed:', navError);
+          }
+        }
+      );
+    } catch (e) {
+      console.warn('[Layout] Failed to register notification response listener:', e);
+    }
+
+    return () => {
+      responseSubscription?.remove?.();
+    };
+  }, [router]);
 
 
   return (

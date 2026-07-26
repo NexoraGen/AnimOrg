@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { spacing, colors } from '../../../theme';
 import { useThemeColors } from '../../../hooks/useThemeColors';
@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 
 import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
+import { notificationService } from '../../../services/notifications';
 
 interface PostActionsProps {
     likes: number;
@@ -27,7 +28,7 @@ interface PostActionsProps {
 export const PostActions: React.FC<PostActionsProps> = ({
     likes: initialLikes,
     comments,
-    shares,
+    shares: initialShares,
     isLiked: initialIsLiked,
     isSaved: initialIsSaved,
     postId,
@@ -45,6 +46,19 @@ export const PostActions: React.FC<PostActionsProps> = ({
     const [likes, setLikes] = React.useState(initialLikes);
     const [isLiked, setIsLiked] = React.useState(initialIsLiked);
     const [isSaved, setIsSaved] = React.useState(initialIsSaved);
+    const [shares, setShares] = React.useState(initialShares);
+
+    React.useEffect(() => {
+        setIsLiked(initialIsLiked);
+    }, [initialIsLiked]);
+
+    React.useEffect(() => {
+        setIsSaved(initialIsSaved);
+    }, [initialIsSaved]);
+
+    React.useEffect(() => {
+        setLikes(initialLikes);
+    }, [initialLikes]);
 
     const handleLike = async () => {
         if (!user) {
@@ -71,6 +85,13 @@ export const PostActions: React.FC<PostActionsProps> = ({
                     targetId: postId,
                     targetPreview: postContent?.substring(0, 50),
                 });
+                // Dispatch push notification to post owner
+                notificationService.dispatchSocialPush(
+                    postOwnerId,
+                    `${user.username} liked your post`,
+                    postContent?.substring(0, 80) || 'Liked your post',
+                    { type: 'like', targetId: postId }
+                ).catch(e => console.warn('[PostActions] Push dispatch failed:', e));
             }
             onLike?.();
         } catch (error) {
@@ -98,6 +119,24 @@ export const PostActions: React.FC<PostActionsProps> = ({
         }
     };
 
+    const handleShare = async () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        try {
+            const shareMessage = `Check out this post on AnimOrg:\n\n"${postContent || ''}"\n\nJoin the discussion on AnimOrg!`;
+            const result = await Share.share({
+                message: shareMessage,
+                title: 'Share Community Post',
+            });
+            if (result.action === Share.sharedAction) {
+                setShares(prev => prev + 1);
+                await firestoreService.incrementPostShare(postId);
+                onShare?.();
+            }
+        } catch (error) {
+            console.error('Error sharing post:', error);
+        }
+    };
+
     return (
         <View style={styles.container}>
             <View style={styles.leftActions}>
@@ -118,7 +157,7 @@ export const PostActions: React.FC<PostActionsProps> = ({
                     <Text style={[styles.actionText, { color: theme.textDim }]}>{comments}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.actionItem} onPress={onShare}>
+                <TouchableOpacity style={styles.actionItem} onPress={handleShare}>
                     <Feather name="share-2" size={19} color={theme.textDim} />
                     <Text style={[styles.actionText, { color: theme.textDim }]}>{shares}</Text>
                 </TouchableOpacity>

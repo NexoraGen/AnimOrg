@@ -110,6 +110,10 @@ export interface User {
   lastWatchDate?: string;
   favoriteBadgeId?: string | null;
   collections?: UserCollection[];
+  pushToken?: string | null;
+  notificationsEnabled?: boolean;
+  notificationSettings?: NotificationCategorySettings;
+  notificationFrequency?: 'minimal' | 'balanced' | 'all';
 }
 
 export type WatchStatus = 'watching' | 'completed' | 'plan-to-watch' | 'dropped' | 'awaiting';
@@ -322,6 +326,7 @@ export interface NotificationCategorySettings {
   dailyReminder: boolean;
   weeklySummary: boolean;
   news: boolean;
+  socialNotifications: boolean;
   quietHoursEnabled: boolean;
   quietHoursStart: string; // e.g. "22:00"
   quietHoursEnd: string;   // e.g. "08:00"

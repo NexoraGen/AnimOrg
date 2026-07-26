@@ -12,6 +12,23 @@ const NEGATIVE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 export const trailerService = {
   /**
+   * Helper to extract 11-character YouTube video ID from various formats.
+   */
+  extractYoutubeId: (url: string): string | null => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return match[2];
+    }
+    const shortsMatch = url.match(/\/shorts\/([a-zA-Z0-9_-]{11})/);
+    if (shortsMatch && shortsMatch[1]) {
+      return shortsMatch[1];
+    }
+    return null;
+  },
+
+  /**
    * Resolves the best available trailer URL for an anime.
    * Checks persistent cache first, then Jikan data, then falls back to YouTube search.
    */
@@ -31,6 +48,13 @@ export const trailerService = {
       } else if (jikanTrailer.embedUrl) {
         const match = jikanTrailer.embedUrl.match(/embed\/([^?]+)/);
         trailerUrl = match ? `https://www.youtube.com/watch?v=${match[1]}` : jikanTrailer.embedUrl;
+      }
+    }
+
+    if (trailerUrl) {
+      const extractedId = trailerService.extractYoutubeId(trailerUrl);
+      if (extractedId) {
+        trailerUrl = `https://www.youtube.com/watch?v=${extractedId}`;
       }
     }
 

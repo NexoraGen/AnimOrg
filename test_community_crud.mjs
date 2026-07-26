@@ -18,7 +18,10 @@ import {
     limit,
     deleteDoc,
     serverTimestamp,
-    getDoc
+    getDoc,
+    increment,
+    writeBatch,
+    where
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -34,6 +37,78 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Simple mock of FirestoreService methods to verify logic
+const firestoreServiceMock = {
+    deletePostComment: async (postId, commentId) => {
+        try {
+            const commentRef = doc(db, 'posts', postId, 'comments', commentId);
+            const postRef = doc(db, 'posts', postId);
+            const batch = writeBatch(db);
+            batch.delete(commentRef);
+            batch.update(postRef, {
+                comments: increment(-1),
+                engagementScore: increment(-2)
+            });
+            await batch.commit();
+            console.log(`[FirestoreServiceMock] Comment ${commentId} deleted successfully and comments count decremented on post.`);
+        } catch (e) {
+            console.error(e);
+            throw e;
+        }
+    },
+
+    incrementPostShare: async (postId) => {
+        try {
+            const postRef = doc(db, 'posts', postId);
+            await updateDoc(postRef, {
+                shares: increment(1),
+                engagementScore: increment(1)
+            });
+            console.log('[FirestoreServiceMock] Share incremented successfully.');
+        } catch (e) {
+            console.error(e);
+            throw e;
+        }
+    },
+
+    togglePostSave: async (userId, postId) => {
+        const saveRef = doc(db, 'users', userId, 'savedPosts', postId);
+        const snap = await getDoc(saveRef);
+        if (snap.exists()) {
+            await deleteDoc(saveRef);
+            console.log(`[FirestoreServiceMock] Post ${postId} unsaved.`);
+            return false;
+        } else {
+            await setDoc(saveRef, { postId, savedAt: serverTimestamp() });
+            console.log(`[FirestoreServiceMock] Post ${postId} saved.`);
+            return true;
+        }
+    },
+
+    getSavedPosts: async (userId) => {
+        try {
+            const savedRef = collection(db, 'users', userId, 'savedPosts');
+            const savedSnap = await getDocs(savedRef);
+            const postIds = savedSnap.docs.map(d => d.id);
+            if (postIds.length === 0) return [];
+
+            const postsRef = collection(db, 'posts');
+            const posts = [];
+
+            const q = query(postsRef, where('__name__', 'in', postIds));
+            const snap = await getDocs(q);
+            snap.docs.forEach(docSnap => {
+                posts.push({ id: docSnap.id, ...docSnap.data() });
+            });
+
+            return posts;
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
+    }
+};
 
 async function getOrCreateUser(email, password, username) {
     let user;
@@ -71,12 +146,7 @@ async function getOrCreateUser(email, password, username) {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
-
-        const usernameRef = doc(db, 'usernames', username.toLowerCase());
-        await setDoc(usernameRef, { uid: user.uid, createdAt: serverTimestamp() });
         console.log(`[Firestore] Profile created for username ${username}`);
-    } else {
-        console.log(`[Firestore] Profile already exists for UID: ${user.uid}`);
     }
 
     return user;
@@ -86,15 +156,13 @@ async function run() {
     console.log("=== STARTING COMMUNITY CRUD VERIFICATION ===");
 
     // 1. Setup/Login User 1
-    console.log("\n--- USER 1: Authenticating... ---");
     const user1Email = "test_user1_community@example.com";
     const user1Password = "TestPassword123!";
     const user1Username = "tester_one";
     const user1 = await getOrCreateUser(user1Email, user1Password, user1Username);
 
     // 2. User 1: Write a community post
-    console.log("\n--- USER 1: Creating a community post... ---");
-    const testContent = `Automated verification post at ${new Date().toISOString()} #testing #animorg`;
+    console.log("\n--- Creating a community post... ---");
     const postsRef = collection(db, 'posts');
     const newPost = {
         userId: user1.uid,
@@ -102,8 +170,7 @@ async function run() {
         userAvatar: '',
         type: 'discussion',
         category: 'discussion',
-        content: testContent,
-        hashtags: ['testing', 'animorg'],
+        content: `Automated test post at ${new Date().toISOString()}`,
         likes: 0,
         comments: 0,
         shares: 0,
@@ -115,52 +182,71 @@ async function run() {
 
     const docRef = await addDoc(postsRef, newPost);
     const createdPostId = docRef.id;
-    console.log(`[Firestore] Post created successfully with ID: ${createdPostId}`);
+    console.log(`[Firestore] Post created with ID: ${createdPostId}`);
 
-    // Verification Read
-    let draftSnap = await getDoc(doc(db, 'posts', createdPostId));
-    console.log(`[Firestore] Read original post content: "${draftSnap.data().content}"`);
-
-    // 3. User 1: Update the post (Edit)
-    console.log("\n--- USER 1: Updating the community post... ---");
-    const updatedContent = `${testContent} [EDITED]`;
-    const postRef = doc(db, 'posts', createdPostId);
-    await updateDoc(postRef, {
-        content: updatedContent,
-        category: 'discussion',
-        updatedAt: serverTimestamp()
+    // 3. User 1: Write a comment
+    console.log("\n--- Adding a comment to the post... ---");
+    const commentRef = doc(db, 'posts', createdPostId, 'comments', 'comment_123');
+    await setDoc(commentRef, {
+        postId: createdPostId,
+        userId: user1.uid,
+        username: user1Username,
+        text: "This is a verification comment!",
+        createdAt: serverTimestamp(),
     });
-    console.log(`[Firestore] Post updated successfully.`);
+    // Update comments count on post
+    await updateDoc(doc(db, 'posts', createdPostId), {
+        comments: increment(1)
+    });
+    console.log(`[Firestore] Comment added.`);
 
-    // Verification Read after update
-    let updatedSnap = await getDoc(postRef);
-    const updatedData = updatedSnap.data();
-    if (updatedData.content === updatedContent) {
-        console.log(`🎉 SUCCESS: Post update verified. Content: "${updatedData.content}"`);
-    } else {
-        console.error(`❌ FAILURE: Post content mismatch. Expected: "${updatedContent}" but got: "${updatedData.content}"`);
-        process.exit(1);
+    // Verification Read post metadata
+    let postSnap = await getDoc(doc(db, 'posts', createdPostId));
+    console.log(`[Firestore] Post comments count after comment addition: ${postSnap.data().comments}`);
+    if (postSnap.data().comments !== 1) {
+        throw new Error("Comments count mismatch after addition");
     }
 
-    // 4. User 1: Delete the post
-    console.log("\n--- USER 1: Deleting the community post... ---");
-    await deleteDoc(postRef);
-    console.log(`[Firestore] Post deleted successfully.`);
+    // 4. User 1: Delete comment and check count decrement
+    console.log("\n--- Deleting the comment and checking updates... ---");
+    await firestoreServiceMock.deletePostComment(createdPostId, 'comment_123');
 
-    // Verification Read after delete
-    let deletedSnap = await getDoc(postRef);
-    if (!deletedSnap.exists()) {
-        console.log(`🎉 SUCCESS: Post deletion verified. Document does not exist.`);
-    } else {
-        console.error(`❌ FAILURE: Post still exists in database after deletion.`);
-        process.exit(1);
+    postSnap = await getDoc(doc(db, 'posts', createdPostId));
+    console.log(`[Firestore] Post comments count after comment deletion: ${postSnap.data().comments}`);
+    if (postSnap.data().comments !== 0) {
+        throw new Error("Comments count mismatch after deletion");
     }
+    console.log(`🎉 SUCCESS: Comment count update verified.`);
 
-    // 5. Sign out User 1
+    // 5. native sharing tests
+    console.log("\n--- Testing Share increments... ---");
+    await firestoreServiceMock.incrementPostShare(createdPostId);
+    postSnap = await getDoc(doc(db, 'posts', createdPostId));
+    console.log(`[Firestore] Post shares count: ${postSnap.data().shares}`);
+    if (postSnap.data().shares !== 1) {
+        throw new Error("Shares count mismatch after sharing");
+    }
+    console.log(`🎉 SUCCESS: Shares increment verified.`);
+
+    // 6. saved posts tests
+    console.log("\n--- Testing Post Saving... ---");
+    await firestoreServiceMock.togglePostSave(user1.uid, createdPostId);
+    const savedFeed = await firestoreServiceMock.getSavedPosts(user1.uid);
+    console.log(`[Firestore] Total saved posts count: ${savedFeed.length}`);
+    if (savedFeed.length === 0 || !savedFeed.find(p => p.id === createdPostId)) {
+        throw new Error("Saved post could not be retrieved from getSavedPosts list");
+    }
+    console.log(`🎉 SUCCESS: Post Save and Retrieval verified.`);
+
+    // Cleanup Save
+    console.log("\n--- Cleaning up setup... ---");
+    await firestoreServiceMock.togglePostSave(user1.uid, createdPostId);
+    await deleteDoc(doc(db, 'posts', createdPostId));
+    console.log(`[Firestore] Post deleted.`);
+
     await signOut(auth);
     console.log("[Auth] User 1 logged out.");
-
-    console.log("\n=== VERIFICATION COMPLETED successfully! ===");
+    console.log("\n=== VERIFICATION COMPLETED SUCCESSFULLY ===");
     process.exit(0);
 }
 

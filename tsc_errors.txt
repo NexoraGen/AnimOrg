@@ -1,0 +1,14 @@
+﻿app/(tabs)/home.tsx(110,54): error TS2345: Argument of type '(fresh: any) => void' is not assignable to parameter of type 'string'.
+app/(tabs)/home.tsx(110,55): error TS7006: Parameter 'fresh' implicitly has an 'any' type.
+app/(tabs)/home.tsx(123,44): error TS2345: Argument of type '(fresh: any) => void' is not assignable to parameter of type 'string'.
+app/(tabs)/home.tsx(123,45): error TS7006: Parameter 'fresh' implicitly has an 'any' type.
+app/(tabs)/home.tsx(136,54): error TS2345: Argument of type '(fresh: any) => void' is not assignable to parameter of type 'string'.
+app/(tabs)/home.tsx(136,55): error TS7006: Parameter 'fresh' implicitly has an 'any' type.
+app/(tabs)/home.tsx(149,54): error TS2345: Argument of type '(fresh: any) => void' is not assignable to parameter of type 'string'.
+app/(tabs)/home.tsx(149,55): error TS7006: Parameter 'fresh' implicitly has an 'any' type.
+backend/src/services/HomeService.ts(24,50): error TS2345: Argument of type '{ timeout: number; }' is not assignable to parameter of type 'string'.
+backend/src/services/HomeService.ts(26,60): error TS2345: Argument of type '{ timeout: number; }' is not assignable to parameter of type 'string'.
+backend/src/services/HomeService.ts(29,54): error TS2345: Argument of type '{ timeout: number; }' is not assignable to parameter of type 'string'.
+backend/src/services/HomeService.ts(32,54): error TS2345: Argument of type '{ timeout: number; }' is not assignable to parameter of type 'string'.
+src/services/notifications.ts(61,21): error TS2339: Property 'status' does not exist on type 'NotificationPermissionsStatus'.
+src/services/notifications.ts(65,25): error TS2339: Property 'status' does not exist on type 'NotificationPermissionsStatus'.

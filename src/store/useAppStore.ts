@@ -442,6 +442,12 @@ export const useAppStore = create<AppState>()(
           const newRank = RankService.getRankByLevel(finalLevel);
           const rankUp = oldRank.title !== newRank.title;
 
+          // Trigger level up local notification
+          const NotificationManager = require('../services/notifications/NotificationManager').NotificationManager;
+          NotificationManager.triggerLevelUp(finalLevel).catch((e: any) => {
+            console.warn('Failed to trigger level up notification:', e);
+          });
+
           set({
             levelUpModalVisible: true,
             levelUpModalData: {
@@ -1175,12 +1181,13 @@ export const useAppStore = create<AppState>()(
         dailyReminder: true,
         weeklySummary: true,
         news: true,
+        socialNotifications: true,
         quietHoursEnabled: true,
         quietHoursStart: '22:00',
         quietHoursEnd: '08:00',
       },
-      updateNotificationSettings: (settings) => set((state) => ({
-        notificationSettings: {
+      updateNotificationSettings: (settings) => set((state) => {
+        const updatedSettings = {
           ...(state.notificationSettings || {
             episodeReleases: true,
             airingCountdown: true,
@@ -1192,21 +1199,41 @@ export const useAppStore = create<AppState>()(
             dailyReminder: true,
             weeklySummary: true,
             news: true,
+            socialNotifications: true,
             quietHoursEnabled: true,
             quietHoursStart: '22:00',
             quietHoursEnd: '08:00',
           }),
           ...settings,
+        };
+
+        const { user } = state;
+        if (user?.id) {
+          firestoreService.updateUserProfile(user.id, { notificationSettings: updatedSettings })
+            .catch((err: any) => console.error('[Store] Error updating settings to Firestore:', err));
         }
-      })),
+
+        return { notificationSettings: updatedSettings };
+      }),
       notificationFrequency: 'balanced',
-      updateNotificationFrequency: (freq) => set({ notificationFrequency: freq }),
+      updateNotificationFrequency: (freq) => {
+        set({ notificationFrequency: freq });
+        const { user } = get();
+        if (user?.id) {
+          firestoreService.updateUserProfile(user.id, { notificationFrequency: freq })
+            .catch((err: any) => console.error('[Store] Error updating frequency to Firestore:', err));
+        }
+      },
       setNotificationsEnabled: async (enabled) => {
         set({ notificationsEnabled: enabled });
+        const { user } = get();
+        if (user?.id) {
+          firestoreService.updateUserProfile(user.id, { notificationsEnabled: enabled })
+            .catch((err: any) => console.error('[Store] Error updating enabled to Firestore:', err));
+        }
         if (enabled) {
           await get().registerNotifications();
         } else {
-          const { user } = get();
           if (user) {
             await firestoreService.setUserPushToken(user.id, '');
           }

@@ -9,6 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
 import { getAvatarSource } from '../../../constants/avatars';
+import { notificationService } from '../../../services/notifications';
 
 interface PostHeaderProps {
     username: string;
@@ -57,6 +58,13 @@ export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
                     type: 'follow',
                     targetId: currentUser.id,
                 });
+                // Dispatch push notification to followed user
+                notificationService.dispatchSocialPush(
+                    userId,
+                    `${currentUser.username} started following you`,
+                    'You have a new follower!',
+                    { type: 'follow', targetId: currentUser.id }
+                ).catch(e => console.warn('[PostHeader] Push dispatch failed:', e));
             }
         } catch (error) {
             console.error(error);

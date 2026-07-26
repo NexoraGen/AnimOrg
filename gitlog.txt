@@ -1,0 +1,59 @@
+﻿commit 9e11be7e95cb79bb6b6884150ba99ee8855b0499
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 18:04:45 2026 +0530
+
+    Hide score and popularity sorting filters for upcoming anime category
+
+commit e289db66694714d45e0d5b92dae1c9bad657c537
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 17:59:34 2026 +0530
+
+    Optimize AnimOrg loading performance, caching, search resilience, and add premium animated loader
+
+commit 44dc95639a37bbf180d6ece903c8496a2cae7db7
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 06:54:31 2026 +0530
+
+    style(profile): add background list-illustration to metric cards
+
+commit 17adb3ce4a6c19b03ce77ff62d276ec91d974099
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 06:43:06 2026 +0530
+
+    fix(social): resolve excessive gap between tabs and first post
+
+commit 03d97e2cc9088ad75bcea7d6a0a98885c4f5f444
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 05:49:42 2026 +0530
+
+    style: fix overlapping header layout on upcoming screen
+
+commit 151bfde384f03c699ab32a02b546ea02dde85e23
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 04:34:11 2026 +0530
+
+    chore: bump version name to 1.0.13, code to 17
+
+commit 3f2bc15a15d50d8f55a2d9e0929e7bde1e10eaf1
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 04:28:50 2026 +0530
+
+    style: resolve segment tab header style to oval pills
+
+commit 9543cb292398ea70099c5781eff116e831d1a937
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 02:09:21 2026 +0530
+
+    chore: bump version to 1.0.12 (code 16)
+
+commit 3031b1f685d3c9c2bda4c7f2bf48a0f0e58f90c2
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 01:33:29 2026 +0530
+
+    feat: implement View All Ranks progression screen and profile triggers
+
+commit 9964868bcf23886140d9ed8e6c3fb0f71fb8379a
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 01:17:11 2026 +0530
+
+    Optimize app performance and loading experience

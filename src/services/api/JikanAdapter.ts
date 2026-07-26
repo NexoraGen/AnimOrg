@@ -9,18 +9,18 @@ const BASE_PATH = '/api/anime';
  * Encapsulates communication logic so frontend remains Jikan-agnostic.
  */
 export const JikanAdapter = {
-    getTrendingAnime: async (page = 1): Promise<Media[]> => {
-        const data = await executeBackendQuery<any>(`${BASE_PATH}/top?filter=airing&page=${page}&limit=20`);
+    getTrendingAnime: async (page = 1, sortBy?: string): Promise<Media[]> => {
+        const data = await executeBackendQuery<any>(`${BASE_PATH}/top?filter=airing&page=${page}&limit=20${sortBy ? `&sortBy=${sortBy}` : ''}`);
         return data.data.filter((item: any) => !isJikanExplicitContent(item)).map(mapJikanToMedia);
     },
 
-    getTopAnime: async (page = 1): Promise<Media[]> => {
-        const data = await executeBackendQuery<any>(`${BASE_PATH}/top?page=${page}&limit=20`);
+    getTopAnime: async (page = 1, sortBy?: string): Promise<Media[]> => {
+        const data = await executeBackendQuery<any>(`${BASE_PATH}/top?page=${page}&limit=20${sortBy ? `&sortBy=${sortBy}` : ''}`);
         return data.data.filter((item: any) => !isJikanExplicitContent(item)).map(mapJikanToMedia);
     },
 
-    getSeasonalAnime: async (page = 1): Promise<Media[]> => {
-        const data = await executeBackendQuery<any>(`${BASE_PATH}/season?page=${page}&limit=20`);
+    getSeasonalAnime: async (page = 1, sortBy?: string): Promise<Media[]> => {
+        const data = await executeBackendQuery<any>(`${BASE_PATH}/season?page=${page}&limit=20${sortBy ? `&sortBy=${sortBy}` : ''}`);
         return data.data.filter((item: any) => !isJikanExplicitContent(item)).map(mapJikanToMedia);
     },
 
@@ -95,8 +95,8 @@ export const JikanAdapter = {
         } as Media));
     },
 
-    getUpcomingAnime: async (page = 1): Promise<Media[]> => {
-        const data = await executeBackendQuery<any>(`${BASE_PATH}/upcoming?page=${page}&limit=20`);
+    getUpcomingAnime: async (page = 1, sortBy?: string): Promise<Media[]> => {
+        const data = await executeBackendQuery<any>(`${BASE_PATH}/upcoming?page=${page}&limit=20${sortBy ? `&sortBy=${sortBy}` : ''}`);
         return data.data.filter((item: any) => !isJikanExplicitContent(item)).map(mapJikanToMedia);
     },
 
@@ -184,8 +184,8 @@ export const JikanAdapter = {
         return (data.data || []).filter((item: any) => !isJikanExplicitContent(item)).map(mapJikanToMedia);
     },
 
-    getAnimeByGenre: async (genreId: number, page = 1): Promise<Media[]> => {
-        const data = await executeBackendQuery<any>(`${BASE_PATH}/search?genres=${genreId}&orderBy=popularity&sort=asc&page=${page}&limit=20`);
+    getAnimeByGenre: async (genreId: number, page = 1, sortBy?: string): Promise<Media[]> => {
+        const data = await executeBackendQuery<any>(`${BASE_PATH}/search?genres=${genreId}&orderBy=${sortBy || 'popularity'}&sort=desc&page=${page}&limit=20`);
         return (data.data || []).filter((item: any) => !isJikanExplicitContent(item)).map(mapJikanToMedia);
     },
 

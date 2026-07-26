@@ -102,46 +102,58 @@ const getCurrentSeasonAndYear = () => {
 };
 
 export const AniListAdapter = {
-  getTrendingAnime: async (page = 1, perPage = 20): Promise<Media[]> => {
+  getTrendingAnime: async (page = 1, sortBy = 'popularity', perPage = 20): Promise<Media[]> => {
+    let aniListSort = 'TRENDING_DESC';
+    if (sortBy === 'score') aniListSort = 'SCORE_DESC';
+    else if (sortBy === 'newest') aniListSort = 'START_DATE_DESC';
+
     const query = `
-      query ($page: Int, $perPage: Int) {
+      query ($page: Int, $perPage: Int, $sort: [MediaSort]) {
         Page (page: $page, perPage: $perPage) {
-          media (sort: TRENDING_DESC, type: ANIME) {
+          media (sort: $sort, type: ANIME) {
             ${BASE_MEDIA_FIELDS}
           }
         }
       }
     `;
-    const data = await executeGraphQLQuery(query, { page, perPage });
+    const data = await executeGraphQLQuery(query, { page, perPage, sort: [aniListSort] });
     return (data.Page?.media || []).filter((m: any) => !m.isAdult).map(mapAniListToMedia);
   },
 
-  getTopAnime: async (page = 1, perPage = 20): Promise<Media[]> => {
+  getTopAnime: async (page = 1, sortBy = 'score', perPage = 20): Promise<Media[]> => {
+    let aniListSort = 'SCORE_DESC';
+    if (sortBy === 'popularity') aniListSort = 'POPULARITY_DESC';
+    else if (sortBy === 'newest') aniListSort = 'START_DATE_DESC';
+
     const query = `
-      query ($page: Int, $perPage: Int) {
+      query ($page: Int, $perPage: Int, $sort: [MediaSort]) {
         Page (page: $page, perPage: $perPage) {
-          media (sort: SCORE_DESC, type: ANIME) {
+          media (sort: $sort, type: ANIME) {
             ${BASE_MEDIA_FIELDS}
           }
         }
       }
     `;
-    const data = await executeGraphQLQuery(query, { page, perPage });
+    const data = await executeGraphQLQuery(query, { page, perPage, sort: [aniListSort] });
     return (data.Page?.media || []).filter((m: any) => !m.isAdult).map(mapAniListToMedia);
   },
 
-  getSeasonalAnime: async (page = 1, perPage = 20): Promise<Media[]> => {
+  getSeasonalAnime: async (page = 1, sortBy = 'popularity', perPage = 20): Promise<Media[]> => {
     const { season, year } = getCurrentSeasonAndYear();
+    let aniListSort = 'POPULARITY_DESC';
+    if (sortBy === 'score') aniListSort = 'SCORE_DESC';
+    else if (sortBy === 'newest') aniListSort = 'START_DATE_DESC';
+
     const query = `
-      query ($page: Int, $perPage: Int, $season: MediaSeason, $year: Int) {
+      query ($page: Int, $perPage: Int, $season: MediaSeason, $year: Int, $sort: [MediaSort]) {
         Page (page: $page, perPage: $perPage) {
-          media (season: $season, seasonYear: $year, sort: POPULARITY_DESC, type: ANIME) {
+          media (season: $season, seasonYear: $year, sort: $sort, type: ANIME) {
             ${BASE_MEDIA_FIELDS}
           }
         }
       }
     `;
-    const data = await executeGraphQLQuery(query, { page, perPage, season, year });
+    const data = await executeGraphQLQuery(query, { page, perPage, season, year, sort: [aniListSort] });
     return (data.Page?.media || []).map(mapAniListToMedia);
   },
 
@@ -166,7 +178,7 @@ export const AniListAdapter = {
     };
   },
 
-  getUpcomingAnime: async (page = 1, perPage = 20): Promise<Media[]> => {
+  getUpcomingAnime: async (page = 1, sortBy = 'popularity', perPage = 20): Promise<Media[]> => {
     const current = getCurrentSeasonAndYear();
     let nextSeason = 'SPRING';
     let nextYear = current.year;
@@ -176,16 +188,20 @@ export const AniListAdapter = {
     else if (current.season === 'SUMMER') nextSeason = 'FALL';
     else { nextSeason = 'WINTER'; nextYear += 1; }
 
+    let aniListSort = 'POPULARITY_DESC';
+    if (sortBy === 'score') aniListSort = 'SCORE_DESC';
+    else if (sortBy === 'newest') aniListSort = 'START_DATE_DESC';
+
     const query = `
-      query ($page: Int, $perPage: Int, $season: MediaSeason, $year: Int) {
+      query ($page: Int, $perPage: Int, $season: MediaSeason, $year: Int, $sort: [MediaSort]) {
         Page (page: $page, perPage: $perPage) {
-          media (season: $season, seasonYear: $year, sort: POPULARITY_DESC, type: ANIME) {
+          media (season: $season, seasonYear: $year, sort: $sort, type: ANIME) {
             ${BASE_MEDIA_FIELDS}
           }
         }
       }
     `;
-    const data = await executeGraphQLQuery(query, { page, perPage, season: nextSeason, year: nextYear });
+    const data = await executeGraphQLQuery(query, { page, perPage, season: nextSeason, year: nextYear, sort: [aniListSort] });
     return (data.Page?.media || []).map(mapAniListToMedia);
   },
 
@@ -386,17 +402,21 @@ export const AniListAdapter = {
     };
   },
 
-  getAnimeByGenre: async (genreName: string, page = 1): Promise<Media[]> => {
+  getAnimeByGenre: async (genreName: string, page = 1, sortBy = 'popularity'): Promise<Media[]> => {
+    let aniListSort = 'POPULARITY_DESC';
+    if (sortBy === 'score') aniListSort = 'SCORE_DESC';
+    else if (sortBy === 'newest') aniListSort = 'START_DATE_DESC';
+
     const query = `
-      query ($genre: String, $page: Int, $perPage: Int) {
+      query ($genre: String, $page: Int, $perPage: Int, $sort: [MediaSort]) {
         Page (page: $page, perPage: $perPage) {
-          media (genre: $genre, sort: POPULARITY_DESC, type: ANIME, isAdult: false) {
+          media (genre: $genre, sort: $sort, type: ANIME, isAdult: false) {
             ${BASE_MEDIA_FIELDS}
           }
         }
       }
     `;
-    const data = await executeGraphQLQuery(query, { genre: genreName, page, perPage: 20 });
+    const data = await executeGraphQLQuery(query, { genre: genreName, page, perPage: 20, sort: [aniListSort] });
     return (data.Page?.media || []).filter((m: any) => !m.isAdult).map(mapAniListToMedia);
   },
 

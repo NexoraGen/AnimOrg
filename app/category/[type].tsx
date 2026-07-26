@@ -35,6 +35,9 @@ export default function CategoryScreen() {
   const { width } = useWindowDimensions();
   const themeColors = useThemeColors();
 
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortBy, setSortBy] = useState('popularity');
+
   const {
     data,
     isLoading,
@@ -48,10 +51,7 @@ export default function CategoryScreen() {
     loadMore,
     onRefresh,
     initialFetch,
-  } = useCategory(type || 'trending');
-
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = useState('popularity');
+  } = useCategory(type || 'trending', sortBy);
 
   const numColumns = viewMode === 'grid' ? (width > 1024 ? 5 : width > 768 ? 4 : 2) : 1;
   const cardWidth = viewMode === 'grid'

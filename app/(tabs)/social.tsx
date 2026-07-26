@@ -182,10 +182,14 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                 finalPosts = scored.slice(0, limitCount);
             }
 
-            // Resolve likes for the final posts being displayed
-            const resolvedFinalPosts = user
+            // Resolve likes and saves for the final posts being displayed
+            const resolvedLikes = user
                 ? await firestoreService.resolveLikesForPosts(user.id, finalPosts)
                 : finalPosts.map(p => ({ ...p, isLiked: false }));
+
+            const resolvedFinalPosts = user
+                ? await firestoreService.resolveSavesForPosts(user.id, resolvedLikes)
+                : resolvedLikes.map(p => ({ ...p, isSaved: false }));
 
             if (isLoadMore) {
                 setPosts(prev => [...prev, ...resolvedFinalPosts]);

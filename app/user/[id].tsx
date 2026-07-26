@@ -219,13 +219,13 @@ export default function UserProfileScreen() {
                 <View style={styles.headerWrapper}>
                     <View style={styles.bannerContainer}>
                         <Image
-                            source={getAvatarSource(profile.avatarUrl)}
+                            source={require('../../assets/anime-banner.png')}
                             style={styles.bannerImage}
-                            blurRadius={40}
                             contentFit="cover"
                         />
                         <LinearGradient
-                            colors={['transparent', theme.background]}
+                            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)', 'rgba(0,0,0,0.96)', theme.background]}
+                            locations={[0, 0.35, 0.7, 1]}
                             style={StyleSheet.absoluteFill}
                         />
                     </View>

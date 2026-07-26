@@ -17,6 +17,8 @@ import { firestoreService } from '../src/services/firebase/firestore';
 import { searchTimezones, autoDetectTimezone } from '../src/utils/timezoneHelper';
 import { getLocalAiringInfo } from '../src/utils/releaseHelper';
 import { notificationPermission } from '../src/services/notificationPermission';
+import { notificationService } from '../src/services/notifications';
+import { APP_VERSION } from '../src/constants/version';
 
 export default function AppSettingsScreen() {
   const router = useRouter();
@@ -302,6 +304,10 @@ export default function AppSettingsScreen() {
               updateNotificationSettings({ news: !(notificationSettings?.news ?? true) });
               triggerHaptic();
             })}
+            {renderToggle('Social (Likes, Comments, Follows)', 'users', notificationSettings?.socialNotifications ?? true, () => {
+              updateNotificationSettings({ socialNotifications: !(notificationSettings?.socialNotifications ?? true) });
+              triggerHaptic();
+            })}
             {renderToggle('Quiet Hours', 'moon', notificationSettings?.quietHoursEnabled ?? true, () => {
               updateNotificationSettings({ quietHoursEnabled: !(notificationSettings?.quietHoursEnabled ?? true) });
               triggerHaptic();
@@ -426,6 +432,38 @@ export default function AppSettingsScreen() {
           {renderAction('Clear Recently Viewed', 'clock', handleClearViewed, true)}
         </View>
 
+        {__DEV__ && (
+          <>
+            <Text style={[styles.sectionTitle, { color: themeColors.primary }]}>DEVELOPER TOOLS</Text>
+            <View style={[styles.sectionGroup, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+              {renderAction('Trigger Local Test Alert', 'bell', async () => {
+                triggerHaptic();
+                await notificationService.scheduleLocalNotification(
+                  'AnimOrg Test Notification',
+                  'This is a local test notification. If you see this, local notifications are working!',
+                  { type: 'test' }
+                );
+                Alert.alert('Scheduled', 'Local test notification has been triggered.');
+              })}
+              {renderAction('Trigger Remote Push Test', 'send', async () => {
+                triggerHaptic();
+                const pushToken = useAppStore.getState().pushToken;
+                if (!pushToken) {
+                  Alert.alert('No Push Token', 'Push token is not registered. Make sure notifications are enabled and you are on a physical device.');
+                  return;
+                }
+                await notificationService.sendPushNotification(
+                  pushToken,
+                  'AnimOrg Remote Push Test',
+                  'This is a remote push test. If you see this, Expo push delivery is working!',
+                  { type: 'test' }
+                );
+                Alert.alert('Sent', 'Remote push test has been dispatched via Expo Push API.');
+              })}
+            </View>
+          </>
+        )}
+
         <Text style={[styles.sectionTitle, { color: themeColors.primary }]}>ABOUT</Text>
         <View style={[styles.sectionGroup, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <View style={[styles.row, { borderBottomColor: themeColors.border }]}>
@@ -435,7 +473,7 @@ export default function AppSettingsScreen() {
               </View>
               <Text style={[styles.rowLabel, { color: themeColors.text }]}>Version</Text>
             </View>
-            <Text style={[styles.rowValue, { color: themeColors.textDim }]}>{Constants.expoConfig?.version || '1.0.8'}</Text>
+            <Text style={[styles.rowValue, { color: themeColors.textDim }]}>{APP_VERSION}</Text>
           </View>
           {renderAction('Send Feedback', 'message-square', () => { triggerHaptic(); })}
         </View>

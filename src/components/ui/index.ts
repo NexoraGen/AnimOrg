@@ -30,5 +30,6 @@ export * from './CreateCollectionModal';
 export * from './ProfileStatCard';
 export * from './ProfileStatsGrid';
 export * from './AnimatedLoader';
+export * from './TrailerSection';
 
 

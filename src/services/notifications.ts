@@ -16,8 +16,7 @@ const getNotifications = (): typeof NotificationsType | null => {
 };
 
 // Configure how notifications should be handled when the app is in the foreground
-const isExpoGoEnv = Constants.appOwnership === 'expo' || Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
-if (!isExpoGoEnv && Platform.OS !== 'web') {
+if (Platform.OS !== 'web') {
     try {
         const normNotifications = getNotifications();
         if (normNotifications) {
@@ -149,5 +148,69 @@ export const notificationService = {
         if (!normNotifications) return;
 
         await normNotifications.cancelAllScheduledNotificationsAsync();
+    },
+
+    sendPushNotification: async (expoPushToken: string, title: string, body: string, data?: any) => {
+        try {
+            const message = {
+                to: expoPushToken,
+                sound: 'default',
+                title: title,
+                body: body,
+                data: data || {},
+            };
+
+            const response = await fetch('https://exp.host/--/api/v2/push/send', {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Accept-encoding': 'gzip, deflate',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(message),
+            });
+            const resData = await response.json();
+            console.log('[NotificationService] Expo push success response:', resData);
+            return resData;
+        } catch (error) {
+            console.error('[NotificationService] Error sending Expo push notification:', error);
+            return null;
+        }
+    },
+
+    dispatchSocialPush: async (recipientId: string, title: string, body: string, data?: any) => {
+        try {
+            const { firestoreService } = require('./firebase/firestore');
+            const settings = await firestoreService.getUserPushSettings(recipientId);
+            if (!settings) {
+                console.log(`[NotificationService] No push settings found for recipient: ${recipientId}`);
+                return;
+            }
+
+            const { pushToken, notificationsEnabled, notificationSettings } = settings;
+            if (!pushToken) {
+                console.log(`[NotificationService] Recipient ${recipientId} has no registered push token`);
+                return;
+            }
+
+            if (!notificationsEnabled) {
+                console.log(`[NotificationService] Recipient ${recipientId} has disabled notifications globally`);
+                return;
+            }
+
+            // Check specific settings toggle if category is specified
+            const category = data?.type;
+            if (category === 'like' || category === 'comment' || category === 'reply' || category === 'follow') {
+                if (notificationSettings && notificationSettings.socialNotifications === false) {
+                    console.log(`[NotificationService] Social notifications are disabled for recipient: ${recipientId}`);
+                    return;
+                }
+            }
+
+            console.log(`[NotificationService] Dispatching Expo push to ${recipientId}: "${title}"`);
+            await notificationService.sendPushNotification(pushToken, title, body, data);
+        } catch (error) {
+            console.error('[NotificationService] Error in dispatchSocialPush:', error);
+        }
     }
 };
