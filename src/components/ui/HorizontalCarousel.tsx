@@ -6,7 +6,6 @@ import {
   FlatList
 } from 'react-native';
 import { PosterCard } from './PosterCard';
-import { ContinueWatchingCard } from './ContinueWatchingCard';
 import { SectionHeader } from './SectionHeader';
 import { Media, WatchHistoryEntry } from '../../types';
 import { spacing } from '../../theme';
@@ -54,14 +53,6 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
   const renderItemInternal = React.useCallback((info: { item: any; index: number }) => {
     if (renderItem) return renderItem(info);
     const { item } = info;
-    if (variant === 'wide') {
-      return (
-        <ContinueWatchingCard
-          entry={item as WatchHistoryEntry}
-          onPress={onPress}
-        />
-      );
-    }
     return (
       <PosterCard
         media={item as Media}
@@ -71,7 +62,7 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
         disableEntryAnimation
       />
     );
-  }, [renderItem, variant, onPress, width, height]);
+  }, [renderItem, onPress, width, height]);
 
   const keyExtractor = React.useCallback((item: any) => {
     const itemId = item.id || item.animeId || item.anime?.id;

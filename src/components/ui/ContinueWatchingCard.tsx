@@ -2,201 +2,298 @@ import React, { useRef } from 'react';
 import {
   View,
   Text,
+  TouchableOpacity,
   Pressable,
   Animated,
   StyleSheet,
-  Platform,
   useWindowDimensions
 } from 'react-native';
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { colors, spacing, borderRadius, typography } from '../../theme';
+import { colors, spacing, borderRadius } from '../../theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { WatchHistoryEntry } from '../../types';
 
-interface ContinueWatchingCardProps {
-  entry: WatchHistoryEntry;
+export interface ContinueWatchingEntry {
+  animeId: string;
+  title: string;
+  posterPath: string;
+  lastWatchedEpisode: number;
+  nextEpisode?: number;
+  totalEpisodes?: number;
+  releasedCount?: number;
+  progressFraction?: number;
+  lastViewedAt?: string;
+}
+
+export interface ContinueWatchingCardProps {
+  entry: ContinueWatchingEntry;
   onPress: (animeId: string) => void;
+  onPlayPress?: (animeId: string, nextEpisode?: number) => void;
 }
 
 export const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = React.memo(({
   entry,
-  onPress
+  onPress,
+  onPlayPress
 }) => {
   const themeColors = useThemeColors();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const cardScale = useRef(new Animated.Value(1)).current;
+  const playScale = useRef(new Animated.Value(1)).current;
 
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.95,
+  const handleCardPressIn = () => {
+    Animated.spring(cardScale, {
+      toValue: 0.98,
       useNativeDriver: true,
+      speed: 20,
     }).start();
   };
 
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
+  const handleCardPressOut = () => {
+    Animated.spring(cardScale, {
       toValue: 1,
       useNativeDriver: true,
+      speed: 20,
     }).start();
   };
 
-  const getRelativeTime = (dateString: string) => {
-    const now = new Date();
-    const past = new Date(dateString);
-    const diffMs = now.getTime() - past.getTime();
-    const diffMins = Math.round(diffMs / 60000);
-    const diffHours = Math.round(diffMins / 60);
-    const diffDays = Math.round(diffHours / 24);
-
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+  const handlePlayPressIn = () => {
+    Animated.spring(playScale, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 20,
+    }).start();
   };
 
-  const totalEpisodes = entry.totalEpisodes || 0;
-  const progress = totalEpisodes > 0 ? (entry.episodeProgress || 0) / totalEpisodes : 0;
-  const nextEpisode = (entry.lastWatchedEpisode || 0) + 1;
-  const hasStarted = (entry.lastWatchedEpisode || 0) > 0;
+  const handlePlayPressOut = () => {
+    Animated.spring(playScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+    }).start();
+  };
+
+  const getRelativeTime = (dateString?: string) => {
+    if (!dateString) return null;
+    try {
+      const now = new Date();
+      const past = new Date(dateString);
+      const diffMs = now.getTime() - past.getTime();
+      if (isNaN(diffMs) || diffMs < 0) return null;
+
+      const diffMins = Math.round(diffMs / 60000);
+      const diffHours = Math.round(diffMins / 60);
+      const diffDays = Math.round(diffHours / 24);
+
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      return `${diffDays}d ago`;
+    } catch {
+      return null;
+    }
+  };
+
+  const lastWatched = entry.lastWatchedEpisode || 0;
+  const nextEp = entry.nextEpisode || lastWatched + 1;
+  const total = entry.totalEpisodes || entry.releasedCount || 0;
+
+  // Compute progress fraction safely between 0 and 1
+  let progressFraction = entry.progressFraction;
+  if (progressFraction === undefined || progressFraction === null) {
+    progressFraction = total > 0 ? lastWatched / total : 0;
+  }
+  progressFraction = Math.min(Math.max(progressFraction, 0), 1);
+  const progressPercent = Math.round(progressFraction * 100);
+
+  const relativeTimeStr = getRelativeTime(entry.lastViewedAt);
+
+  const handlePlay = (e: any) => {
+    e.stopPropagation?.();
+    if (onPlayPress) {
+      onPlayPress(entry.animeId, nextEp);
+    } else {
+      onPress(entry.animeId);
+    }
+  };
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ scale: scaleAnim }] }]}>
+    <Animated.View style={[styles.wrapper, { transform: [{ scale: cardScale }] }]}>
       <Pressable
         onPress={() => onPress(entry.animeId)}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.pressable}
+        onPressIn={handleCardPressIn}
+        onPressOut={handleCardPressOut}
+        style={[
+          styles.container,
+          {
+            backgroundColor: themeColors.surface,
+            borderColor: 'rgba(255,255,255,0.06)'
+          }
+        ]}
       >
-        <Image
-          source={entry.posterPath ? { uri: entry.posterPath } : { uri: 'https://images.unsplash.com/photo-1578632738908-48c104e8d89e?q=80&w=600' }}
-          style={styles.image}
-          contentFit="cover"
-          transition={300}
-        />
-
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.8)']}
-          style={styles.gradient}
-        />
-
-        <View style={styles.content}>
-          <Text style={styles.title} numberOfLines={1}>
-            {entry.title}
-          </Text>
-          <View style={styles.subtitleRow}>
-            <Text style={styles.subtitle}>
-              {hasStarted ? `Next: Episode ${nextEpisode}` : 'Start Watching'}
-            </Text>
-            <Text style={styles.dot}> • </Text>
-            <Text style={styles.timeLabel}>
-              {getRelativeTime(entry.lastViewedAt)}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.playIconContainer}>
-          <View style={styles.playBlur}>
-            <Feather name="play" size={24} color="#FFF" style={{ marginLeft: 4 }} />
-          </View>
-        </View>
-
-        <View style={[styles.progressContainer, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-          <View
-            style={[
-              styles.progressBar,
-              {
-                width: `${progress * 100}%`,
-                backgroundColor: themeColors.primary
-              }
-            ]}
+        {/* Left: Large Anime Poster */}
+        <View style={styles.posterContainer}>
+          <Image
+            source={entry.posterPath ? { uri: entry.posterPath } : { uri: 'https://images.unsplash.com/photo-1578632738908-48c104e8d89e?q=80&w=600' }}
+            style={styles.poster}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="memory-disk"
           />
         </View>
+
+        {/* Middle: Details & Progress */}
+        <View style={styles.infoContainer}>
+          <Text style={[styles.title, { color: themeColors.text }]} numberOfLines={1}>
+            {entry.title}
+          </Text>
+
+          <View style={styles.episodeRow}>
+            <Text style={[styles.nextEpisodeText, { color: colors.primary }]}>
+              Ep {nextEp}
+            </Text>
+            <Text style={styles.dot}> • </Text>
+            <Text style={[styles.watchedText, { color: themeColors.textDim }]}>
+              {total > 0 ? `${lastWatched}/${total} Watched` : `${lastWatched} Watched`}
+            </Text>
+          </View>
+
+          {/* Viewing Progress Bar */}
+          <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${progressPercent}%`,
+                  backgroundColor: colors.primary
+                }
+              ]}
+            />
+          </View>
+
+          {/* Progress Percentage and Recency Badge */}
+          <View style={styles.metaRow}>
+            <Text style={[styles.percentText, { color: themeColors.textDim }]}>
+              {progressPercent}% completed
+            </Text>
+            {relativeTimeStr ? (
+              <Text style={[styles.timeText, { color: themeColors.textDim }]}>
+                {relativeTimeStr}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Right: Independent Play Button */}
+        <Animated.View style={{ transform: [{ scale: playScale }] }}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={handlePlay}
+            onPressIn={handlePlayPressIn}
+            onPressOut={handlePlayPressOut}
+            style={[styles.playButton, { backgroundColor: colors.primary }]}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Feather name="play" size={18} color="#FFFFFF" style={{ marginLeft: 2 }} />
+          </TouchableOpacity>
+        </Animated.View>
       </Pressable>
     </Animated.View>
   );
 });
 
 const styles = StyleSheet.create({
+  wrapper: {
+    marginHorizontal: spacing.M,
+    marginBottom: spacing.M,
+  },
   container: {
-    width: 240,
-    height: 140,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm + 4,
     borderRadius: borderRadius.xl,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-    elevation: 10,
-    shadowColor: colors.primaryDark || colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  pressable: {
-    flex: 1,
+  posterContainer: {
+    width: 80,
+    height: 112,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  image: {
+  poster: {
     width: '100%',
     height: '100%',
   },
-  gradient: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  content: {
-    position: 'absolute',
-    bottom: spacing.M,
-    left: spacing.M,
-    right: spacing.M,
+  infoContainer: {
+    flex: 1,
+    marginLeft: spacing.md,
+    marginRight: spacing.sm,
+    justifyContent: 'center',
   },
   title: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '900' as any,
-    marginBottom: 2,
-    letterSpacing: -0.3,
+    fontWeight: '800',
+    marginBottom: 4,
+    letterSpacing: -0.2,
   },
-  subtitleRow: {
+  episodeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: spacing.xs,
   },
-  subtitle: {
-    color: '#E50914',
-    fontSize: 12,
-    fontWeight: 'bold' as any,
+  nextEpisodeText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   dot: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 13,
+    marginHorizontal: 4,
+  },
+  watchedText: {
     fontSize: 12,
+    fontWeight: '600',
   },
-  timeLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 11,
-    fontWeight: '600' as any,
-  },
-  playIconContainer: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  playBlur: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(183, 28, 28, 0.8)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  progressContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 4,
+  progressTrack: {
+    height: 6,
+    width: '100%',
     backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginVertical: 4,
   },
-  progressBar: {
+  progressFill: {
     height: '100%',
+    borderRadius: 3,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  percentText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  timeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  playButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });

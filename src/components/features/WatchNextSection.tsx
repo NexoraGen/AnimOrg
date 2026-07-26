@@ -15,7 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '../../theme';
 import { useAppStore } from '../../store/useAppStore';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { SectionHeader } from '../ui';
+import { SectionHeader, ContinueWatchingCard } from '../ui';
 import { getCurrentlyReleasedEpisodesCount, getEpisodeAiringTime, resolveAnimeTrackingStatus } from '../../utils/releaseHelper';
 import { notificationService } from '../../services/notifications';
 import { Media } from '../../types';
@@ -336,7 +336,7 @@ export const WatchNextSection: React.FC = React.memo(() => {
                 return;
             }
 
-            if (lastWatched < releasedCount) {
+            if (lastWatched < releasedCount || releasedCount === 0) {
                 const nextEpNum = lastWatched + 1;
                 cwList.push({
                     animeId: wId,
@@ -344,8 +344,10 @@ export const WatchNextSection: React.FC = React.memo(() => {
                     posterPath: animeItem.posterPath,
                     lastWatchedEpisode: lastWatched,
                     nextEpisode: nextEpNum,
-                    progressFraction: releasedCount > 0 ? lastWatched / releasedCount : 0,
-                    releasedCount: releasedCount
+                    totalEpisodes: animeItem.episodes || 0,
+                    progressFraction: releasedCount > 0 ? lastWatched / releasedCount : (animeItem.episodes ? lastWatched / animeItem.episodes : 0),
+                    releasedCount: releasedCount,
+                    lastViewedAt: progress.updatedAt || (animeItem as any).updatedAt
                 });
             } else if (!isFinishedAnime && lastWatched >= releasedCount) {
                 const nextEpNum = lastWatched + 1;
@@ -369,6 +371,12 @@ export const WatchNextSection: React.FC = React.memo(() => {
                     });
                 }
             }
+        });
+
+        cwList.sort((a, b) => {
+            const timeA = a.lastViewedAt ? new Date(a.lastViewedAt).getTime() : 0;
+            const timeB = b.lastViewedAt ? new Date(b.lastViewedAt).getTime() : 0;
+            return timeB - timeA;
         });
 
         awList.sort((a, b) => {
@@ -428,36 +436,43 @@ export const WatchNextSection: React.FC = React.memo(() => {
     return (
         <View style={styles.container}>
             {/* 1. segment A: Continue Watching Decks */}
-            {continueWatchingList.length > 0 && (
+            {continueWatchingList.length > 0 ? (
                 <View style={styles.sectionWrapper}>
                     <SectionHeader
                         title="Continue Watching"
                         subtitle="Pick up where you left off"
                         onViewAll={() => router.push('/category/continue-watching')}
                     />
-                    <FlatList
-                        data={continueWatchingList}
-                        keyExtractor={(item) => `cw-${item.animeId}`}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
-                        initialNumToRender={4}
-                        maxToRenderPerBatch={8}
-                        windowSize={5}
-                        removeClippedSubviews={Platform.OS === 'android'}
-                        scrollEventThrottle={16}
-                        keyboardShouldPersistTaps="handled"
-                        getItemLayout={(data, index) => ({ length: 292, offset: 292 * index, index })}
-                        renderItem={({ item: progress }) => (
-                            <WatchNextContinueWatchingCard
-                                progress={progress}
-                                onPress={(id: string) => router.push(`/details/${id}`)}
-                                themeColors={themeColors}
+                    <View style={styles.verticalListContainer}>
+                        {continueWatchingList.map((entry) => (
+                            <ContinueWatchingCard
+                                key={`cw-${entry.animeId}`}
+                                entry={entry}
+                                onPress={(id) => router.push(`/details/${id}`)}
+                                onPlayPress={(id, nextEp) => router.push(`/details/${id}?episode=${nextEp || 1}&autoplay=true`)}
                             />
-                        )}
-                    />
+                        ))}
+                    </View>
                 </View>
-            )}
+            ) : isAuthenticated && watchlist.length === 0 ? (
+                <View style={styles.sectionWrapper}>
+                    <SectionHeader
+                        title="Continue Watching"
+                        subtitle="Pick up where you left off"
+                    />
+                    <View style={[styles.emptyCard, { backgroundColor: themeColors.surface, borderColor: 'rgba(255,255,255,0.06)' }]}>
+                        <View style={[styles.emptyIconBox, { backgroundColor: 'rgba(229, 9, 20, 0.12)' }]}>
+                            <Feather name="tv" size={28} color={colors.primary} />
+                        </View>
+                        <Text style={[styles.emptyTitle, { color: themeColors.text }]}>
+                            You haven't started watching any anime yet.
+                        </Text>
+                        <Text style={[styles.emptySubtitle, { color: themeColors.textDim }]}>
+                            Start watching an anime and it'll appear here.
+                        </Text>
+                    </View>
+                </View>
+            ) : null}
 
             {/* 2. segment B: Caught Up ongoing counting */}
             {awaitingList.length > 0 && (
@@ -626,5 +641,35 @@ const styles = StyleSheet.create({
         fontSize: 9,
         fontWeight: 'bold',
         textTransform: 'uppercase',
+    },
+    verticalListContainer: {
+        paddingTop: spacing.xs,
+    },
+    emptyCard: {
+        marginHorizontal: spacing.M,
+        padding: spacing.xl,
+        borderRadius: borderRadius.xl,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyIconBox: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: spacing.md,
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontWeight: '800',
+        textAlign: 'center',
+        marginBottom: spacing.xs,
+    },
+    emptySubtitle: {
+        fontSize: 13,
+        fontWeight: '500',
+        textAlign: 'center',
     }
 });
