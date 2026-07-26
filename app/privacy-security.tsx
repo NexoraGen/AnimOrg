@@ -12,6 +12,7 @@ import { typography, spacing, borderRadius } from '../src/theme';
 import { GlassHeader } from '../src/components/ui/GlassHeader';
 import { AnimatedScreen } from '../src/components/layout/AnimatedScreen';
 import { Button } from '../src/components/ui/Button';
+import { getSafeTopInset, HEADER_HEIGHT } from '../src/utils/layout';
 
 export default function PrivacySecurityScreen() {
   const router = useRouter();
@@ -176,7 +177,7 @@ export default function PrivacySecurityScreen() {
         }
       />
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 80, paddingBottom: insets.bottom + 40 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT + spacing.md, paddingBottom: insets.bottom + 40 }]}>
 
         <Text style={[styles.sectionTitle, { color: themeColors.primary }]}>ACCOUNT CREDENTIALS</Text>
 

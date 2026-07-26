@@ -22,6 +22,8 @@ import { ACHIEVEMENTS, Badge } from '../src/config/achievements';
 import { AchievementService } from '../src/services/AchievementService';
 import { CinematicModal } from '../src/components/layout/CinematicModal';
 
+import { getSafeTopInset, HEADER_HEIGHT } from '../src/utils/layout';
+
 export default function AchievementsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -135,7 +137,7 @@ export default function AchievementsScreen() {
 
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
+                contentContainerStyle={[styles.scrollContent, { paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT + spacing.sm, paddingBottom: insets.bottom + spacing.xl }]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* PROGRESS OVERVIEW BANNER */}

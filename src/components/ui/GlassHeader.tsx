@@ -7,7 +7,9 @@ import { colors, spacing, typography } from '../../theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppStore } from '../../store/useAppStore';
 
-export const HEADER_HEIGHT = 65;
+import { getSafeTopInset, HEADER_HEIGHT } from '../../utils/layout';
+
+export { HEADER_HEIGHT };
 
 interface GlassHeaderProps {
   title: string;
@@ -27,11 +29,12 @@ export const GlassHeader: React.FC<GlassHeaderProps> = ({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const theme = useAppStore(state => state.theme);
+  const safeTop = getSafeTopInset(insets);
 
   return (
     <View style={[
       styles.header,
-      { backgroundColor: transparent ? 'transparent' : colors.background, paddingTop: insets.top }
+      { backgroundColor: transparent ? 'transparent' : colors.background, paddingTop: safeTop }
     ]}>
       <View style={styles.content}>
         <View style={styles.leftContainer}>

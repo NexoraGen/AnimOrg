@@ -53,6 +53,7 @@ import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { formatRating, hasValidRating } from '../../src/utils/formatters';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_BACKDROP } from '../../src/constants/images';
 import { EpisodeCountRegistry } from '../../src/utils/episodeCountSync';
+import { getSafeTopInset } from '../../src/utils/layout';
 
 // ─── PAGE-LEVEL SAFETY NET ─────────────────────────────────────────────────
 // Wraps the entire screen so crashes never bubble up to the global layout boundary.
@@ -620,7 +621,7 @@ function DetailsScreenInner() {
 
   return (
     <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
-      <View style={[styles.header, { top: insets.top + spacing.sm }]}>
+      <View style={[styles.header, { top: getSafeTopInset(insets) + spacing.sm }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Feather name="chevron-left" color="#FFF" size={28} />
         </TouchableOpacity>

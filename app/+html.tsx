@@ -14,19 +14,12 @@ export default function Root({ children }: PropsWithChildren) {
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{
           __html: `
-          html, body, #root {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
+          * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+          }
+          body {
             background-color: #0B0B0B;
             color: #FFFFFF;
-            overflow: hidden;
-          }
-          * {
-            box-sizing: border-box;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
           }
         ` }} />

@@ -92,7 +92,7 @@ android {
         applicationId 'com.nexora.animorg'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 17
+        versionCode 18
         versionName "1.0.13"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
@@ -104,13 +104,6 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
-
-        release {
-            storeFile file("@itisnexora__animorg.jks")
-            storePassword  "8e4ee3449617c7b016d4dd43e8706a3a"
-            keyAlias "465d3dae6159e5ff6d667ca521ae6541"
-            keyPassword "2d1018b35128ca80b24a15f53eb07329"
-        }
     }
     buildTypes {
         debug {
@@ -119,7 +112,7 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.release
+            signingConfig signingConfigs.debug
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

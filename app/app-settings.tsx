@@ -19,6 +19,7 @@ import { getLocalAiringInfo } from '../src/utils/releaseHelper';
 import { notificationPermission } from '../src/services/notificationPermission';
 import { notificationService } from '../src/services/notifications';
 import { APP_VERSION } from '../src/constants/version';
+import { getSafeTopInset, HEADER_HEIGHT } from '../src/utils/layout';
 
 export default function AppSettingsScreen() {
   const router = useRouter();
@@ -175,7 +176,7 @@ export default function AppSettingsScreen() {
         }
       />
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 80, paddingBottom: insets.bottom + 40 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT + spacing.md, paddingBottom: insets.bottom + 40 }]}>
 
         <Text style={[styles.sectionTitle, { color: themeColors.primary }]}>ACCOUNT & SECURITY</Text>
         <View style={[styles.sectionGroup, { backgroundColor: themeColors.surface, borderColor: themeColors.border, marginBottom: 20 }]}>

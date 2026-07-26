@@ -14,6 +14,7 @@ import { firestoreService } from '../src/services/firebase/firestore';
 import { useAppStore } from '../src/store/useAppStore';
 import { CommunityNotification } from '../src/types';
 import { getAvatarSource } from '../src/constants/avatars';
+import { getSafeTopInset, HEADER_HEIGHT } from '../src/utils/layout';
 
 export default function NotificationsScreen() {
     const router = useRouter();
@@ -91,9 +92,14 @@ export default function NotificationsScreen() {
             <FlatList
                 data={notifications}
                 keyExtractor={(item) => item.id}
-                contentContainerStyle={[styles.listContent, { paddingTop: 100 }]}
+                contentContainerStyle={[styles.listContent, { paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT + spacing.xs }]}
                 refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary} />
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={theme.primary}
+                        progressViewOffset={getSafeTopInset(insets) + HEADER_HEIGHT}
+                    />
                 }
                 ListEmptyComponent={
                     !isLoading ? (

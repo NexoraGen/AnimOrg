@@ -1,4 +1,3 @@
-console.log('[ANIMORG_DIAGNOSTIC] RootLayout module evaluated');
 import { useEffect, useState, useRef } from 'react';
 import { View, Platform, ActivityIndicator, Text, StyleSheet, Animated } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -9,18 +8,25 @@ import { ErrorBoundary } from '../src/components/common/ErrorBoundary';
 import * as SplashScreen from 'expo-splash-screen';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 let isHotRefresh = false;
 
-// Prevent the splash screen from auto-hiding before asset loading is complete on native.
-if (Platform.OS !== 'web') {
-  SplashScreen.preventAutoHideAsync().catch(() => {
-    /* reloading the app might cause this to error, which is ok */
-  });
-}
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* reloading the app might cause this to error, which is ok */
+});
 
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+// Conditionally import GestureHandlerRootView for native, use plain View on web
+let GestureHandlerRootView: any = View;
+if (Platform.OS !== 'web') {
+  try {
+    GestureHandlerRootView = require('react-native-gesture-handler').GestureHandlerRootView;
+  } catch (e) {
+    // Fallback to View if gesture handler is not available
+  }
+}
 
 import { CinematicOverlay } from '../src/components/ui/CinematicOverlay';
 import { NotificationPermissionDialog, AnimatedLoader } from '../src/components/ui';
@@ -119,6 +125,13 @@ export default function RootLayout() {
   }, [isAuthenticated, isGuest, user, isLoadingAuth, hasHydrated, isAppInitializing, segments]);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!useAppStore.getState().hasHydrated) {
+        console.log('[Layout] Enforcing hydration fallback');
+        useAppStore.getState().setHasHydrated(true);
+      }
+    }, 100);
+
     const unsubscribe = initializeAuth();
 
     // Aggressive cleanup sweep of legacy oversized cache objects
@@ -136,7 +149,10 @@ export default function RootLayout() {
     };
     performCleanupSweep();
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -202,39 +218,41 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background || '#0B0B0B', overflow: Platform.OS === 'web' ? 'hidden' : undefined }}>
-        {hasHydrated && (
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.background },
-              animation: Platform.OS === 'web' ? 'none' : 'fade',
-              animationDuration: 300,
-            }}
-          >
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
-            <Stack.Screen name="(tabs)" options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
-            <Stack.Screen name="details/[id]" options={{ presentation: Platform.OS === 'web' ? 'card' : 'modal' }} />
-            <Stack.Screen name="category/[type]" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
-            <Stack.Screen name="ranks" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
-            <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="create-post" options={{ animation: 'slide_from_bottom' }} />
-          </Stack>
-        )}
-        <CinematicOverlay visible={modalCount > 0} />
-        <StatusBar style="light" />
-        {(shouldShowSplash || !hasHydrated) && <CinematicStartupSplash isReady={!isAppInitializing && hasHydrated} />}
-        <NotificationPermissionDialog
-          visible={showNotifDialog}
-          onClose={() => setShowNotifDialog(false)}
-        />
-        <AchievementUnlockModal
-          visible={achievementUnlockModalVisible}
-          badge={activeAchievementBadge}
-          onClose={closeAchievementUnlockModal}
-        />
-      </GestureHandlerRootView>
+      <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+        <GestureHandlerRootView style={{ flex: 1, overflow: Platform.OS === 'web' ? 'hidden' : undefined }}>
+          {hasHydrated && (
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.background },
+                animation: Platform.OS === 'web' ? 'none' : 'fade',
+                animationDuration: 300,
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
+              <Stack.Screen name="(tabs)" options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
+              <Stack.Screen name="details/[id]" options={{ presentation: Platform.OS === 'web' ? 'card' : 'modal' }} />
+              <Stack.Screen name="category/[type]" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
+              <Stack.Screen name="ranks" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
+              <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="create-post" options={{ animation: 'slide_from_bottom' }} />
+            </Stack>
+          )}
+          <CinematicOverlay visible={modalCount > 0} />
+          <StatusBar style="light" translucent backgroundColor="transparent" />
+          {(shouldShowSplash || !hasHydrated) && <CinematicStartupSplash isReady={!isAppInitializing && hasHydrated} />}
+          <NotificationPermissionDialog
+            visible={showNotifDialog}
+            onClose={() => setShowNotifDialog(false)}
+          />
+          <AchievementUnlockModal
+            visible={achievementUnlockModalVisible}
+            badge={activeAchievementBadge}
+            onClose={closeAchievementUnlockModal}
+          />
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

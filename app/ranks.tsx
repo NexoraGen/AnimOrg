@@ -21,6 +21,7 @@ import { useAppStore } from '../src/store/useAppStore';
 import { LevelService } from '../src/services/LevelService';
 import { RankService, RankProgressItem } from '../src/services/RankService';
 import { spacing } from '../src/theme';
+import { getSafeTopInset, HEADER_HEIGHT } from '../src/utils/layout';
 
 export default function RanksScreen() {
     const router = useRouter();
@@ -68,7 +69,7 @@ export default function RanksScreen() {
                 contentContainerStyle={[
                     styles.scrollContent,
                     {
-                        paddingTop: Platform.OS === 'ios' ? insets.top + 60 : 70,
+                        paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT + spacing.xs,
                         paddingBottom: insets.bottom + 40,
                         maxWidth: isDesktop ? 800 : '100%',
                         alignSelf: isDesktop ? 'center' : 'stretch',

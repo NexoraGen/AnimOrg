@@ -19,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 
 import { colors, spacing, borderRadius } from '../../src/theme';
 import { GlassHeader, Button, HEADER_HEIGHT, AuthModal } from '../../src/components/ui';
+import { getSafeTopInset } from '../../src/utils/layout';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
@@ -212,8 +213,8 @@ export default function UserProfileScreen() {
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + HEADER_HEIGHT }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={theme.primary} progressViewOffset={insets.top + HEADER_HEIGHT} />}
+                contentContainerStyle={{ flexGrow: 1, paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={theme.primary} progressViewOffset={getSafeTopInset(insets) + HEADER_HEIGHT} />}
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.headerWrapper}>

@@ -21,6 +21,7 @@ import { GlassHeader, PosterCard, HEADER_HEIGHT, SkeletonLoader } from '../../sr
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useCategory } from '../../src/hooks/useCategory';
+import { getSafeTopInset } from '../../src/utils/layout';
 
 const SORT_OPTIONS = [
   { id: 'popularity', label: 'Popularity' },
@@ -102,7 +103,7 @@ export default function CategoryScreen() {
         }
       />
 
-      <View style={{ flex: 1, paddingTop: insets.top + HEADER_HEIGHT }}>
+      <View style={{ flex: 1, paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT }}>
         {/* Sort filter bar */}
         <View style={styles.filterBar}>
           {type !== 'upcoming' && (

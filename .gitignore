@@ -23,31 +23,6 @@ expo-env.d.ts
 # debug
 npm-debug.*
 yarn-debug.*
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
-node_modules/
-
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
 yarn-error.*
 
 # macOS
@@ -56,19 +31,8 @@ yarn-error.*
 
 # local env files
 .env
-.env.*
+.env*
 .env*.local
-
-# Credentials & Keys
-*.pem
-*.key
-*.p12
-*.jks
-*.keystore
-service-account*.json
-firebase-admin*.json
-google-services.json
-GoogleService-Info.plist
 
 # typescript
 *.tsbuildinfo

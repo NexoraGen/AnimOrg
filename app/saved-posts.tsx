@@ -22,7 +22,7 @@ import { firestoreService } from '../src/services/firebase/firestore';
 import { CommunityPost } from '../src/types';
 import { CommunityPostCard } from '../src/components/features/community/CommunityPostCard';
 
-const HEADER_HEIGHT = 56;
+import { getSafeTopInset, HEADER_HEIGHT } from '../src/utils/layout';
 
 export default function SavedPostsScreen() {
     const router = useRouter();
@@ -89,14 +89,14 @@ export default function SavedPostsScreen() {
                     keyExtractor={(item) => item.id}
                     contentContainerStyle={[
                         styles.listContent,
-                        { paddingTop: insets.top + HEADER_HEIGHT + 20 }
+                        { paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT + spacing.xs }
                     ]}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={handleRefresh}
                             tintColor={theme.primary}
-                            progressViewOffset={insets.top + HEADER_HEIGHT + 20}
+                            progressViewOffset={getSafeTopInset(insets) + HEADER_HEIGHT}
                         />
                     }
                     renderItem={({ item }) => (
