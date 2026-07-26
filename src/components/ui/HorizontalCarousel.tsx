@@ -2,9 +2,9 @@ import React from 'react';
 import {
   StyleSheet,
   View,
-  Platform
+  Platform,
+  FlatList
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
 import { PosterCard } from './PosterCard';
 import { ContinueWatchingCard } from './ContinueWatchingCard';
 import { SectionHeader } from './SectionHeader';
@@ -78,6 +78,17 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
     return `${title}-${itemId || Math.random()}`;
   }, [title]);
 
+  const getItemLayout = React.useCallback((data: any, index: number) => {
+    // For variant === 'wide', the items touch without external gap (except padding at start/end of the list)
+    // For default, PosterCard has marginHorizontal of spacing.S (8px), meaning each card takes width + 16px of horizontal space
+    const itemStride = itemWidth || (variant === 'wide' ? width : width + 16);
+    return {
+      length: itemStride,
+      offset: itemStride * index,
+      index,
+    };
+  }, [variant, width, itemWidth]);
+
   return (
     <View style={styles.container}>
       <SectionHeader
@@ -88,11 +99,9 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
       />
 
       {isLoading ? (
-        <FlashList
+        <FlatList
           data={[1, 2, 3, 4, 5]}
           horizontal
-          // @ts-ignore
-          estimatedItemSize={width + spacing.md}
           showsHorizontalScrollIndicator={false}
           renderItem={() => (
             <SkeletonLoader
@@ -104,22 +113,23 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
           keyExtractor={(item) => `skeleton-${title}-${item}`}
         />
       ) : (
-        <FlashList
-          data={data as any}
+        <FlatList
+          data={data}
           horizontal
-          // @ts-ignore
-          estimatedItemSize={width + spacing.md}
           showsHorizontalScrollIndicator={false}
-          snapToInterval={disableSnap ? undefined : (itemWidth || (width + spacing.md))}
+          snapToInterval={disableSnap ? undefined : (itemWidth || (variant === 'wide' ? width : width + 16))}
           decelerationRate={disableSnap ? "normal" : "fast"}
           snapToAlignment={disableSnap ? undefined : "start"}
           renderItem={renderItemInternal}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
-          drawDistance={width * 3}
-          removeClippedSubviews
-          // @ts-ignore
           initialNumToRender={5}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          scrollEventThrottle={16}
+          keyboardShouldPersistTaps="handled"
+          getItemLayout={getItemLayout}
         />
       )}
     </View>

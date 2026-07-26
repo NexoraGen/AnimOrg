@@ -8,7 +8,7 @@ interface CharacterCardProps {
   character: Character;
 }
 
-export const CharacterCard: React.FC<CharacterCardProps> = ({ character }) => {
+export const CharacterCard: React.FC<CharacterCardProps> = React.memo(({ character }) => {
   return (
     <View style={styles.container}>
       <Image
@@ -37,7 +37,7 @@ export const CharacterCard: React.FC<CharacterCardProps> = ({ character }) => {
       </View>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

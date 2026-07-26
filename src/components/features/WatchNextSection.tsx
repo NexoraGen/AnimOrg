@@ -5,13 +5,14 @@ import {
     StyleSheet,
     TouchableOpacity,
     ScrollView,
-    useWindowDimensions
+    useWindowDimensions,
+    FlatList,
+    Platform
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '../../theme';
-import { FlashList } from '@shopify/flash-list';
 import { useAppStore } from '../../store/useAppStore';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SectionHeader } from '../ui';
@@ -20,7 +21,7 @@ import { notificationService } from '../../services/notifications';
 import { Media } from '../../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const AwaitingAnimeCard = React.memo(({ progress, themeColors, userTimezone, router, onReleased }: any) => {
+const AwaitingAnimeCard = React.memo(({ progress, themeColors, userTimezone, onPress, onReleased }: any) => {
     const [now, setNow] = useState(Date.now());
 
     useEffect(() => {
@@ -75,7 +76,7 @@ const AwaitingAnimeCard = React.memo(({ progress, themeColors, userTimezone, rou
     return (
         <TouchableOpacity
             style={[styles.card, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.03)' }]}
-            onPress={() => router.push(`/details/${progress.animeId}`)}
+            onPress={() => onPress(progress.animeId)}
             activeOpacity={0.8}
         >
             <Image
@@ -110,6 +111,90 @@ const AwaitingAnimeCard = React.memo(({ progress, themeColors, userTimezone, rou
             <View style={styles.playBtnContainer}>
                 <View style={[styles.playBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
                     <Feather name="bell" size={14} color={themeColors.textDim} />
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+});
+
+const WatchNextContinueWatchingCard = React.memo(({ progress, onPress, themeColors }: any) => {
+    return (
+        <TouchableOpacity
+            style={[styles.card, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.03)' }]}
+            onPress={() => onPress(progress.animeId)}
+            activeOpacity={0.8}
+        >
+            <Image
+                source={progress.posterPath ? { uri: progress.posterPath } : { uri: 'https://images.unsplash.com/photo-1578632738908-48c104e8d89e?q=80&w=600' }}
+                style={styles.poster}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+            />
+            <View style={styles.info}>
+                <Text style={[styles.animeTitle, { color: themeColors.text }]} numberOfLines={2}>
+                    {progress.title}
+                </Text>
+                <View style={styles.progressRow}>
+                    <Text style={[styles.nextEp, { color: colors.primary }]}>
+                        Ep {progress.nextEpisode}
+                    </Text>
+                    <View style={styles.dot} />
+                    <Text style={[styles.status, { color: themeColors.textDim }]}>
+                        {progress.lastWatchedEpisode} Watched
+                    </Text>
+                </View>
+                <View style={styles.progressBarBg}>
+                    <View
+                        style={[
+                            styles.progressBarFill,
+                            {
+                                backgroundColor: colors.primary,
+                                width: `${Math.min(progress.progressFraction * 100, 100)}%`
+                            }
+                        ]}
+                    />
+                </View>
+            </View>
+            <View style={styles.playBtnContainer}>
+                <View style={[styles.playBtn, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                    <Feather name="play" size={14} color="#FFF" />
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+});
+
+const WatchNextUpcomingCard = React.memo(({ progress, onPress, themeColors }: any) => {
+    return (
+        <TouchableOpacity
+            style={[styles.card, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.03)' }]}
+            onPress={() => onPress(progress.id)}
+            activeOpacity={0.8}
+        >
+            <Image
+                source={progress.posterPath ? { uri: progress.posterPath } : { uri: 'https://images.unsplash.com/photo-1578632738908-48c104e8d89e?q=80&w=600' }}
+                style={styles.poster}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+            />
+            <View style={styles.info}>
+                <Text style={[styles.animeTitle, { color: themeColors.text }]} numberOfLines={2}>
+                    {progress.title}
+                </Text>
+                <View style={styles.progressRow}>
+                    <Text style={[styles.nextEp, { color: '#FFD700' }]}>
+                        {progress.nextEp}
+                    </Text>
+                    <View style={styles.dot} />
+                    <Text style={[styles.status, { color: themeColors.textDim }]} numberOfLines={1}>
+                        {progress.countdown}
+                    </Text>
+                </View>
+                <View style={styles.timeBadgeContainer}>
+                    <Feather name="star" size={11} color="#FFD700" />
+                    <Text style={[styles.timeBadgeText, { color: themeColors.textDim }]} numberOfLines={1}>
+                        {progress.statusText}
+                    </Text>
                 </View>
             </View>
         </TouchableOpacity>
@@ -350,61 +435,25 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         subtitle="Pick up where you left off"
                         onViewAll={() => router.push('/category/continue-watching')}
                     />
-                    <FlashList
+                    <FlatList
                         data={continueWatchingList}
                         keyExtractor={(item) => `cw-${item.animeId}`}
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.scrollContent}
-                        // @ts-ignore
-                        estimatedItemSize={296}
-                        removeClippedSubviews={true}
-                        // @ts-ignore
                         initialNumToRender={4}
+                        maxToRenderPerBatch={8}
+                        windowSize={5}
+                        removeClippedSubviews={Platform.OS === 'android'}
                         scrollEventThrottle={16}
+                        keyboardShouldPersistTaps="handled"
+                        getItemLayout={(data, index) => ({ length: 292, offset: 292 * index, index })}
                         renderItem={({ item: progress }) => (
-                            <TouchableOpacity
-                                style={[styles.card, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.03)' }]}
-                                onPress={() => router.push(`/details/${progress.animeId}`)}
-                                activeOpacity={0.8}
-                            >
-                                <Image
-                                    source={progress.posterPath ? { uri: progress.posterPath } : { uri: 'https://images.unsplash.com/photo-1578632738908-48c104e8d89e?q=80&w=600' }}
-                                    style={styles.poster}
-                                    contentFit="cover"
-                                    cachePolicy="memory-disk"
-                                />
-                                <View style={styles.info}>
-                                    <Text style={[styles.animeTitle, { color: themeColors.text }]} numberOfLines={2}>
-                                        {progress.title}
-                                    </Text>
-                                    <View style={styles.progressRow}>
-                                        <Text style={[styles.nextEp, { color: colors.primary }]}>
-                                            Ep {progress.nextEpisode}
-                                        </Text>
-                                        <View style={styles.dot} />
-                                        <Text style={[styles.status, { color: themeColors.textDim }]}>
-                                            {progress.lastWatchedEpisode} Watched
-                                        </Text>
-                                    </View>
-                                    <View style={styles.progressBarBg}>
-                                        <View
-                                            style={[
-                                                styles.progressBarFill,
-                                                {
-                                                    backgroundColor: colors.primary,
-                                                    width: `${Math.min(progress.progressFraction * 100, 100)}%`
-                                                }
-                                            ]}
-                                        />
-                                    </View>
-                                </View>
-                                <View style={styles.playBtnContainer}>
-                                    <View style={[styles.playBtn, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
-                                        <Feather name="play" size={14} color="#FFF" />
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
+                            <WatchNextContinueWatchingCard
+                                progress={progress}
+                                onPress={(id: string) => router.push(`/details/${id}`)}
+                                themeColors={themeColors}
+                            />
                         )}
                     />
                 </View>
@@ -418,24 +467,25 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         subtitle="Caught up ongoing scheduled broadcasts"
                         onViewAll={() => router.push('/category/schedule')}
                     />
-                    <FlashList
+                    <FlatList
                         data={awaitingList}
                         keyExtractor={(item) => `await-${item.animeId}`}
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.scrollContent}
-                        // @ts-ignore
-                        estimatedItemSize={296}
-                        removeClippedSubviews={true}
-                        // @ts-ignore
-                        initialNumToRender={3}
+                        initialNumToRender={4}
+                        maxToRenderPerBatch={8}
+                        windowSize={5}
+                        removeClippedSubviews={Platform.OS === 'android'}
                         scrollEventThrottle={16}
+                        keyboardShouldPersistTaps="handled"
+                        getItemLayout={(data, index) => ({ length: 292, offset: 292 * index, index })}
                         renderItem={({ item: progress }) => (
                             <AwaitingAnimeCard
                                 progress={progress}
                                 themeColors={themeColors}
                                 userTimezone={user?.timezone}
-                                router={router}
+                                onPress={(id: string) => router.push(`/details/${id}`)}
                                 onReleased={handleReleased}
                             />
                         )}
@@ -451,51 +501,25 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         subtitle="New confirmed sequel releases"
                         onViewAll={() => router.push('/category/upcoming')}
                     />
-                    <FlashList
+                    <FlatList
                         data={upcomingList}
                         keyExtractor={(item) => `sequel-${item.id}`}
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.scrollContent}
-                        // @ts-ignore
-                        estimatedItemSize={296}
-                        removeClippedSubviews={true}
-                        // @ts-ignore
-                        initialNumToRender={3}
+                        initialNumToRender={4}
+                        maxToRenderPerBatch={8}
+                        windowSize={5}
+                        removeClippedSubviews={Platform.OS === 'android'}
                         scrollEventThrottle={16}
+                        keyboardShouldPersistTaps="handled"
+                        getItemLayout={(data, index) => ({ length: 292, offset: 292 * index, index })}
                         renderItem={({ item: progress }) => (
-                            <TouchableOpacity
-                                style={[styles.card, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.03)' }]}
-                                onPress={() => router.push(`/details/${progress.id}`)}
-                                activeOpacity={0.8}
-                            >
-                                <Image
-                                    source={progress.posterPath ? { uri: progress.posterPath } : { uri: 'https://images.unsplash.com/photo-1578632738908-48c104e8d89e?q=80&w=600' }}
-                                    style={styles.poster}
-                                    contentFit="cover"
-                                    cachePolicy="memory-disk"
-                                />
-                                <View style={styles.info}>
-                                    <Text style={[styles.animeTitle, { color: themeColors.text }]} numberOfLines={2}>
-                                        {progress.title}
-                                    </Text>
-                                    <View style={styles.progressRow}>
-                                        <Text style={[styles.nextEp, { color: '#FFD700' }]}>
-                                            {progress.nextEp}
-                                        </Text>
-                                        <View style={styles.dot} />
-                                        <Text style={[styles.status, { color: themeColors.textDim }]} numberOfLines={1}>
-                                            {progress.countdown}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.timeBadgeContainer}>
-                                        <Feather name="star" size={11} color="#FFD700" />
-                                        <Text style={[styles.timeBadgeText, { color: themeColors.textDim }]} numberOfLines={1}>
-                                            {progress.statusText}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
+                            <WatchNextUpcomingCard
+                                progress={progress}
+                                onPress={(id: string) => router.push(`/details/${id}`)}
+                                themeColors={themeColors}
+                            />
                         )}
                     />
                 </View>

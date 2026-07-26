@@ -46,7 +46,7 @@ import { LevelUpModal } from '../../src/components/ui/LevelUpModal';
 import { RankDetailsModal } from '../../src/components/ui/RankDetailsModal';
 import { UserCollection } from '../../src/types';
 
-const DEFAULT_BANNER = require('../../assets/profile-banner.png');
+const DEFAULT_BANNER = require('../../assets/anime-banner.png');
 const GUEST_AVATAR = require('../../assets/guest-avatar.png');
 const WATCHING_SILHOUETTE = require('../../assets/list-watching.png');
 const COMPLETED_SILHOUETTE = require('../../assets/list-completed.png');
@@ -246,6 +246,11 @@ export default function ProfileScreen() {
         <View style={[styles.headerHero, { paddingTop: insets.top + spacing.sm }]}>
           <View style={{ position: 'absolute', top: insets.top + spacing.sm, right: spacing.md, zIndex: 100 }}>
             <View style={styles.headerActions}>
+              {!isGuest && (
+                <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/saved-posts')}>
+                  <Feather name="bookmark" size={20} color="white" />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.iconButton} onPress={() => setNotificationsEnabled(!notificationsEnabled)}>
                 <Feather name={notificationsEnabled ? "bell" : "bell-off"} size={20} color="white" />
               </TouchableOpacity>
@@ -649,67 +654,7 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* --- ACHIEVEMENTS / BADGES GRID --- */}
-        {!isGuest && (
-          <>
-            <SectionHeader
-              title={`Unlocked Achievements (${(user?.badges || []).length}/${ACHIEVEMENTS.length})`}
-              onViewAll={() => router.push('/achievements' as any)}
-            />
-            {user?.badges && user.badges.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.badgesScroll}
-              >
-                {ACHIEVEMENTS.map(badge => {
-                  const isUnlocked = user.badges?.includes(badge.id);
-                  return (
-                    <View
-                      key={badge.id}
-                      style={[
-                        styles.badgeCard,
-                        {
-                          backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                          borderColor: isUnlocked ? `${themeColors.primary}30` : 'rgba(255, 255, 255, 0.05)',
-                          opacity: isUnlocked ? 1 : 0.35
-                        }
-                      ]}
-                    >
-                      <View style={[
-                        styles.badgeIconCircle,
-                        {
-                          backgroundColor: isUnlocked ? `${themeColors.primary}15` : 'rgba(255, 255, 255, 0.03)'
-                        }
-                      ]}>
-                        <Feather
-                          name={badge.icon as any}
-                          size={18}
-                          color={isUnlocked ? themeColors.primary : 'rgba(255, 255, 255, 0.3)'}
-                        />
-                      </View>
-                      <Text style={[styles.badgeTitleText, { color: isUnlocked ? 'white' : 'rgba(255,255,255,0.4)', fontWeight: 'bold' }]} numberOfLines={1}>
-                        {badge.title}
-                      </Text>
-                      <Text style={[styles.badgeDescText, { color: 'rgba(255,255,255,0.5)' }]} numberOfLines={2}>
-                        {badge.description}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            ) : (
-              <View style={styles.section}>
-                <View style={[styles.emptyBadgesCard, { borderColor: 'rgba(255,255,255,0.05)' }]}>
-                  <Feather name="award" size={24} color="rgba(255,255,255,0.2)" />
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 6, textAlign: 'center' }}>
-                    No achievements unlocked yet. Track anime to earn badges!
-                  </Text>
-                </View>
-              </View>
-            )}
-          </>
-        )}
+
 
 
         <LevelUpModal
@@ -1298,47 +1243,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.xs,
   },
-  badgesScroll: {
-    paddingLeft: spacing.xl,
-    paddingRight: spacing.xl,
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-  badgeCard: {
-    width: 140,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  badgeIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  badgeTitleText: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  badgeDescText: {
-    fontSize: 10,
-    textAlign: 'center',
-    lineHeight: 13,
-  },
-  emptyBadgesCard: {
-    marginHorizontal: spacing.xl,
-    padding: spacing.xl,
-    borderRadius: 20,
-    borderWidth: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
   rankRowTouch: {
     flexDirection: 'row',
     alignItems: 'center',

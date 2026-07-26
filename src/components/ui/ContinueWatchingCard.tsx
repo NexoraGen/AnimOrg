@@ -20,7 +20,7 @@ interface ContinueWatchingCardProps {
   onPress: (animeId: string) => void;
 }
 
-export const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
+export const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = React.memo(({
   entry,
   onPress
 }) => {
@@ -114,7 +114,7 @@ export const ContinueWatchingCard: React.FC<ContinueWatchingCardProps> = ({
       </Pressable>
     </Animated.View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

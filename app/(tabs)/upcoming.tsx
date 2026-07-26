@@ -437,19 +437,29 @@ export default function UpcomingScreen() {
                         <Text style={[styles.trackedGroupCountText, { color: iconColor }]}>{items.length}</Text>
                     </View>
                 </View>
-                <ScrollView
+                <FlatList
+                    data={items}
+                    keyExtractor={(item) => `${tickKey}-${item.id}`}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.trackedScroll}
+                    initialNumToRender={3}
+                    maxToRenderPerBatch={6}
+                    windowSize={3}
+                    removeClippedSubviews={Platform.OS === 'android'}
                     scrollEventThrottle={16}
                     keyboardShouldPersistTaps="handled"
-                >
-                    {items.map(item => (
-                        <TrackedAnimeCard key={`${tickKey}-${item.id}`} media={item}
-                            nextEpisode={item.nextEp} releaseDate={item.releaseTime || item.statusText}
-                            countdown={item.countdown} onPress={(id) => router.push(`/details/${id}`)} />
-                    ))}
-                </ScrollView>
+                    getItemLayout={(data, index) => ({ length: 332, offset: 332 * index, index })}
+                    renderItem={({ item }) => (
+                        <TrackedAnimeCard
+                            media={item}
+                            nextEpisode={item.nextEp}
+                            releaseDate={item.releaseTime || item.statusText}
+                            countdown={item.countdown}
+                            onPress={(id) => router.push(`/details/${id}`)}
+                        />
+                    )}
+                />
             </View>
         );
     };
