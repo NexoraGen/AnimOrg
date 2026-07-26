@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -38,7 +38,8 @@ import {
   SkeletonLoader,
   ReviewComposer,
   AuthPromptModal,
-  TrackingNotificationPrompt
+  TrackingNotificationPrompt,
+  TrailerSection
 } from '../../src/components/ui';
 import { notificationPermission } from '../../src/services/notificationPermission';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
@@ -98,11 +99,12 @@ class SectionGuard extends React.Component<
 
 interface HeroBackdropProps {
   backdropPath?: string | null;
-  trailerUrl?: string | null;
+  hasTrailer?: boolean;
+  onPlayPress?: () => void;
   themeColors: any;
 }
 
-const HeroBackdrop = React.memo(({ backdropPath, trailerUrl, themeColors }: HeroBackdropProps) => {
+const HeroBackdrop = React.memo(({ backdropPath, hasTrailer, onPlayPress, themeColors }: HeroBackdropProps) => {
   const source = React.useMemo(() => (
     typeof backdropPath === 'string' && backdropPath.trim() ? { uri: backdropPath } : { uri: PLACEHOLDER_BACKDROP }
   ), [backdropPath]);
@@ -120,10 +122,10 @@ const HeroBackdrop = React.memo(({ backdropPath, trailerUrl, themeColors }: Hero
         locations={[0, 0.4, 0.6, 1]}
         style={StyleSheet.absoluteFill}
       />
-      {trailerUrl && (
+      {hasTrailer && onPlayPress && (
         <TouchableOpacity
           style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', paddingBottom: 40 }]}
-          onPress={() => Linking.openURL(trailerUrl)}
+          onPress={onPlayPress}
         >
           <View style={[styles.playOverlay, { backgroundColor: `${themeColors.primary}CC` }]}>
             <Feather name="play" size={32} color="#FFF" fill="#FFF" style={{ marginLeft: 4 }} />
@@ -193,6 +195,8 @@ function DetailsScreenInner() {
 
   const shareScale = useRef(new Animated.Value(1)).current;
   const isInputFocused = useRef(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const [isTrailerModalVisible, setTrailerModalVisible] = useState(false);
 
   const [media, setMedia] = useState<Media | null>(null);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -628,6 +632,7 @@ function DetailsScreenInner() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         scrollEventThrottle={16}
       >
@@ -635,7 +640,8 @@ function DetailsScreenInner() {
           <View style={styles.imageContainer}>
             <HeroBackdrop
               backdropPath={media.backdropPath}
-              trailerUrl={media.trailerUrl}
+              hasTrailer={!!media.trailerUrl}
+              onPlayPress={() => setTrailerModalVisible(true)}
               themeColors={themeColors}
             />
 
@@ -660,7 +666,7 @@ function DetailsScreenInner() {
             <View style={styles.actionRow}>
               <Button
                 title={media.trailerUrl ? "Watch Trailer" : "No Trailer"}
-                onPress={() => media.trailerUrl && Linking.openURL(media.trailerUrl)}
+                onPress={() => media.trailerUrl && setTrailerModalVisible(true)}
                 style={styles.trailerButton}
                 disabled={!media.trailerUrl}
                 icon={<Feather name="play" color="#FFF" size={20} fill="#FFF" />}
@@ -788,6 +794,8 @@ function DetailsScreenInner() {
                 </View>
               </View>
             </View>
+
+
 
             {/* Episode Tracking Section */}
             {media.format !== 'Movie' && (
@@ -1126,6 +1134,32 @@ function DetailsScreenInner() {
           />
         </View>
       </CinematicModal>
+
+      {/* Trailer Playback Overlay Modal */}
+      {media && media.trailerUrl && (
+        <CinematicModal
+          visible={isTrailerModalVisible}
+          onClose={() => setTrailerModalVisible(false)}
+          maxWidth={800}
+        >
+          <View style={styles.trailerModalInner}>
+            <TouchableOpacity
+              style={styles.closeTrailerButton}
+              onPress={() => setTrailerModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Feather name="x" color="#FFF" size={24} />
+            </TouchableOpacity>
+            <TrailerSection
+              animeId={id}
+              title={media.title}
+              trailerUrl={media.trailerUrl}
+              thumbnailPath={media.backdropPath}
+              themeColors={themeColors}
+            />
+          </View>
+        </CinematicModal>
+      )}
     </AnimatedScreen>
   );
 }
@@ -1508,5 +1542,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: borderRadius.md,
+  },
+  trailerModalInner: {
+    paddingTop: spacing.XL,
+    paddingBottom: spacing.M,
+    backgroundColor: '#000',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  closeTrailerButton: {
+    position: 'absolute',
+    top: spacing.M,
+    right: spacing.M,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
