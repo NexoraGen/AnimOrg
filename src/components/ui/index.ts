@@ -6,6 +6,7 @@ export * from './SkeletonLoader';
 export * from './ExpandableText';
 export * from './StarRating';
 export * from './ContinueWatchingCard';
+export * from './ContinueWatchingPreviewCard';
 export * from './SectionHeader';
 export * from './GenreChip';
 export * from './ReviewCard';

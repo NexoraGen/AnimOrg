@@ -15,7 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { colors, spacing, borderRadius, typography } from '../../theme';
 import { useAppStore } from '../../store/useAppStore';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { SectionHeader, ContinueWatchingCard } from '../ui';
+import { SectionHeader, ContinueWatchingCard, ContinueWatchingPreviewCard } from '../ui';
 import { getCurrentlyReleasedEpisodesCount, getEpisodeAiringTime, resolveAnimeTrackingStatus } from '../../utils/releaseHelper';
 import { notificationService } from '../../services/notifications';
 import { Media } from '../../types';
@@ -443,16 +443,27 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         subtitle="Pick up where you left off"
                         onViewAll={() => router.push('/category/continue-watching')}
                     />
-                    <View style={styles.verticalListContainer}>
-                        {continueWatchingList.map((entry) => (
-                            <ContinueWatchingCard
-                                key={`cw-${entry.animeId}`}
-                                entry={entry}
+                    <FlatList
+                        data={continueWatchingList.slice(0, 5)}
+                        keyExtractor={(item) => `cw-${item.animeId}`}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.scrollContent}
+                        initialNumToRender={4}
+                        maxToRenderPerBatch={5}
+                        windowSize={5}
+                        removeClippedSubviews={Platform.OS === 'android'}
+                        scrollEventThrottle={16}
+                        keyboardShouldPersistTaps="handled"
+                        getItemLayout={(data, index) => ({ length: 296, offset: 296 * index, index })}
+                        renderItem={({ item }) => (
+                            <ContinueWatchingPreviewCard
+                                entry={item}
                                 onPress={(id) => router.push(`/details/${id}`)}
                                 onPlayPress={(id, nextEp) => router.push(`/details/${id}?episode=${nextEp || 1}&autoplay=true`)}
                             />
-                        ))}
-                    </View>
+                        )}
+                    />
                 </View>
             ) : isAuthenticated && watchlist.length === 0 ? (
                 <View style={styles.sectionWrapper}>
