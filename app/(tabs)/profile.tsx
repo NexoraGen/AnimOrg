@@ -47,7 +47,7 @@ import { LevelUpModal } from '../../src/components/ui/LevelUpModal';
 import { RankDetailsModal } from '../../src/components/ui/RankDetailsModal';
 import { UserCollection } from '../../src/types';
 
-const DEFAULT_BANNER = require('../../assets/anime-banner.png');
+const DEFAULT_BANNER = require('../../assets/profile-banner.png');
 const GUEST_AVATAR = require('../../assets/guest-avatar.png');
 const WATCHING_SILHOUETTE = require('../../assets/list-watching.png');
 const COMPLETED_SILHOUETTE = require('../../assets/list-completed.png');
