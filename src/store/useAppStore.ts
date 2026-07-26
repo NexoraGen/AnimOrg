@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, WatchlistItem, Media, WatchHistoryEntry, UserRating, ActivityFeedItem, AnimeProgress, Episode, NotificationCategorySettings, UserCollection } from '../types';
 import { ACHIEVEMENTS, Badge } from '../config/achievements';
@@ -152,10 +153,10 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       // Hydration Initial State
-      hasHydrated: false,
+      hasHydrated: Platform.OS === 'web' ? true : false,
       setHasHydrated: (val) => set({ hasHydrated: val }),
 
-      isAppInitializing: true,
+      isAppInitializing: Platform.OS === 'web' ? false : true,
       setIsAppInitializing: (val) => set({ isAppInitializing: val }),
 
       // Level Up Modal & Progression State
@@ -1432,13 +1433,28 @@ export const useAppStore = create<AppState>()(
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: (state) => {
         console.log('[Store] AsyncStorage rehydration initiated');
+        // Fallback safety timeout: guarantee hasHydrated flips to true within 1500ms even if AsyncStorage stalls
+        const fallbackTimer = setTimeout(() => {
+          try {
+            useAppStore.getState().setHasHydrated(true);
+          } catch (e) { }
+        }, 1500);
+
         return (hydratedState, error) => {
+          clearTimeout(fallbackTimer);
           if (error) {
             console.error('[Store] AsyncStorage rehydration failed:', error);
           } else {
             console.log('[Store] AsyncStorage rehydration complete!');
-            hydratedState?.setHasHydrated(true);
           }
+          // Always enforce hasHydrated = true so app navigation root never locks into a white screen
+          try {
+            if (hydratedState) {
+              hydratedState.setHasHydrated(true);
+            } else {
+              useAppStore.getState().setHasHydrated(true);
+            }
+          } catch (e) { }
         };
       },
       partialize: (state) => ({

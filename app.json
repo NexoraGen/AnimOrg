@@ -31,7 +31,9 @@
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
     },
     "plugins": [
       "expo-router",
@@ -64,7 +66,10 @@
     },
     "owner": "itisnexora",
     "extra": {
-      "router": {},
+      "router": {
+        "origin": false,
+        "root": "app"
+      },
       "eas": {
         "projectId": "a2a3be68-4799-4025-ab7c-f3f8070eff20"
       }

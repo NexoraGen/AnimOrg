@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, spacing, borderRadius, typography } from '../../src/theme';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
@@ -240,7 +240,7 @@ export default function RegisterScreen() {
                   />
                   {passwordsMatch && (
                     <View style={styles.checkIcon}>
-                      <Check color={colors.success} size={20} />
+                      <Feather name="check" color={colors.success} size={20} />
                     </View>
                   )}
                 </View>

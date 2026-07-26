@@ -1,3 +1,4 @@
+console.log('[ANIMORG_DIAGNOSTIC] RootLayout module evaluated');
 import { useEffect, useState, useRef } from 'react';
 import { View, Platform, ActivityIndicator, Text, StyleSheet, Animated } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -12,20 +13,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 let isHotRefresh = false;
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync().catch(() => {
-  /* reloading the app might cause this to error, which is ok */
-});
-
-// Conditionally import GestureHandlerRootView for native, use plain View on web
-let GestureHandlerRootView: any = View;
+// Prevent the splash screen from auto-hiding before asset loading is complete on native.
 if (Platform.OS !== 'web') {
-  try {
-    GestureHandlerRootView = require('react-native-gesture-handler').GestureHandlerRootView;
-  } catch (e) {
-    // Fallback to View if gesture handler is not available
-  }
+  SplashScreen.preventAutoHideAsync().catch(() => {
+    /* reloading the app might cause this to error, which is ok */
+  });
 }
+
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { CinematicOverlay } from '../src/components/ui/CinematicOverlay';
 import { NotificationPermissionDialog, AnimatedLoader } from '../src/components/ui';
@@ -207,7 +202,7 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
-      <GestureHandlerRootView style={{ flex: 1, overflow: Platform.OS === 'web' ? 'hidden' : undefined }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background || '#0B0B0B', overflow: Platform.OS === 'web' ? 'hidden' : undefined }}>
         {hasHydrated && (
           <Stack
             screenOptions={{
