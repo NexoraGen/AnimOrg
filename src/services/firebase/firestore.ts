@@ -139,13 +139,95 @@ export const firestoreService = {
 
       const q = query(postsRef, ...constraints);
       const snap = await getDocs(q);
+      const posts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityPost));
+
+      const resolvedPosts = auth.currentUser
+        ? await firestoreService.resolveLikesForPosts(auth.currentUser.uid, posts)
+        : posts.map(p => ({ ...p, isLiked: false }));
+
       return {
-        posts: snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityPost)),
+        posts: resolvedPosts,
         lastDoc: snap.docs[snap.docs.length - 1]
       };
     } catch (error) {
       console.error('[FirestoreService] Error getting feed:', error);
       return { posts: [], lastDoc: null };
+    }
+  },
+
+  resolveLikesForPosts: async (userId: string, posts: CommunityPost[]): Promise<CommunityPost[]> => {
+    if (!userId || !posts || posts.length === 0) {
+      return posts.map(p => ({ ...p, isLiked: false }));
+    }
+    try {
+      const postIds = posts.map(p => p.id);
+      const likedPostIds = new Set<string>();
+
+      const chunks: string[][] = [];
+      for (let i = 0; i < postIds.length; i += 30) {
+        chunks.push(postIds.slice(i, i + 30));
+      }
+
+      await Promise.all(chunks.map(async (chunk) => {
+        const q = query(
+          collection(db, 'likes'),
+          where('userId', '==', userId),
+          where('postId', 'in', chunk)
+        );
+        const snap = await getDocs(q);
+        snap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data && data.postId) {
+            likedPostIds.add(data.postId);
+          }
+        });
+      }));
+
+      return posts.map(p => ({
+        ...p,
+        isLiked: likedPostIds.has(p.id)
+      }));
+    } catch (e) {
+      console.error('[FirestoreService] Error resolving likes:', e);
+      return posts.map(p => ({ ...p, isLiked: false }));
+    }
+  },
+
+  resolveLikesForComments: async (userId: string, postId: string, comments: PostComment[]): Promise<PostComment[]> => {
+    if (!userId || !comments || comments.length === 0) {
+      return comments.map(c => ({ ...c, isLiked: false }));
+    }
+    try {
+      const commentIds = comments.map(c => c.id);
+      const likedCommentIds = new Set<string>();
+
+      const chunks: string[][] = [];
+      for (let i = 0; i < commentIds.length; i += 30) {
+        chunks.push(commentIds.slice(i, i + 30));
+      }
+
+      await Promise.all(chunks.map(async (chunk) => {
+        const q = query(
+          collection(db, 'likes'),
+          where('userId', '==', userId),
+          where('commentId', 'in', chunk)
+        );
+        const snap = await getDocs(q);
+        snap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data && data.commentId) {
+            likedCommentIds.add(data.commentId);
+          }
+        });
+      }));
+
+      return comments.map(c => ({
+        ...c,
+        isLiked: likedCommentIds.has(c.id)
+      }));
+    } catch (e) {
+      console.error('[FirestoreService] Error resolving comment likes:', e);
+      return comments.map(c => ({ ...c, isLiked: false }));
     }
   },
 
@@ -272,8 +354,14 @@ export const firestoreService = {
       if (lastDoc) q = query(q, startAfter(lastDoc));
 
       const snap = await getDocs(q);
+      const comments = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PostComment));
+
+      const resolvedComments = auth.currentUser
+        ? await firestoreService.resolveLikesForComments(auth.currentUser.uid, postId, comments)
+        : comments.map(c => ({ ...c, isLiked: false }));
+
       return {
-        comments: snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as PostComment)),
+        comments: resolvedComments,
         lastDoc: snap.docs[snap.docs.length - 1]
       };
     } catch (error) {
