@@ -77,6 +77,7 @@ export default function ProfileScreen() {
   const clearSession = useAppStore(state => state.clearSession);
   const refreshUserData = useAppStore(state => state.refreshUserData);
   const isAppInitializing = useAppStore(state => state.isAppInitializing);
+  const profileError = useAppStore(state => state.profileError);
 
   const levelUpModalVisible = useAppStore(state => state.levelUpModalVisible);
   const setLevelUpModalVisible = useAppStore(state => state.setLevelUpModalVisible);
@@ -86,6 +87,22 @@ export default function ProfileScreen() {
 
   const [userPosts, setUserPosts] = React.useState<CommunityPost[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [retrying, setRetrying] = React.useState(false);
+
+  const handleRetry = React.useCallback(async () => {
+    setRetrying(true);
+    try {
+      if (user?.id) {
+        await refreshUserData();
+      } else {
+        await useAppStore.getState().initializeAuth();
+      }
+    } catch (e) {
+      console.warn("Retry failed:", e);
+    } finally {
+      setRetrying(false);
+    }
+  }, [user, refreshUserData]);
 
   // Stable ref for scroll animations — must be above early-returns (Rules of Hooks)
   const scrollY = React.useRef(new Animated.Value(0)).current;
@@ -214,6 +231,30 @@ export default function ProfileScreen() {
   };
 
   // --- LOADING GUARD: all hooks above; conditional render safely below ---
+  // If startup auth / profile fetched fails completely and there's no cached user, show the premium Retry UI
+  if (!user && profileError) {
+    return (
+      <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center', padding: spacing.xl || 24 }]}>
+        <View style={styles.errorCard}>
+          <Feather name="wifi-off" size={48} color={themeColors.primary} style={{ marginBottom: spacing.md }} />
+          <Text style={[styles.errorTitle, { color: themeColors.text }]}>Unable to Connect</Text>
+          <Text style={[styles.errorSubtitle, { color: themeColors.textDim }]}>{profileError}</Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: themeColors.primary }]}
+            onPress={handleRetry}
+            disabled={retrying}
+          >
+            {retrying ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.retryButtonText}>Retry Connection</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   // Guard includes isAppInitializing so we never render the profile during Firestore hydration
   if (isLoadingAuth || !hasHydrated || isAppInitializing) {
     return (
@@ -227,6 +268,26 @@ export default function ProfileScreen() {
   return (
     <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
       <StatusBar barStyle="light-content" />
+
+      {profileError && (
+        <View style={[styles.offlineBanner, { backgroundColor: themeColors.primary + '33', borderColor: themeColors.primary }]}>
+          <Feather name="alert-triangle" size={16} color={themeColors.primary} style={{ marginRight: spacing.xs }} />
+          <Text style={[styles.offlineBannerText, { color: themeColors.text }]} numberOfLines={1}>
+            Offline - Displaying Cached Data
+          </Text>
+          <TouchableOpacity
+            onPress={handleRetry}
+            disabled={retrying}
+            style={[styles.offlineBannerRetryBtn, { backgroundColor: themeColors.primary }]}
+          >
+            {retrying ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text style={styles.offlineBannerRetryText}>Retry</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Animated.ScrollView
         onScroll={Animated.event(
@@ -1335,5 +1396,67 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 'auto',
+  },
+  errorCard: {
+    padding: spacing.lg,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    maxWidth: 340,
+    width: '100%',
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: spacing.xs,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+    lineHeight: 20,
+  },
+  retryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 180,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  offlineBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  offlineBannerRetryBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginLeft: spacing.sm,
+  },
+  offlineBannerRetryText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
