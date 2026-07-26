@@ -361,9 +361,6 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         removeClippedSubviews={true}
                         // @ts-ignore
                         initialNumToRender={4}
-                        snapToInterval={296}
-                        snapToAlignment="start"
-                        decelerationRate="fast"
                         scrollEventThrottle={16}
                         renderItem={({ item: progress }) => (
                             <TouchableOpacity
@@ -432,9 +429,6 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         removeClippedSubviews={true}
                         // @ts-ignore
                         initialNumToRender={3}
-                        snapToInterval={296}
-                        snapToAlignment="start"
-                        decelerationRate="fast"
                         scrollEventThrottle={16}
                         renderItem={({ item: progress }) => (
                             <AwaitingAnimeCard
@@ -468,9 +462,6 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         removeClippedSubviews={true}
                         // @ts-ignore
                         initialNumToRender={3}
-                        snapToInterval={296}
-                        snapToAlignment="start"
-                        decelerationRate="fast"
                         scrollEventThrottle={16}
                         renderItem={({ item: progress }) => (
                             <TouchableOpacity

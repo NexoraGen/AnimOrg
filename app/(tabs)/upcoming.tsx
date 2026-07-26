@@ -441,9 +441,6 @@ export default function UpcomingScreen() {
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.trackedScroll}
-                    snapToInterval={336}
-                    snapToAlignment="start"
-                    decelerationRate="fast"
                     scrollEventThrottle={16}
                     keyboardShouldPersistTaps="handled"
                 >

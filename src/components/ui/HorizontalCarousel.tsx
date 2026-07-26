@@ -26,6 +26,7 @@ interface HorizontalCarouselProps {
   renderItem?: (info: { item: any; index: number }) => React.ReactElement | null;
   itemWidth?: number;
   icon?: any;
+  disableSnap?: boolean;
 }
 
 const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
@@ -40,7 +41,8 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
   subtitle,
   renderItem,
   itemWidth,
-  icon
+  icon,
+  disableSnap = true
 }) => {
   const colors = useThemeColors();
 
@@ -108,9 +110,9 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
           // @ts-ignore
           estimatedItemSize={width + spacing.md}
           showsHorizontalScrollIndicator={false}
-          snapToInterval={itemWidth || (width + spacing.md)}
-          decelerationRate="fast"
-          snapToAlignment="start"
+          snapToInterval={disableSnap ? undefined : (itemWidth || (width + spacing.md))}
+          decelerationRate={disableSnap ? "normal" : "fast"}
+          snapToAlignment={disableSnap ? undefined : "start"}
           renderItem={renderItemInternal}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
