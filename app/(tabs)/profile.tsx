@@ -89,6 +89,11 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [retrying, setRetrying] = React.useState(false);
 
+  React.useEffect(() => {
+    console.log("[DEBUG PROFILE] [0] Profile screen mounted");
+    return () => console.log("[DEBUG PROFILE] [CLEANUP] Profile screen unmounted");
+  }, []);
+
   const handleRetry = React.useCallback(async () => {
     setRetrying(true);
     try {
@@ -187,14 +192,32 @@ export default function ProfileScreen() {
 
   const loadUserPosts = React.useCallback(async () => {
     if (!user?.id || !isAuthenticated) return;
+
+    console.log("[DEBUG PROFILE] [10] START loadUserPosts");
     try {
-      const result = await firestoreService.getCommunityFeed({
-        userId: user.id,
-        pageSize: 5
+      console.log("[DEBUG PROFILE] [10] ENTER loadUserPosts");
+      // Add a strict timeout to prevent manual pull-to-refresh infinite spins
+      const result = await new Promise<any>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Timeout loading posts")), 6000);
+        firestoreService.getCommunityFeed({
+          userId: user.id,
+          pageSize: 5
+        }).then((res) => {
+          clearTimeout(timer);
+          resolve(res);
+        }).catch((err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
       });
       setUserPosts(result.posts);
+      console.log("[DEBUG PROFILE] [10] SUCCESS loadUserPosts");
     } catch (error) {
+      console.log(`[DEBUG PROFILE] [10] ERROR loadUserPosts: ${error}`);
       console.error('[Profile] Failed to load user posts:', error);
+    } finally {
+      console.log("[DEBUG PROFILE] [10] FINALLY loadUserPosts");
+      console.log("[DEBUG PROFILE] [10] END loadUserPosts");
     }
   }, [user?.id, isAuthenticated]);
 
@@ -209,7 +232,8 @@ export default function ProfileScreen() {
     setRefreshing(true);
     try {
       if (user) {
-        await Promise.all([
+        // Prevent deadlock by using allSettled instead of Promise.all
+        await Promise.allSettled([
           refreshUserData(),
           loadUserPosts()
         ]);
@@ -257,6 +281,7 @@ export default function ProfileScreen() {
 
   // Guard includes isAppInitializing so we never render the profile during Firestore hydration
   if (isLoadingAuth || !hasHydrated || isAppInitializing) {
+    console.log(`[DEBUG PROFILE] Still loading: isLoadingAuth=${isLoadingAuth}, hasHydrated=${hasHydrated}, isAppInitializing=${isAppInitializing}`);
     return (
       <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator color={themeColors.primary} size="large" />
@@ -264,6 +289,8 @@ export default function ProfileScreen() {
       </View>
     );
   }
+
+  console.log("[DEBUG PROFILE] [last] Loading=false, Profile is rendering");
 
   return (
     <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>

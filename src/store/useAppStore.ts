@@ -657,7 +657,7 @@ export const useAppStore = create<AppState>()(
           } catch (error) {
             if (retries <= 0) throw error;
             await new Promise(resolve => setTimeout(resolve, delay));
-            return fetchWithRetry(fn, retries - 1, delay * 1.5); // Exponential delay
+            return fetchWithRetry(fn, retries - 1, delay * 1.5);
           }
         };
 
@@ -665,7 +665,7 @@ export const useAppStore = create<AppState>()(
           console.log(`[Telemetry] Auth success. Initiating profile load for user: ${userId}`);
           const startTime = Date.now();
 
-          // 1. Fetch initial profile once - wait / poll if profile is currently being created on Login/Google Sign-In
+          // 1. Fetch initial profile once
           let fetchError = null;
           let userProfile = await promiseWithTimeout(
             fetchWithRetry(() => firestoreService.getUserProfile(userId)),
@@ -677,6 +677,7 @@ export const useAppStore = create<AppState>()(
             return get().user;
           });
 
+          // Polling database on cold new users (bypassed if explicit network timeout occurred)
           if (!userProfile && !hasCachedProfile && !fetchError) {
             console.warn("[useAppStore] Profile document not found. Polling database...");
             for (let i = 0; i < 7; i++) {
@@ -692,7 +693,7 @@ export const useAppStore = create<AppState>()(
             }
           }
 
-          // Self-heal: If profile document is still absent, auto-create it now so user is never marked raw Guest User
+          // Self-heal: If profile document is still absent, auto-create it now
           if (!userProfile && !hasCachedProfile) {
             if (fetchError) throw fetchError;
             console.log("[Telemetry] Executing self-heal profile creation for new user:", userId);
@@ -743,7 +744,7 @@ export const useAppStore = create<AppState>()(
           });
           console.log(`[Telemetry] Initial profile load succeeded in ${Date.now() - startTime}ms`);
 
-          // Check daily login XP
+          // Check daily login XP synchronously without blocking rendering
           const currentUser = get().user;
           if (currentUser) {
             const loginResult = XPService.processXPEvent(currentUser, 'DAILY_LOGIN');
@@ -756,87 +757,16 @@ export const useAppStore = create<AppState>()(
           }
 
           if (get().notificationsEnabled) {
-            get().registerNotifications();
+            get().registerNotifications(); // Fire and forget
           }
 
-          // 2. Fetch other user metadata silently in the background
-          console.log("[Telemetry] Initiating background fetch for secondary user metadata...");
-          const [history, activity, allProgress, ratings, notInterested, followingList, followersList] = await Promise.all([
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getContinueWatching(userId)),
-              5000,
-              "ContinueWatching metadata load timed out"
-            ).catch((err) => {
-              console.warn("[useAppStore] ContinueWatching fetch error:", err);
-              return get().continueWatching || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getActivityFeed(userId)),
-              5000,
-              "ActivityFeed metadata load timed out"
-            ).catch((err) => {
-              console.warn("[useAppStore] ActivityFeed fetch error:", err);
-              return get().activityFeed || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getAllProgress(userId)),
-              5000,
-              "AllProgress metadata load timed out"
-            ).catch((err) => {
-              console.warn("[useAppStore] AllProgress fetch error:", err);
-              return Object.values(get().animeProgress || {});
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getUserRatings(userId)),
-              5000,
-              "UserRatings metadata load timed out"
-            ).catch((err) => {
-              console.warn("[useAppStore] UserRatings fetch error:", err);
-              return get().userRatings || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getNotInterested(userId)),
-              5000,
-              "NotInterested metadata load timed out"
-            ).catch((err) => {
-              console.warn("[useAppStore] NotInterested fetch error:", err);
-              return get().notInterested || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getUserFollowing(userId)),
-              5000,
-              "UserFollowing metadata load timed out"
-            ).catch((err) => {
-              console.warn("[useAppStore] UserFollowing fetch error:", err);
-              return get().following || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getUserFollowers(userId)),
-              5000,
-              "UserFollowers metadata load timed out"
-            ).catch((err) => {
-              console.warn("[useAppStore] UserFollowers fetch error:", err);
-              return get().followers || [];
-            }),
-          ]);
-
-          const progressMap: Record<string, AnimeProgress> = {};
-          if (allProgress) {
-            allProgress.forEach((p: AnimeProgress) => {
-              progressMap[String(p.animeId)] = p;
-            });
+          // 2. Safely trigger isolated secondary fetching
+          try {
+            const { profileLoadingManager } = require('../services/ProfileLoadingManager');
+            profileLoadingManager.loadSecondaryData(userId, false); // No await. Fire and forget!
+          } catch (mgrError) {
+            console.error("[useAppStore] Failed to trigger secondary profile loading:", mgrError);
           }
-
-          set({
-            continueWatching: history || [],
-            activityFeed: activity || [],
-            animeProgress: progressMap,
-            userRatings: ratings || [],
-            notInterested: notInterested || [],
-            following: followingList || [],
-            followers: followersList || [],
-          });
-          console.log("[Telemetry] Background fetch of user metadata completed successfully.");
 
         } catch (bgError: any) {
           console.error("[useAppStore] Background initial fetch warning:", bgError);
@@ -1495,93 +1425,32 @@ export const useAppStore = create<AppState>()(
         const startTime = Date.now();
 
         try {
-          const [userProfile, history, activity, allProgress, ratings, notInterested, followingList, followersList] = await Promise.all([
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getUserProfile(user.id)),
-              6000,
-              "Refresh profile timeout"
-            ).catch((err) => {
-              console.warn("[useAppStore] Refresh profile error/timeout:", err);
-              return get().user;
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getContinueWatching(user.id)),
-              6000,
-              "Refresh continueWatching timeout"
-            ).catch((err) => {
-              console.warn("[useAppStore] Refresh continueWatching error/timeout:", err);
-              return get().continueWatching || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getActivityFeed(user.id)),
-              6000,
-              "Refresh activityFeed timeout"
-            ).catch((err) => {
-              console.warn("[useAppStore] Refresh activityFeed error/timeout:", err);
-              return get().activityFeed || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getAllProgress(user.id)),
-              6000,
-              "Refresh allProgress timeout"
-            ).catch((err) => {
-              console.warn("[useAppStore] Refresh allProgress error/timeout:", err);
-              return Object.values(get().animeProgress || {});
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getUserRatings(user.id)),
-              6000,
-              "Refresh userRatings timeout"
-            ).catch((err) => {
-              console.warn("[useAppStore] Refresh userRatings error/timeout:", err);
-              return get().userRatings || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getNotInterested(user.id)),
-              6000,
-              "Refresh notInterested timeout"
-            ).catch((err) => {
-              console.warn("[useAppStore] Refresh notInterested error/timeout:", err);
-              return get().notInterested || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getUserFollowing(user.id)),
-              6000,
-              "Refresh userFollowing timeout"
-            ).catch((err) => {
-              console.warn("[useAppStore] Refresh userFollowing error/timeout:", err);
-              return get().following || [];
-            }),
-            promiseWithTimeout(
-              fetchWithRetry(() => firestoreService.getUserFollowers(user.id)),
-              6000,
-              "Refresh userFollowers timeout"
-            ).catch((err) => {
-              console.warn("[useAppStore] Refresh userFollowers error/timeout:", err);
-              return get().followers || [];
-            }),
-          ]);
+          // Only perform critical blocking refresh on the base profile
+          let userProfile = await promiseWithTimeout(
+            fetchWithRetry(() => firestoreService.getUserProfile(user.id)),
+            6000,
+            "Refresh profile timeout"
+          ).catch((err) => {
+            console.warn(`[DEBUG REFRESH] ERROR getUserProfile: ${err}`);
+            return get().user;
+          });
 
-          const progressMap: Record<string, AnimeProgress> = {};
-          if (allProgress) {
-            allProgress.forEach(p => {
-              progressMap[String(p.animeId)] = p;
-            });
-          }
-
+          // Sync critical data
           set((state) => ({
             user: userProfile || state.user,
-            continueWatching: history || [],
-            activityFeed: activity || [],
-            animeProgress: progressMap,
-            userRatings: ratings || [],
-            notInterested: notInterested || [],
-            following: followingList || [],
-            followers: followersList || [],
             collections: userProfile?.collections || state.collections || [],
             profileError: null
           }));
-          console.log(`[Telemetry] refreshUserData completed successfully in ${Date.now() - startTime}ms`);
+
+          // Trigger secondary data fetch completely asynchronously (fire-and-forget)
+          try {
+            const { profileLoadingManager } = require('../services/ProfileLoadingManager');
+            profileLoadingManager.loadSecondaryData(user.id, true);
+          } catch (mgrError) {
+            console.warn("[useAppStore] Failed to trigger secondary profile refresh:", mgrError);
+          }
+
+          console.log(`[Telemetry] refreshUserData primary sync completed in ${Date.now() - startTime}ms`);
         } catch (error: any) {
           console.error("[useAppStore] Failed to refresh user data:", error);
           set({
