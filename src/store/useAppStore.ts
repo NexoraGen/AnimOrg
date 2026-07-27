@@ -22,6 +22,8 @@ interface AppState {
   clearSession: () => void;
   setUser: (user: User | null) => void;
   initializeAuth: () => () => void;
+  retryInitializeProfile: () => Promise<void>;
+  _initializeProfileData: (userId: string, firebaseUser: any, hasCachedProfile: boolean) => Promise<void>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   refreshUserData: () => Promise<void>;
   isAppInitializing: boolean;
@@ -182,6 +184,18 @@ export const useAppStore = create<AppState>()(
       // Profile load errors
       profileError: null,
       setProfileError: (val) => set({ profileError: val }),
+
+      retryInitializeProfile: async () => {
+        const firebaseUser = firebaseAuthService.getCurrentUser();
+        if (!firebaseUser) {
+          set({ profileError: "Authentication session not found." });
+          return;
+        }
+
+        set({ isAppInitializing: true, profileError: null });
+        const hasCachedProfile = false; // Always false on retry since we want a fresh profile
+        await get()._initializeProfileData(firebaseUser.uid, firebaseUser, hasCachedProfile);
+      },
 
       // Level Up Modal & Progression State
       levelUpModalVisible: false,
@@ -534,7 +548,7 @@ export const useAppStore = create<AppState>()(
         const unsubscribeAuth = firebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
           if (firebaseUser) {
             const userId = firebaseUser.uid;
-            const hasCachedProfile = get().user && get().user?.id === userId;
+            const hasCachedProfile = !!(get().user && get().user?.id === userId);
 
             // Guard: If we are already authenticated as the same user and app is fully initialized, do not re-trigger loading sequence
             if (get().isAuthenticated && get().user?.id === userId && !get().isAppInitializing) {
@@ -595,190 +609,7 @@ export const useAppStore = create<AppState>()(
             });
 
             // Asynchronously fetch other data in the background so it never blocks the startup splash screen transition
-            (async () => {
-              try {
-                console.log(`[Telemetry] Auth success. Initiating profile load for user: ${userId}`);
-                const startTime = Date.now();
-
-                // 1. Fetch initial profile once - wait / poll if profile is currently being created on Login/Google Sign-In
-                let userProfile = await promiseWithTimeout(
-                  fetchWithRetry(() => firestoreService.getUserProfile(userId)),
-                  5000,
-                  "Fetching user profile timed out. Please check your internet connection."
-                ).catch((err) => {
-                  console.warn("[useAppStore] Profile fetch timeout or failed, falling back to cached user state if available:", err);
-                  return get().user;
-                });
-
-                if (!userProfile && !hasCachedProfile) {
-                  console.warn("[useAppStore] Profile document not found. Polling database...");
-                  for (let i = 0; i < 7; i++) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    userProfile = await promiseWithTimeout(
-                      firestoreService.getUserProfile(userId),
-                      3000,
-                      `Polling user profile timed out on attempt ${i + 1}`
-                    ).catch(() => null);
-                    if (userProfile) {
-                      break;
-                    }
-                  }
-                }
-
-                // Self-heal: If profile document is still absent, auto-create it now so user is never marked raw Guest User
-                if (!userProfile && !hasCachedProfile) {
-                  console.log("[Telemetry] Executing self-heal profile creation for new user:", userId);
-                  const backupProfile = {
-                    id: userId,
-                    email: firebaseUser.email || '',
-                    username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-                    avatarUrl: firebaseUser.photoURL || '',
-                    favoriteGenres: [],
-                    watchStats: {
-                      animeCount: 0,
-                      totalHours: 0,
-                    },
-                    hasCompletedOnboarding: false
-                  };
-                  await promiseWithTimeout(
-                    firestoreService.createUserProfile(userId, backupProfile),
-                    5000,
-                    "Failed to create new user profile (timeout)."
-                  );
-                  userProfile = backupProfile;
-                }
-
-                if (userProfile && !userProfile.timezone) {
-                  try {
-                    const { autoDetectTimezone } = require('../utils/timezoneHelper');
-                    const detected = autoDetectTimezone();
-                    userProfile.timezone = detected.id;
-                    userProfile.timezoneLabel = detected.label;
-                    userProfile.country = detected.country;
-                    firestoreService.updateUserProfile(userId, {
-                      timezone: detected.id,
-                      timezoneLabel: detected.label,
-                      country: detected.country
-                    }).catch((e: any) => console.warn('Failed to auto-save detected timezone on signup:', e));
-                  } catch (e) {
-                    console.warn('Failed to auto-detect timezone during initialization:', e);
-                  }
-                }
-
-                // Resolve primary authentication and profile info to let splash screen hide instantly
-                set({
-                  user: userProfile || get().user,
-                  collections: userProfile?.collections || get().collections || [],
-                  isAppInitializing: false,
-                  isLoadingAuth: false,
-                  profileError: null
-                });
-                console.log(`[Telemetry] Initial profile load succeeded in ${Date.now() - startTime}ms`);
-
-                // Check daily login XP
-                const currentUser = get().user;
-                if (currentUser) {
-                  const loginResult = XPService.processXPEvent(currentUser, 'DAILY_LOGIN');
-                  if (loginResult.xpAdded > 0) {
-                    set({ user: { ...currentUser, ...loginResult.updatedProfile } });
-                    firestoreService.updateUserProfile(currentUser.id, loginResult.updatedProfile).catch(e => {
-                      console.warn('Failed to save daily login XP:', e);
-                    });
-                  }
-                }
-
-                if (get().notificationsEnabled) {
-                  get().registerNotifications();
-                }
-
-                // 2. Fetch other user metadata silently in the background
-                console.log("[Telemetry] Initiating background fetch for secondary user metadata...");
-                const [history, activity, allProgress, ratings, notInterested, followingList, followersList] = await Promise.all([
-                  promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getContinueWatching(userId)),
-                    5000,
-                    "ContinueWatching metadata load timed out"
-                  ).catch((err) => {
-                    console.warn("[useAppStore] ContinueWatching fetch error:", err);
-                    return get().continueWatching || [];
-                  }),
-                  promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getActivityFeed(userId)),
-                    5000,
-                    "ActivityFeed metadata load timed out"
-                  ).catch((err) => {
-                    console.warn("[useAppStore] ActivityFeed fetch error:", err);
-                    return get().activityFeed || [];
-                  }),
-                  promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getAllProgress(userId)),
-                    5000,
-                    "AllProgress metadata load timed out"
-                  ).catch((err) => {
-                    console.warn("[useAppStore] AllProgress fetch error:", err);
-                    return Object.values(get().animeProgress || {});
-                  }),
-                  promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getUserRatings(userId)),
-                    5000,
-                    "UserRatings metadata load timed out"
-                  ).catch((err) => {
-                    console.warn("[useAppStore] UserRatings fetch error:", err);
-                    return get().userRatings || [];
-                  }),
-                  promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getNotInterested(userId)),
-                    5000,
-                    "NotInterested metadata load timed out"
-                  ).catch((err) => {
-                    console.warn("[useAppStore] NotInterested fetch error:", err);
-                    return get().notInterested || [];
-                  }),
-                  promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getUserFollowing(userId)),
-                    5000,
-                    "UserFollowing metadata load timed out"
-                  ).catch((err) => {
-                    console.warn("[useAppStore] UserFollowing fetch error:", err);
-                    return get().following || [];
-                  }),
-                  promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getUserFollowers(userId)),
-                    5000,
-                    "UserFollowers metadata load timed out"
-                  ).catch((err) => {
-                    console.warn("[useAppStore] UserFollowers fetch error:", err);
-                    return get().followers || [];
-                  }),
-                ]);
-
-                const progressMap: Record<string, AnimeProgress> = {};
-                if (allProgress) {
-                  allProgress.forEach((p: AnimeProgress) => {
-                    progressMap[String(p.animeId)] = p;
-                  });
-                }
-
-                set({
-                  continueWatching: history || [],
-                  activityFeed: activity || [],
-                  animeProgress: progressMap,
-                  userRatings: ratings || [],
-                  notInterested: notInterested || [],
-                  following: followingList || [],
-                  followers: followersList || [],
-                });
-                console.log("[Telemetry] Background fetch of user metadata completed successfully.");
-
-              } catch (bgError: any) {
-                console.error("[useAppStore] Background initial fetch warning:", bgError);
-                set({
-                  isAppInitializing: false,
-                  isLoadingAuth: false,
-                  profileError: bgError?.message || "Failed to initialize active user profile. Please check your internet connection."
-                });
-              }
-            })();
+            get()._initializeProfileData(userId, firebaseUser, hasCachedProfile);
           } else {
             // Unauthenticated state
             if (get().isGuest) {
@@ -817,6 +648,204 @@ export const useAppStore = create<AppState>()(
           }
           unsubscribeAuth();
         };
+      },
+
+      _initializeProfileData: async (userId: string, firebaseUser: any, hasCachedProfile: boolean) => {
+        const fetchWithRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> => {
+          try {
+            return await fn();
+          } catch (error) {
+            if (retries <= 0) throw error;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return fetchWithRetry(fn, retries - 1, delay * 1.5); // Exponential delay
+          }
+        };
+
+        try {
+          console.log(`[Telemetry] Auth success. Initiating profile load for user: ${userId}`);
+          const startTime = Date.now();
+
+          // 1. Fetch initial profile once - wait / poll if profile is currently being created on Login/Google Sign-In
+          let fetchError = null;
+          let userProfile = await promiseWithTimeout(
+            fetchWithRetry(() => firestoreService.getUserProfile(userId)),
+            5000,
+            "Fetching user profile timed out. Please check your internet connection."
+          ).catch((err) => {
+            console.warn("[useAppStore] Profile fetch timeout or failed, falling back to cached user state if available:", err);
+            fetchError = err;
+            return get().user;
+          });
+
+          if (!userProfile && !hasCachedProfile && !fetchError) {
+            console.warn("[useAppStore] Profile document not found. Polling database...");
+            for (let i = 0; i < 7; i++) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              userProfile = await promiseWithTimeout(
+                firestoreService.getUserProfile(userId),
+                3000,
+                `Polling user profile timed out on attempt ${i + 1}`
+              ).catch(() => null);
+              if (userProfile) {
+                break;
+              }
+            }
+          }
+
+          // Self-heal: If profile document is still absent, auto-create it now so user is never marked raw Guest User
+          if (!userProfile && !hasCachedProfile) {
+            if (fetchError) throw fetchError;
+            console.log("[Telemetry] Executing self-heal profile creation for new user:", userId);
+            const backupProfile = {
+              id: userId,
+              email: firebaseUser.email || '',
+              username: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              avatarUrl: firebaseUser.photoURL || '',
+              favoriteGenres: [],
+              watchStats: {
+                animeCount: 0,
+                totalHours: 0,
+              },
+              hasCompletedOnboarding: false
+            };
+            await promiseWithTimeout(
+              firestoreService.createUserProfile(userId, backupProfile),
+              5000,
+              "Failed to create new user profile (timeout)."
+            );
+            userProfile = backupProfile;
+          }
+
+          if (userProfile && !userProfile.timezone) {
+            try {
+              const { autoDetectTimezone } = require('../utils/timezoneHelper');
+              const detected = autoDetectTimezone();
+              userProfile.timezone = detected.id;
+              userProfile.timezoneLabel = detected.label;
+              userProfile.country = detected.country;
+              firestoreService.updateUserProfile(userId, {
+                timezone: detected.id,
+                timezoneLabel: detected.label,
+                country: detected.country
+              }).catch((e: any) => console.warn('Failed to auto-save detected timezone on signup:', e));
+            } catch (e) {
+              console.warn('Failed to auto-detect timezone during initialization:', e);
+            }
+          }
+
+          // Resolve primary authentication and profile info to let splash screen hide instantly
+          set({
+            user: userProfile || get().user,
+            collections: userProfile?.collections || get().collections || [],
+            isAppInitializing: false,
+            isLoadingAuth: false,
+            profileError: null
+          });
+          console.log(`[Telemetry] Initial profile load succeeded in ${Date.now() - startTime}ms`);
+
+          // Check daily login XP
+          const currentUser = get().user;
+          if (currentUser) {
+            const loginResult = XPService.processXPEvent(currentUser, 'DAILY_LOGIN');
+            if (loginResult.xpAdded > 0) {
+              set({ user: { ...currentUser, ...loginResult.updatedProfile } });
+              firestoreService.updateUserProfile(currentUser.id, loginResult.updatedProfile).catch(e => {
+                console.warn('Failed to save daily login XP:', e);
+              });
+            }
+          }
+
+          if (get().notificationsEnabled) {
+            get().registerNotifications();
+          }
+
+          // 2. Fetch other user metadata silently in the background
+          console.log("[Telemetry] Initiating background fetch for secondary user metadata...");
+          const [history, activity, allProgress, ratings, notInterested, followingList, followersList] = await Promise.all([
+            promiseWithTimeout(
+              fetchWithRetry(() => firestoreService.getContinueWatching(userId)),
+              5000,
+              "ContinueWatching metadata load timed out"
+            ).catch((err) => {
+              console.warn("[useAppStore] ContinueWatching fetch error:", err);
+              return get().continueWatching || [];
+            }),
+            promiseWithTimeout(
+              fetchWithRetry(() => firestoreService.getActivityFeed(userId)),
+              5000,
+              "ActivityFeed metadata load timed out"
+            ).catch((err) => {
+              console.warn("[useAppStore] ActivityFeed fetch error:", err);
+              return get().activityFeed || [];
+            }),
+            promiseWithTimeout(
+              fetchWithRetry(() => firestoreService.getAllProgress(userId)),
+              5000,
+              "AllProgress metadata load timed out"
+            ).catch((err) => {
+              console.warn("[useAppStore] AllProgress fetch error:", err);
+              return Object.values(get().animeProgress || {});
+            }),
+            promiseWithTimeout(
+              fetchWithRetry(() => firestoreService.getUserRatings(userId)),
+              5000,
+              "UserRatings metadata load timed out"
+            ).catch((err) => {
+              console.warn("[useAppStore] UserRatings fetch error:", err);
+              return get().userRatings || [];
+            }),
+            promiseWithTimeout(
+              fetchWithRetry(() => firestoreService.getNotInterested(userId)),
+              5000,
+              "NotInterested metadata load timed out"
+            ).catch((err) => {
+              console.warn("[useAppStore] NotInterested fetch error:", err);
+              return get().notInterested || [];
+            }),
+            promiseWithTimeout(
+              fetchWithRetry(() => firestoreService.getUserFollowing(userId)),
+              5000,
+              "UserFollowing metadata load timed out"
+            ).catch((err) => {
+              console.warn("[useAppStore] UserFollowing fetch error:", err);
+              return get().following || [];
+            }),
+            promiseWithTimeout(
+              fetchWithRetry(() => firestoreService.getUserFollowers(userId)),
+              5000,
+              "UserFollowers metadata load timed out"
+            ).catch((err) => {
+              console.warn("[useAppStore] UserFollowers fetch error:", err);
+              return get().followers || [];
+            }),
+          ]);
+
+          const progressMap: Record<string, AnimeProgress> = {};
+          if (allProgress) {
+            allProgress.forEach((p: AnimeProgress) => {
+              progressMap[String(p.animeId)] = p;
+            });
+          }
+
+          set({
+            continueWatching: history || [],
+            activityFeed: activity || [],
+            animeProgress: progressMap,
+            userRatings: ratings || [],
+            notInterested: notInterested || [],
+            following: followingList || [],
+            followers: followersList || [],
+          });
+          console.log("[Telemetry] Background fetch of user metadata completed successfully.");
+
+        } catch (bgError: any) {
+          console.error("[useAppStore] Background initial fetch warning:", bgError);
+          set({
+            isAppInitializing: false,
+            isLoadingAuth: false,
+            profileError: bgError?.message || "Failed to initialize active user profile. Please check your internet connection."
+          });
+        }
       },
 
       updateProfile: async (data) => {

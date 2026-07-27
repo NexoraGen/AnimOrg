@@ -95,7 +95,7 @@ export default function ProfileScreen() {
       if (user?.id) {
         await refreshUserData();
       } else {
-        await useAppStore.getState().initializeAuth();
+        await useAppStore.getState().retryInitializeProfile();
       }
     } catch (e) {
       console.warn("Retry failed:", e);
