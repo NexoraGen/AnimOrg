@@ -21,15 +21,15 @@ class HomeService {
 
         // Fetch all categories with a 600ms stagger to fit Jikan API's 3 requests/sec rate limit exactly, preventing 429 storms.
         const results = await Promise.allSettled([
-            AnimeService.getTrendingAnime(1, 20, config),
+            AnimeService.getTrendingAnime(1, 20, undefined, config),
             new Promise((resolve) => setTimeout(resolve, 600)).then(() =>
-                AnimeService.getTopAnime(1, undefined, 20, config)
+                AnimeService.getTopAnime(1, undefined, 20, undefined, config)
             ),
             new Promise((resolve) => setTimeout(resolve, 1200)).then(() =>
-                AnimeService.getCurrentSeason(1, 20, config)
+                AnimeService.getCurrentSeason(1, 20, undefined, config)
             ),
             new Promise((resolve) => setTimeout(resolve, 1800)).then(() =>
-                AnimeService.getUpcomingAnime(1, 20, config)
+                AnimeService.getUpcomingAnime(1, 20, undefined, config)
             ),
             new Promise((resolve) => setTimeout(resolve, 2400)).then(() =>
                 AnimeService.getSchedule(undefined, 1, 20, config)
