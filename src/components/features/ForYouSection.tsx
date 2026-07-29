@@ -141,10 +141,10 @@ const ForYouSectionComponent: React.FC = () => {
                     </View>
 
                     <Text style={[styles.onboardTitle, { color: themeColors.text }]}>
-                        ✨ Your recommendations start here
+                        ✨ Unlock Recommendations
                     </Text>
                     <Text style={[styles.onboardDesc, { color: themeColors.textDim }]}>
-                        Start building your anime journey by tracking your favorite series and creating your Watchlist. The more you watch and track, the smarter your recommendations become.
+                        Track the anime you watch to get personalized suggestions.
                     </Text>
 
                     <View style={styles.buttonGroup}>

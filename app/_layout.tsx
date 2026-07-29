@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import { useEffect, useState, useRef } from 'react';
 import { View, Platform, ActivityIndicator, Text, StyleSheet, Animated, AppState, TouchableOpacity } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -12,6 +13,8 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { VersionCheckService } from '../src/services/VersionCheckService';
+import { UpdateAvailableModal } from '../src/components/ui/UpdateAvailableModal';
 
 let isHotRefresh = false;
 
@@ -20,15 +23,9 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   /* reloading the app might cause this to error, which is ok */
 });
 
-// Conditionally import GestureHandlerRootView for native, use plain View on web
-let GestureHandlerRootView: any = View;
-if (Platform.OS !== 'web') {
-  try {
-    GestureHandlerRootView = require('react-native-gesture-handler').GestureHandlerRootView;
-  } catch (e) {
-    // Fallback to View if gesture handler is not available
-  }
-}
+// Native app relies on GestureHandlerRootView which is now safely initialized at the top.
+import { GestureHandlerRootView as RNGesRoot } from 'react-native-gesture-handler';
+const GestureHandlerRootView = Platform.OS === 'web' ? View : RNGesRoot;
 
 import { CinematicOverlay } from '../src/components/ui/CinematicOverlay';
 import { NotificationPermissionDialog, AnimatedLoader } from '../src/components/ui';
@@ -71,6 +68,12 @@ export default function RootLayout() {
 
   const [showNotifDialog, setShowNotifDialog] = useState(false);
 
+  const [updateVisible, setUpdateVisible] = useState(false);
+  const [versionInfo, setVersionInfo] = useState<any>(null);
+  const [isForceUpdate, setIsForceUpdate] = useState(false);
+  const [playStoreUrl, setPlayStoreUrl] = useState('');
+  const hasDeferredUpdateThisSession = useRef(false);
+
   useEffect(() => {
     if (!hasHydrated || isLoadingAuth) return;
     const checkOnboarding = async () => {
@@ -84,6 +87,39 @@ export default function RootLayout() {
 
   const router = useRouter();
   const segments = useSegments();
+
+  // App Update Checker
+  useEffect(() => {
+    if (!hasHydrated || isLoadingAuth) return;
+
+    const checkUpdate = async () => {
+      if (hasDeferredUpdateThisSession.current) return;
+
+      const segmentsList = segments as string[];
+      if (segmentsList[0] === '(auth)') return; // don't interrupt auth stack
+
+      const res = await VersionCheckService.checkForUpdates();
+      if (res.isUpdateAvailable) {
+        setVersionInfo(res.versionInfo);
+        setIsForceUpdate(res.isForceUpdate);
+        setPlayStoreUrl(res.playStoreUrl);
+        setUpdateVisible(true);
+      }
+    };
+
+    // Initial check
+    checkUpdate();
+
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkUpdate();
+      }
+    });
+
+    return () => {
+      appStateSubscription.remove();
+    };
+  }, [hasHydrated, isLoadingAuth, segments]);
 
   // Root Layout Global Intercept and Onboarding Guardian
   useEffect(() => {
@@ -303,6 +339,16 @@ export default function RootLayout() {
           <NotificationPermissionDialog
             visible={showNotifDialog}
             onClose={() => setShowNotifDialog(false)}
+          />
+          <UpdateAvailableModal
+            visible={updateVisible}
+            versionInfo={versionInfo}
+            isForceUpdate={isForceUpdate}
+            playStoreUrl={playStoreUrl}
+            onLater={() => {
+              hasDeferredUpdateThisSession.current = true;
+              setUpdateVisible(false);
+            }}
           />
           <AchievementUnlockModal
             visible={achievementUnlockModalVisible}

@@ -188,25 +188,35 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
                 {/* 3. EMBEDDED IFRAME PLAYER */}
                 {isPlaying && !hasError && youtubeId && (
                     <View style={StyleSheet.absoluteFill}>
-                        <YoutubeIframe
-                            videoId={youtubeId}
-                            height={playerHeight}
-                            width={containerWidth}
-                            play={true}
-                            forceAndroidAutoplay={true}
-                            onReady={handlePlayerReady}
-                            onError={handlePlayerError}
-                            webViewProps={{
-                                androidLayerType: 'hardware',
-                                allowsInlineMediaPlayback: true,
-                            }}
-                            initialPlayerParams={{
-                                modestbranding: true,
-                                rel: false,
-                                controls: true,
-                                ccloadpolicy: true
-                            }}
-                        />
+                        {Platform.OS === 'web' ? (
+                            <iframe
+                                src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&controls=1&modestbranding=1&rel=0`}
+                                style={{ width: '100%', height: '100%', border: 'none' }}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen={true}
+                                onLoad={handlePlayerReady}
+                            />
+                        ) : (
+                            <YoutubeIframe
+                                videoId={youtubeId}
+                                height={playerHeight}
+                                width={containerWidth}
+                                play={true}
+                                forceAndroidAutoplay={true}
+                                onReady={handlePlayerReady}
+                                onError={handlePlayerError}
+                                webViewProps={{
+                                    androidLayerType: 'hardware',
+                                    allowsInlineMediaPlayback: true,
+                                }}
+                                initialPlayerParams={{
+                                    modestbranding: true,
+                                    rel: false,
+                                    controls: true,
+                                    ccloadpolicy: true
+                                }}
+                            />
+                        )}
                     </View>
                 )}
 

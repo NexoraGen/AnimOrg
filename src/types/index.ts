@@ -111,6 +111,7 @@ export interface User {
   favoriteBadgeId?: string | null;
   collections?: UserCollection[];
   pushToken?: string | null;
+  fcmToken?: string | null;
   notificationsEnabled?: boolean;
   notificationSettings?: NotificationCategorySettings;
   notificationFrequency?: 'minimal' | 'balanced' | 'all';

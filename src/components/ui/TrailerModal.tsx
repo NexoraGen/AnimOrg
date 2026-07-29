@@ -7,7 +7,8 @@ import {
     Modal,
     ActivityIndicator,
     useWindowDimensions,
-    Linking
+    Linking,
+    Platform
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -123,24 +124,34 @@ export const TrailerModal: React.FC<TrailerModalProps> = ({ visible, trailerUrl,
 
                     {/* Active YT Frame */}
                     {!hasError && youtubeId && (
-                        <YoutubeIframe
-                            videoId={youtubeId!}
-                            height={playerHeight}
-                            width={playerWidth}
-                            play={true}
-                            forceAndroidAutoplay={true}
-                            onReady={handlePlayerReady}
-                            onError={handlePlayerError}
-                            initialPlayerParams={{
-                                modestbranding: true,
-                                rel: false,
-                                controls: true
-                            }}
-                            webViewProps={{
-                                androidLayerType: 'hardware',
-                                allowsInlineMediaPlayback: true,
-                            }}
-                        />
+                        Platform.OS === 'web' ? (
+                            <iframe
+                                src={`https://www.youtube.com/embed/${youtubeId}?autoplay=1&controls=1&modestbranding=1&rel=0`}
+                                style={{ width: playerWidth, height: playerHeight, border: 'none' }}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen={true}
+                                onLoad={handlePlayerReady}
+                            />
+                        ) : (
+                            <YoutubeIframe
+                                videoId={youtubeId!}
+                                height={playerHeight}
+                                width={playerWidth}
+                                play={true}
+                                forceAndroidAutoplay={true}
+                                onReady={handlePlayerReady}
+                                onError={handlePlayerError}
+                                initialPlayerParams={{
+                                    modestbranding: true,
+                                    rel: false,
+                                    controls: true
+                                }}
+                                webViewProps={{
+                                    androidLayerType: 'hardware',
+                                    allowsInlineMediaPlayback: true,
+                                }}
+                            />
+                        )
                     )}
 
                     {/* Fallback Guard */}

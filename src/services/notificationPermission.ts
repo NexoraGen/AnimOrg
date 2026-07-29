@@ -100,6 +100,29 @@ export const notificationPermission = {
     },
 
     /**
+     * Get the native FCM/APNS device push token.
+     */
+    getPushToken: async (): Promise<string | null> => {
+        if (Platform.OS === 'web') return null;
+
+        const isExpoGo =
+            Constants.appOwnership === 'expo' ||
+            Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+        if (isExpoGo) return null;
+
+        const Notifications = getNotificationsModule();
+        if (!Notifications) return null;
+
+        try {
+            const tokenQuery = await Notifications.getDevicePushTokenAsync();
+            return tokenQuery.data;
+        } catch (e) {
+            console.warn('[NotificationPermission] Failed to get device push token:', e);
+            return null;
+        }
+    },
+
+    /**
      * Open device notification settings for this app.
      */
     openSettings: async (): Promise<void> => {

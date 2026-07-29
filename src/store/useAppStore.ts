@@ -1302,6 +1302,18 @@ export const useAppStore = create<AppState>()(
           if (token) {
             set({ pushToken: token });
             await firestoreService.setUserPushToken(user.id, token);
+
+            // Also store pure FCM token for native Firebase backend interactions
+            try {
+              const { notificationPermission } = require('../services/notificationPermission');
+              const fcmToken = await notificationPermission.getPushToken();
+              if (fcmToken) {
+                await firestoreService.updateUserProfile(user.id, { fcmToken });
+              }
+            } catch (fcmError) {
+              console.warn('Failed to store raw FCM token:', fcmError);
+            }
+
             console.log('Successfully registered push token');
           }
         } catch (error) {
