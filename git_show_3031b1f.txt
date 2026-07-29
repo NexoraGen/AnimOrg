@@ -1,0 +1,756 @@
+commit 3031b1f685d3c9c2bda4c7f2bf48a0f0e58f90c2
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 01:33:29 2026 +0530
+
+    feat: implement View All Ranks progression screen and profile triggers
+
+diff --git a/app/(tabs)/profile.tsx b/app/(tabs)/profile.tsx
+index 86f4389..92f64d2 100644
+--- a/app/(tabs)/profile.tsx
++++ b/app/(tabs)/profile.tsx
+@@ -322,6 +322,16 @@ export default function ProfileScreen() {
+                   <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.4)" style={{ marginLeft: 2 }} />
+                 </TouchableOpacity>
+ 
++                <TouchableOpacity
++                  onPress={() => router.push('/ranks')}
++                  activeOpacity={0.7}
++                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 }}
++                >
++                  <Feather name="award" size={12} color={themeColors.primary} />
++                  <Text style={{ color: themeColors.primary, fontSize: 12, fontWeight: '700' }}>View All Ranks</Text>
++                  <Feather name="chevron-right" size={12} color={themeColors.primary} />
++                </TouchableOpacity>
++
+                 {!isGuest && levelInfo.nextRankTitle && (
+                   <Text style={[styles.nextRankPromo, { color: themeColors.textDim, marginTop: 4 }]}>
+                     Next Rank: {levelInfo.nextRankTitle} (Level {levelInfo.nextRankMinLevel})
+diff --git a/app/_layout.tsx b/app/_layout.tsx
+index d10d7aa..f139f15 100644
+--- a/app/_layout.tsx
++++ b/app/_layout.tsx
+@@ -186,6 +186,7 @@ export default function RootLayout() {
+             <Stack.Screen name="(tabs)" options={{ animation: Platform.OS === 'web' ? 'none' : 'fade' }} />
+             <Stack.Screen name="details/[id]" options={{ presentation: Platform.OS === 'web' ? 'card' : 'modal' }} />
+             <Stack.Screen name="category/[type]" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
++            <Stack.Screen name="ranks" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
+             <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
+             <Stack.Screen name="create-post" options={{ animation: 'slide_from_bottom' }} />
+           </Stack>
+diff --git a/app/ranks.tsx b/app/ranks.tsx
+new file mode 100644
+index 0000000..2b4ebf2
+--- /dev/null
++++ b/app/ranks.tsx
+@@ -0,0 +1,484 @@
++import React, { useMemo } from 'react';
++import {
++    View,
++    Text,
++    StyleSheet,
++    ScrollView,
++    TouchableOpacity,
++    Platform,
++    useWindowDimensions
++} from 'react-native';
++import { useRouter } from 'expo-router';
++import { useSafeAreaInsets } from 'react-native-safe-area-context';
++import { LinearGradient } from 'expo-linear-gradient';
++import { Feather } from '@expo/vector-icons';
++import Animated, { FadeInUp } from 'react-native-reanimated';
++
++import { AnimatedScreen } from '../src/components/layout/AnimatedScreen';
++import { GlassHeader } from '../src/components/ui/GlassHeader';
++import { useThemeColors } from '../src/hooks/useThemeColors';
++import { useAppStore } from '../src/store/useAppStore';
++import { LevelService } from '../src/services/LevelService';
++import { RankService, RankProgressItem } from '../src/services/RankService';
++import { spacing } from '../src/theme';
++
++export default function RanksScreen() {
++    const router = useRouter();
++    const insets = useSafeAreaInsets();
++    const themeColors = useThemeColors();
++    const { width } = useWindowDimensions();
++    const isDesktop = width > 768;
++
++    const user = useAppStore(state => state.user);
++
++    // Compute current user level and rank progress
++    const levelInfo = useMemo(() => {
++        return LevelService.getLevelInfo(user?.xp || 0);
++    }, [user?.xp]);
++
++    const allRanks = useMemo(() => {
++        return RankService.getAllRanksWithProgress(levelInfo.level, levelInfo.currentXp);
++    }, [levelInfo.level, levelInfo.currentXp]);
++
++    const currentRankItem = useMemo(() => {
++        return allRanks.find(r => r.status === 'current') || allRanks[0];
++    }, [allRanks]);
++
++    const nextRankItem = useMemo(() => {
++        return allRanks.find(r => r.minimumLevel > levelInfo.level) || null;
++    }, [allRanks, levelInfo.level]);
++
++    return (
++        <AnimatedScreen style={{ backgroundColor: themeColors.background }}>
++            <GlassHeader
++                title="AnimOrg Ranks"
++                leftComponent={
++                    <TouchableOpacity
++                        onPress={() => router.back()}
++                        style={[styles.headerButton, { backgroundColor: 'rgba(255,255,255,0.06)' }]}
++                        activeOpacity={0.7}
++                    >
++                        <Feather name="arrow-left" size={20} color={themeColors.text} />
++                    </TouchableOpacity>
++                }
++            />
++
++            <ScrollView
++                showsVerticalScrollIndicator={false}
++                contentContainerStyle={[
++                    styles.scrollContent,
++                    {
++                        paddingTop: Platform.OS === 'ios' ? insets.top + 60 : 70,
++                        paddingBottom: insets.bottom + 40,
++                        maxWidth: isDesktop ? 800 : '100%',
++                        alignSelf: isDesktop ? 'center' : 'stretch',
++                        width: '100%',
++                    }
++                ]}
++            >
++                {/* --- OVERALL PROGRESS HEADER CARD --- */}
++                <Animated.View entering={FadeInUp.duration(400)}>
++                    <LinearGradient
++                        colors={[`${themeColors.primary}25`, 'rgba(20,20,28,0.95)']}
++                        start={{ x: 0, y: 0 }}
++                        end={{ x: 1, y: 1 }}
++                        style={[styles.progressCard, { borderColor: `${themeColors.primary}40` }]}
++                    >
++                        <View style={styles.cardHeaderRow}>
++                            <View style={styles.rankIconBadge}>
++                                <Text style={{ fontSize: 32 }}>{currentRankItem.icon}</Text>
++                            </View>
++                            <View style={{ flex: 1 }}>
++                                <Text style={[styles.cardSubtitle, { color: themeColors.primary }]}>CURRENT RANK</Text>
++                                <Text style={[styles.cardTitle, { color: themeColors.text }]}>{levelInfo.rankTitle}</Text>
++                                <Text style={[styles.cardMetaText, { color: themeColors.textDim }]}>
++                                    Level {levelInfo.level} • {levelInfo.currentXp.toLocaleString()} Total XP
++                                </Text>
++                            </View>
++                        </View>
++
++                        {/* XP Progress Track */}
++                        <View style={styles.xpTrackWrapper}>
++                            <View style={styles.xpTextRow}>
++                                <Text style={[styles.xpText, { color: themeColors.textMuted }]}>
++                                    {levelInfo.currentXp - levelInfo.xpForCurrentLevel} / {levelInfo.xpForNextLevel - levelInfo.xpForCurrentLevel} XP
++                                </Text>
++                                <Text style={[styles.xpPctText, { color: themeColors.primary }]}>
++                                    {Math.round(levelInfo.progressPercentage)}%
++                                </Text>
++                            </View>
++
++                            <View style={[styles.trackBackground, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
++                                <LinearGradient
++                                    colors={[themeColors.primary, '#FF3B30']}
++                                    start={{ x: 0, y: 0 }}
++                                    end={{ x: 1, y: 0 }}
++                                    style={[styles.trackFill, { width: `${Math.min(100, Math.max(0, levelInfo.progressPercentage))}%` }]}
++                                />
++                            </View>
++                        </View>
++
++                        {/* Next Rank Requirement Banner */}
++                        {nextRankItem ? (
++                            <View style={[styles.nextRankBanner, { backgroundColor: `${themeColors.primary}12`, borderColor: `${themeColors.primary}30` }]}>
++                                <Feather name="trending-up" size={16} color={themeColors.primary} />
++                                <Text style={[styles.nextRankText, { color: themeColors.text }]}>
++                                    You need <Text style={{ color: themeColors.primary, fontWeight: '800' }}>{(nextRankItem.xpRequired - levelInfo.currentXp).toLocaleString()} XP</Text> to reach <Text style={{ color: themeColors.primary, fontWeight: '800' }}>{nextRankItem.title}</Text>.
++                                </Text>
++                            </View>
++                        ) : (
++                            <View style={[styles.nextRankBanner, { backgroundColor: `${themeColors.primary}15`, borderColor: `${themeColors.primary}30` }]}>
++                                <Feather name="award" size={16} color={themeColors.primary} />
++                                <Text style={[styles.nextRankText, { color: themeColors.text }]}>
++                                    You have reached the maximum rank: <Text style={{ color: themeColors.primary, fontWeight: '800' }}>AnimOrg Grandmaster</Text>!
++                                </Text>
++                            </View>
++                        )}
++
++                        {/* Motivational Text */}
++                        <View style={styles.motivationalRow}>
++                            <Feather name="zap" size={14} color="rgba(255,255,255,0.5)" />
++                            <Text style={[styles.motivationalText, { color: themeColors.textDim }]}>
++                                Keep watching and completing anime to unlock your next AnimOrg Rank.
++                            </Text>
++                        </View>
++                    </LinearGradient>
++                </Animated.View>
++
++                {/* --- SECTION TITLE --- */}
++                <View style={styles.sectionHeader}>
++                    <Text style={[styles.sectionTitle, { color: themeColors.text }]}>All AnimOrg Ranks</Text>
++                    <Text style={[styles.sectionSubtitle, { color: themeColors.textDim }]}>9 Rank Tiers to Master</Text>
++                </View>
++
++                {/* --- RANKS TIMELINE LIST --- */}
++                <View style={styles.ranksList}>
++                    {allRanks.map((rank, index) => (
++                        <RankCardItem
++                            key={rank.id}
++                            rank={rank}
++                            index={index}
++                            themeColors={themeColors}
++                            isLast={index === allRanks.length - 1}
++                        />
++                    ))}
++                </View>
++            </ScrollView>
++        </AnimatedScreen>
++    );
++}
++
++interface RankCardItemProps {
++    rank: RankProgressItem;
++    index: number;
++    themeColors: any;
++    isLast: boolean;
++}
++
++const RankCardItem: React.FC<RankCardItemProps> = React.memo(({ rank, index, themeColors, isLast }) => {
++    const isCurrent = rank.status === 'current';
++    const isUnlocked = rank.status === 'unlocked';
++    const isLocked = rank.status === 'locked';
++
++    return (
++        <Animated.View entering={FadeInUp.delay(index * 50).duration(300)}>
++            <View style={styles.timelineRow}>
++                {/* Timeline Connector Line */}
++                {!isLast && (
++                    <View
++                        style={[
++                            styles.timelineLine,
++                            { backgroundColor: isUnlocked || isCurrent ? `${themeColors.primary}40` : 'rgba(255,255,255,0.06)' }
++                        ]}
++                    />
++                )}
++
++                {/* Rank Card Container */}
++                <View
++                    style={[
++                        styles.rankCard,
++                        isCurrent && [
++                            styles.currentRankCard,
++                            { borderColor: themeColors.primary, backgroundColor: `${themeColors.primary}12` }
++                        ],
++                        isUnlocked && {
++                            borderColor: 'rgba(255,255,255,0.12)',
++                            backgroundColor: 'rgba(255,255,255,0.03)'
++                        },
++                        isLocked && {
++                            borderColor: 'rgba(255,255,255,0.05)',
++                            backgroundColor: 'rgba(255,255,255,0.015)',
++                            opacity: 0.6
++                        }
++                    ]}
++                >
++                    <View style={styles.cardTopRow}>
++                        {/* Icon Circle */}
++                        <View
++                            style={[
++                                styles.iconContainer,
++                                isCurrent && { backgroundColor: `${themeColors.primary}25`, borderColor: themeColors.primary },
++                                isUnlocked && { backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.15)' },
++                                isLocked && { backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.05)' }
++                            ]}
++                        >
++                            <Text style={{ fontSize: 26 }}>{rank.icon}</Text>
++                        </View>
++
++                        {/* Rank Details */}
++                        <View style={{ flex: 1, marginLeft: spacing.md }}>
++                            <View style={styles.rankTitleRow}>
++                                <Text
++                                    style={[
++                                        styles.rankItemTitle,
++                                        { color: isCurrent ? themeColors.primary : themeColors.text }
++                                    ]}
++                                >
++                                    {rank.title}
++                                </Text>
++
++                                {/* Status Badge */}
++                                {isCurrent && (
++                                    <View style={[styles.statusBadge, { backgroundColor: themeColors.primary }]}>
++                                        <Text style={styles.statusBadgeText}>CURRENT RANK</Text>
++                                    </View>
++                                )}
++                                {isUnlocked && (
++                                    <View style={[styles.statusBadge, { backgroundColor: '#34C75925', borderColor: '#34C759' }]}>
++                                        <Feather name="check" size={10} color="#34C759" style={{ marginRight: 2 }} />
++                                        <Text style={[styles.statusBadgeText, { color: '#34C759' }]}>UNLOCKED</Text>
++                                    </View>
++                                )}
++                                {isLocked && (
++                                    <View style={[styles.statusBadge, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}>
++                                        <Feather name="lock" size={10} color={themeColors.textDim} style={{ marginRight: 2 }} />
++                                        <Text style={[styles.statusBadgeText, { color: themeColors.textDim }]}>LOCKED</Text>
++                                    </View>
++                                )}
++                            </View>
++
++                            {/* Requirement & Level */}
++                            <Text style={[styles.reqText, { color: themeColors.textDim }]}>
++                                Min Level {rank.minimumLevel} • {rank.xpRequired.toLocaleString()} XP
++                            </Text>
++                        </View>
++                    </View>
++
++                    {/* Description */}
++                    <Text style={[styles.rankDescription, { color: isCurrent ? themeColors.text : themeColors.textMuted }]}>
++                        "{rank.description}"
++                    </Text>
++
++                    {/* Progress Bar for Current Rank */}
++                    {isCurrent && (
++                        <View style={{ marginTop: spacing.md }}>
++                            <View style={[styles.trackBackground, { height: 6, backgroundColor: 'rgba(255,255,255,0.1)' }]}>
++                                <View
++                                    style={[
++                                        styles.trackFill,
++                                        { height: 6, width: `${rank.progressPercentage}%`, backgroundColor: themeColors.primary }
++                                    ]}
++                                />
++                            </View>
++                        </View>
++                    )}
++
++                    {/* Locked XP Needed Banner */}
++                    {isLocked && (
++                        <Text style={[styles.lockedNeededText, { color: themeColors.textDim }]}>
++                            Needs <Text style={{ color: themeColors.primary, fontWeight: '700' }}>{rank.xpNeededToUnlock.toLocaleString()} XP</Text> more to unlock.
++                        </Text>
++                    )}
++                </View>
++            </View>
++        </Animated.View>
++    );
++});
++
++const styles = StyleSheet.create({
++    headerButton: {
++        width: 38,
++        height: 38,
++        borderRadius: 19,
++        alignItems: 'center',
++        justifyContent: 'center',
++    },
++    scrollContent: {
++        paddingHorizontal: spacing.xl,
++    },
++    progressCard: {
++        borderRadius: 24,
++        borderWidth: 1,
++        padding: spacing.xl,
++        marginBottom: spacing.xl,
++    },
++    cardHeaderRow: {
++        flexDirection: 'row',
++        alignItems: 'center',
++    },
++    rankIconBadge: {
++        width: 56,
++        height: 56,
++        borderRadius: 28,
++        backgroundColor: 'rgba(255,255,255,0.06)',
++        alignItems: 'center',
++        justifyContent: 'center',
++        marginRight: spacing.md,
++    },
++    cardSubtitle: {
++        fontSize: 10,
++        fontWeight: '900',
++        letterSpacing: 1,
++        textTransform: 'uppercase',
++        marginBottom: 2,
++    },
++    cardTitle: {
++        fontSize: 22,
++        fontWeight: '900',
++        letterSpacing: -0.5,
++    },
++    cardMetaText: {
++        fontSize: 12,
++        marginTop: 2,
++    },
++    xpTrackWrapper: {
++        marginTop: spacing.lg,
++    },
++    xpTextRow: {
++        flexDirection: 'row',
++        justifyContent: 'space-between',
++        marginBottom: 6,
++    },
++    xpText: {
++        fontSize: 12,
++        fontWeight: '600',
++    },
++    xpPctText: {
++        fontSize: 12,
++        fontWeight: '900',
++    },
++    trackBackground: {
++        height: 8,
++        borderRadius: 4,
++        overflow: 'hidden',
++        width: '100%',
++    },
++    trackFill: {
++        height: '100%',
++        borderRadius: 4,
++    },
++    nextRankBanner: {
++        flexDirection: 'row',
++        alignItems: 'center',
++        gap: spacing.sm,
++        paddingHorizontal: spacing.md,
++        paddingVertical: spacing.sm,
++        borderRadius: 12,
++        borderWidth: 1,
++        marginTop: spacing.lg,
++    },
++    nextRankText: {
++        fontSize: 13,
++        flex: 1,
++        lineHeight: 18,
++    },
++    motivationalRow: {
++        flexDirection: 'row',
++        alignItems: 'center',
++        gap: 6,
++        marginTop: spacing.md,
++    },
++    motivationalText: {
++        fontSize: 11,
++        fontStyle: 'italic',
++    },
++    sectionHeader: {
++        marginBottom: spacing.lg,
++    },
++    sectionTitle: {
++        fontSize: 20,
++        fontWeight: '900',
++    },
++    sectionSubtitle: {
++        fontSize: 12,
++        marginTop: 2,
++    },
++    ranksList: {
++        gap: spacing.md,
++    },
++    timelineRow: {
++        position: 'relative',
++    },
++    timelineLine: {
++        position: 'absolute',
++        left: 28,
++        top: 60,
++        bottom: -16,
++        width: 2,
++        zIndex: -1,
++    },
++    rankCard: {
++        borderRadius: 20,
++        borderWidth: 1,
++        padding: spacing.md,
++    },
++    currentRankCard: {
++        shadowColor: '#E50914',
++        shadowOffset: { width: 0, height: 4 },
++        shadowOpacity: 0.3,
++        shadowRadius: 10,
++        elevation: 4,
++    },
++    cardTopRow: {
++        flexDirection: 'row',
++        alignItems: 'center',
++    },
++    iconContainer: {
++        width: 48,
++        height: 48,
++        borderRadius: 24,
++        borderWidth: 1,
++        alignItems: 'center',
++        justifyContent: 'center',
++    },
++    rankTitleRow: {
++        flexDirection: 'row',
++        alignItems: 'center',
++        justifyContent: 'space-between',
++        flexWrap: 'wrap',
++        gap: 6,
++    },
++    rankItemTitle: {
++        fontSize: 16,
++        fontWeight: '900',
++    },
++    statusBadge: {
++        flexDirection: 'row',
++        alignItems: 'center',
++        paddingHorizontal: 8,
++        paddingVertical: 2,
++        borderRadius: 8,
++        borderWidth: 1,
++        borderColor: 'transparent',
++    },
++    statusBadgeText: {
++        color: '#FFF',
++        fontSize: 9,
++        fontWeight: '900',
++        letterSpacing: 0.5,
++    },
++    reqText: {
++        fontSize: 12,
++        marginTop: 2,
++    },
++    rankDescription: {
++        fontSize: 13,
++        lineHeight: 18,
++        marginTop: spacing.sm,
++        fontStyle: 'italic',
++    },
++    lockedNeededText: {
++        fontSize: 11,
++        marginTop: spacing.sm,
++    },
++});
+diff --git a/src/components/ui/RankDetailsModal.tsx b/src/components/ui/RankDetailsModal.tsx
+index 5f536d0..1c950c8 100644
+--- a/src/components/ui/RankDetailsModal.tsx
++++ b/src/components/ui/RankDetailsModal.tsx
+@@ -2,6 +2,7 @@ import React from 'react';
+ import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
+ import Animated, { FadeIn, FadeOut, FadeInUp, FadeOutDown } from 'react-native-reanimated';
+ import { Feather } from '@expo/vector-icons';
++import { useRouter } from 'expo-router';
+ import { useThemeColors } from '../../hooks/useThemeColors';
+ import { typography, spacing, borderRadius } from '../../theme';
+ import { LevelInfo } from '../../services/LevelService';
+@@ -15,12 +16,18 @@ interface RankDetailsModalProps {
+ 
+ export const RankDetailsModal: React.FC<RankDetailsModalProps> = ({ visible, onClose, levelInfo }) => {
+     const themeColors = useThemeColors();
++    const router = useRouter();
+ 
+     if (!visible) return null;
+ 
+     const xpForNextRank = levelInfo.nextRankMinLevel ? getXpForLevel(levelInfo.nextRankMinLevel) : 0;
+     const xpNeededForNextRank = Math.max(0, xpForNextRank - levelInfo.currentXp);
+ 
++    const handleViewAllRanks = () => {
++        onClose();
++        router.push('/ranks');
++    };
++
+     return (
+         <Modal
+             transparent
+@@ -50,7 +57,7 @@ export const RankDetailsModal: React.FC<RankDetailsModalProps> = ({ visible, onC
+ 
+                     <View style={styles.rankBadgeRow}>
+                         <Text style={styles.rankIcon}>{levelInfo.rankIcon}</Text>
+-                        <View>
++                        <View style={{ flex: 1 }}>
+                             <Text style={[styles.rankTitle, { color: themeColors.primary }]}>{levelInfo.rankTitle}</Text>
+                             <Text style={[styles.levelSubtitle, { color: themeColors.textDim }]}>Level {levelInfo.level} • {levelInfo.currentXp} XP</Text>
+                         </View>
+@@ -88,10 +95,18 @@ export const RankDetailsModal: React.FC<RankDetailsModalProps> = ({ visible, onC
+ 
+                     <TouchableOpacity
+                         style={[styles.btn, { backgroundColor: themeColors.primary }]}
++                        onPress={handleViewAllRanks}
++                        activeOpacity={0.8}
++                    >
++                        <Text style={styles.btnText}>View All Ranks</Text>
++                    </TouchableOpacity>
++
++                    <TouchableOpacity
++                        style={[styles.secondaryBtn, { backgroundColor: 'rgba(255,255,255,0.06)' }]}
+                         onPress={onClose}
+                         activeOpacity={0.8}
+                     >
+-                        <Text style={styles.btnText}>Got It</Text>
++                        <Text style={[styles.secondaryBtnText, { color: themeColors.textDim }]}>Close</Text>
+                     </TouchableOpacity>
+                 </Animated.View>
+             </View>
+@@ -203,4 +218,16 @@ const styles = StyleSheet.create({
+         fontSize: 14,
+         fontWeight: 'bold',
+     },
++    secondaryBtn: {
++        width: '100%',
++        height: 40,
++        borderRadius: 12,
++        alignItems: 'center',
++        justifyContent: 'center',
++        marginTop: spacing.sm,
++    },
++    secondaryBtnText: {
++        fontSize: 13,
++        fontWeight: '600',
++    },
+ });
+diff --git a/src/config/ranks.ts b/src/config/ranks.ts
+index 282723c..615d975 100644
+--- a/src/config/ranks.ts
++++ b/src/config/ranks.ts
+@@ -1,4 +1,5 @@
+ export interface RankDefinition {
++    id: string;
+     minimumLevel: number;
+     maximumLevel: number;
+     title: string;
+@@ -8,6 +9,7 @@ export interface RankDefinition {
+ 
+ export const RANKS: RankDefinition[] = [
+     {
++        id: 'rookie',
+         minimumLevel: 1,
+         maximumLevel: 4,
+         title: 'AnimOrg Rookie',
+@@ -15,6 +17,7 @@ export const RANKS: RankDefinition[] = [
+         description: 'Welcome to AnimOrg! Starting your premier tracking journey.'
+     },
+     {
++        id: 'explorer',
+         minimumLevel: 5,
+         maximumLevel: 9,
+         title: 'AnimOrg Explorer',
+@@ -22,6 +25,7 @@ export const RANKS: RankDefinition[] = [
+         description: 'Diving into anime catalogs and setting up your first watchlist.'
+     },
+     {
++        id: 'scout',
+         minimumLevel: 10,
+         maximumLevel: 14,
+         title: 'AnimOrg Scout',
+@@ -29,6 +33,7 @@ export const RANKS: RankDefinition[] = [
+         description: 'Deeper tracking of seasonal titles, episodes, and reviews.'
+     },
+     {
++        id: 'enthusiast',
+         minimumLevel: 15,
+         maximumLevel: 24,
+         title: 'AnimOrg Enthusiast',
+@@ -36,6 +41,7 @@ export const RANKS: RankDefinition[] = [
+         description: 'Expressing passion through reviews, ratings, and genre tags.'
+     },
+     {
++        id: 'veteran',
+         minimumLevel: 25,
+         maximumLevel: 39,
+         title: 'AnimOrg Veteran',
+@@ -43,6 +49,7 @@ export const RANKS: RankDefinition[] = [
+         description: 'A solid track record of watching classics and creating collections.'
+     },
+     {
++        id: 'elite',
+         minimumLevel: 40,
+         maximumLevel: 59,
+         title: 'AnimOrg Elite',
+@@ -50,6 +57,7 @@ export const RANKS: RankDefinition[] = [
+         description: 'Commanding extensive database lists, rating insights, and scores.'
+     },
+     {
++        id: 'master',
+         minimumLevel: 60,
+         maximumLevel: 79,
+         title: 'AnimOrg Master',
+@@ -57,6 +65,7 @@ export const RANKS: RankDefinition[] = [
+         description: 'Deep dedication with hundreds of watched episodes cataloged.'
+     },
+     {
++        id: 'legend',
+         minimumLevel: 80,
+         maximumLevel: 99,
+         title: 'AnimOrg Legend',
+@@ -64,6 +73,7 @@ export const RANKS: RankDefinition[] = [
+         description: 'A mythic presence in the community, logging milestones effortlessly.'
+     },
+     {
++        id: 'grandmaster',
+         minimumLevel: 100,
+         maximumLevel: 9999,
+         title: 'AnimOrg Grandmaster',
+diff --git a/src/services/RankService.ts b/src/services/RankService.ts
+index 771260d..79c86ef 100644
+--- a/src/services/RankService.ts
++++ b/src/services/RankService.ts
+@@ -1,6 +1,13 @@
+ import { RANKS, RankDefinition } from '../config/ranks';
+ import { getXpForLevel } from '../config/levelConfig';
+ 
++export interface RankProgressItem extends RankDefinition {
++    xpRequired: number;
++    status: 'unlocked' | 'current' | 'locked';
++    progressPercentage: number;
++    xpNeededToUnlock: number;
++}
++
+ export const RankService = {
+     /**
+      * Returns current rank configuration based on player level
+@@ -40,6 +47,49 @@ export const RankService = {
+             levelsToGo,
+             xpRemaining,
+         };
++    },
++
++    /**
++     * Returns all ranks enriched with user progression state (unlocked, current, locked)
++     */
++    getAllRanksWithProgress: (level: number, currentXp: number): RankProgressItem[] => {
++        const currentRank = RankService.getRankByLevel(level);
++
++        return RANKS.map(rank => {
++            const xpRequired = getXpForLevel(rank.minimumLevel);
++            let status: 'unlocked' | 'current' | 'locked' = 'locked';
++
++            if (level > rank.maximumLevel) {
++                status = 'unlocked';
++            } else if (level >= rank.minimumLevel && level <= rank.maximumLevel) {
++                status = 'current';
++            } else {
++                status = 'locked';
++            }
++
++            let progressPercentage = 0;
++            if (status === 'unlocked') {
++                progressPercentage = 100;
++            } else if (status === 'current') {
++                const startXp = getXpForLevel(rank.minimumLevel);
++                const nextRankXp = rank.maximumLevel < 9999 ? getXpForLevel(rank.maximumLevel + 1) : startXp + 5000;
++                const span = Math.max(1, nextRankXp - startXp);
++                progressPercentage = Math.min(100, Math.max(0, ((currentXp - startXp) / span) * 100));
++            } else {
++                progressPercentage = 0;
++            }
++
++            const xpNeededToUnlock = Math.max(0, xpRequired - currentXp);
++
++            return {
++                ...rank,
++                xpRequired,
++                status,
++                progressPercentage,
++                xpNeededToUnlock,
++            };
++        });
+     }
+ };
++
+ export type RankUtils = typeof RankService;

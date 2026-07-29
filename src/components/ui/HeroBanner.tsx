@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, useWindowDimensions, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,6 +8,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { spacing, borderRadius, typography } from '../../theme';
 import { formatRating } from '../../utils/formatters';
 import { PLACEHOLDER_BACKDROP, PLACEHOLDER_POSTER } from '../../constants/images';
+import { TrailerModal } from './TrailerModal';
 
 // Creating an Animated wrapper for expo-image to enable scale transforms
 const AnimatedImage = Animated.createAnimatedComponent(Image);
@@ -24,6 +25,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
   const opacity = useRef(new Animated.Value(0)).current;
   const zoomAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  const [showTrailer, setShowTrailer] = useState(false);
 
   const isMobile = screenWidth < 768;
 
@@ -148,7 +151,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
               <Animated.View style={[styles.secondaryButtonWrapper, { transform: [{ scale: pulseAnim }] }]}>
                 <TouchableOpacity
                   style={[styles.glassButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
-                  onPress={() => Linking.openURL(media.trailerUrl)}
+                  onPress={() => setShowTrailer(true)}
                   activeOpacity={0.8}
                 >
                   <Feather name="video" size={18} color="#FFF" />
@@ -159,6 +162,14 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
           </View>
         </View>
       </LinearGradient>
+
+      {media.trailerUrl && (
+        <TrailerModal
+          visible={showTrailer}
+          trailerUrl={media.trailerUrl}
+          onClose={() => setShowTrailer(false)}
+        />
+      )}
     </Animated.View>
   );
 });

@@ -545,8 +545,26 @@ export const useAppStore = create<AppState>()(
           }
         };
 
+        // Watchdog to prevent infinite loading if AsyncStorage deadlock blocks onAuthStateChanged
+        let hasFiredAuth = false;
+
+        console.log('[AUTH] Waiting for auth state...');
+        const initWatchdog = setTimeout(() => {
+          if (!hasFiredAuth) {
+            console.error('[useAppStore] Auth initialization watchdog triggered. onAuthStateChanged timed out due to AsyncStorage deadlock.');
+            set({
+              isLoadingAuth: false,
+              isAppInitializing: false,
+              profileError: 'Authentication connection timed out. Please check your network and try again.'
+            });
+          }
+        }, 8000);
+
         const unsubscribeAuth = firebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
+          hasFiredAuth = true;
+          clearTimeout(initWatchdog);
           if (firebaseUser) {
+            console.log(`[AUTH] User detected: ${firebaseUser.uid}`);
             const userId = firebaseUser.uid;
             const hasCachedProfile = !!(get().user && get().user?.id === userId);
 
@@ -562,6 +580,7 @@ export const useAppStore = create<AppState>()(
               isAppInitializing: !hasCachedProfile,
               isGuest: false
             });
+            console.log('[AUTH] Auth finished');
 
             // 2. Set up real-time listener for "trackedAnime" (Primary for Hub)
             if (globalTrackedListener) {
@@ -611,6 +630,7 @@ export const useAppStore = create<AppState>()(
             // Asynchronously fetch other data in the background so it never blocks the startup splash screen transition
             get()._initializeProfileData(userId, firebaseUser, hasCachedProfile);
           } else {
+            console.log('[AUTH] No user found');
             // Unauthenticated state
             if (get().isGuest) {
               set({
@@ -618,6 +638,7 @@ export const useAppStore = create<AppState>()(
                 isAppInitializing: false,
                 profileError: null
               });
+              console.log('[AUTH] Auth finished (Guest)');
             } else {
               set({
                 user: null,
@@ -637,6 +658,7 @@ export const useAppStore = create<AppState>()(
                 isGuest: false,
                 profileError: null
               });
+              console.log('[AUTH] Auth finished (Unauthenticated)');
             }
           }
         });
@@ -662,6 +684,7 @@ export const useAppStore = create<AppState>()(
         };
 
         try {
+          console.log('[AUTH] Profile loading started');
           console.log(`[Telemetry] Auth success. Initiating profile load for user: ${userId}`);
           const startTime = Date.now();
 
@@ -742,6 +765,8 @@ export const useAppStore = create<AppState>()(
             isLoadingAuth: false,
             profileError: null
           });
+
+          console.log('[AUTH] Profile loaded');
           console.log(`[Telemetry] Initial profile load succeeded in ${Date.now() - startTime}ms`);
 
           // Check daily login XP synchronously without blocking rendering

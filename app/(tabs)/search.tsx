@@ -33,8 +33,9 @@ import { useRouter } from 'expo-router';
 import { animeApi } from '../../src/services/animeApi';
 import { useDebounce } from '../../src/hooks/useDebounce';
 import { Media } from '../../src/types';
-import { RecommendationService, RecommendationResult } from '../../src/services/RecommendationService';
+import { RecommendationResult, RecommendationService } from '../../src/services/RecommendationService';
 import { RecommendationModal } from '../../src/components/features/RecommendationModal';
+import { BackendWarmupService } from '../../src/services/api/BackendWarmupService';
 
 const THEME_MAP: Record<string, number> = {
   'Action': 1, 'Adventure': 2, 'Comedy': 4, 'Romance': 22,
@@ -347,6 +348,9 @@ export default function SearchScreen() {
   const handleInputChange = useCallback((text: string) => {
     lastKeystrokeTimeRef.current = Date.now();
     setInputText(text);
+    if (text.length > 0) {
+      BackendWarmupService.triggerFeatureWarmup('Search Typing');
+    }
   }, []);
 
   const toggleGenre = useCallback((id: number) => {
@@ -511,6 +515,11 @@ export default function SearchScreen() {
       }
     };
   }, [debouncedQuery, selectedGenres, minScore, status]);
+
+  // Initial trigger for Search page index
+  useEffect(() => {
+    BackendWarmupService.triggerFeatureWarmup('Search Index Opened');
+  }, []);
 
   const loadMore = useCallback(async () => {
     if (isMoreLoading || !hasNextPage || isLoading || isDiscoverMode) return;

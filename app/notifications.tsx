@@ -36,9 +36,14 @@ export default function NotificationsScreen() {
             return;
         }
         setIsLoading(true);
-        const data = await firestoreService.getNotifications(user.id);
-        setNotifications(data);
-        setIsLoading(false);
+        try {
+            const data = await firestoreService.getNotifications(user.id);
+            setNotifications(data);
+        } catch (error) {
+            console.error('[NotificationsScreen] Failed to load notifications:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleRefresh = async () => {

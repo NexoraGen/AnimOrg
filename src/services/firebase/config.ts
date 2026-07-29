@@ -18,6 +18,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+console.log('[AUTH] Firebase initialized');
 
 let auth: Auth;
 if (Platform.OS === 'web') {
@@ -33,9 +34,7 @@ if (Platform.OS === 'web') {
 let dbInstance;
 try {
     dbInstance = initializeFirestore(app, {
-        localCache: persistentLocalCache({
-            tabManager: persistentMultipleTabManager() // Native/Web-safe resilient offline local caching
-        }),
+        localCache: persistentLocalCache(),
         ignoreUndefinedProperties: true
     });
 } catch (e) {

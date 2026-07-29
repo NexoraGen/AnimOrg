@@ -6,25 +6,18 @@ import {
     TouchableOpacity,
     Platform,
     Dimensions,
-    useWindowDimensions,
     ActivityIndicator,
+    Linking,
+    useWindowDimensions
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut, Easing } from 'react-native-reanimated';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { spacing, borderRadius, typography } from '../../theme';
 import { trailerService } from '../../services/trailerService';
 import { SkeletonLoader } from './SkeletonLoader';
-
-let WebView: any = null;
-if (Platform.OS !== 'web') {
-    try {
-        WebView = require('react-native-webview').WebView;
-    } catch (e) {
-        console.warn('[TrailerSection] WebView not loaded:', e);
-    }
-}
+import YoutubeIframe from 'react-native-youtube-iframe';
 
 interface TrailerSectionProps {
     animeId: string;
@@ -39,16 +32,14 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
     title,
     trailerUrl,
     thumbnailPath,
-    themeColors,
 }) => {
     const colors = useThemeColors();
     const { width } = useWindowDimensions();
 
     const [isPlaying, setIsPlaying] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isPlayerReady, setIsPlayerReady] = useState(false);
     const [hasError, setHasError] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
-    const [playerKey, setPlayerKey] = useState(0); // Used to force re-render on retry
+    const [errorReason, setErrorReason] = useState<string | null>(null);
 
     const safetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -56,29 +47,25 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
         return trailerService.extractYoutubeId(trailerUrl);
     }, [trailerUrl]);
 
-    const embedUrl = React.useMemo(() => {
-        if (!youtubeId) return null;
-        return `https://www.youtube.com/embed/${youtubeId}?autoplay=1&mute=0&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`;
-    }, [youtubeId]);
-
-    // Fallback to youtube high-res thumbnail, then backdropPath/posterPath, then placeholder
+    // Construct Universal Thumbnail (HD YouTube cover or provided poster fallback)
     const thumbnailSource = React.useMemo(() => {
         if (youtubeId) {
-            return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+            return `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
         }
         return thumbnailPath || undefined;
     }, [youtubeId, thumbnailPath]);
 
-    // Safety Timeout for loading state (e.g. if WebView/iframe gets stuck loading)
+    // Safety Timeout for loading state
     const startSafetyTimeout = useCallback(() => {
         if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
         safetyTimeoutRef.current = setTimeout(() => {
-            if (isLoading) {
-                console.warn('[TrailerSection] Safety timeout triggered. Transitioning to error state.');
-                handlePlaybackError();
+            if (!isPlayerReady) {
+                console.warn('[TrailerSection] Embedded player initialization timed out.');
+                setHasError(true);
+                setErrorReason('timeout');
             }
-        }, 12000); // 12 seconds loading safety limit
-    }, [isLoading]);
+        }, 12000);
+    }, [isPlayerReady]);
 
     useEffect(() => {
         return () => {
@@ -87,47 +74,58 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
     }, []);
 
     const handlePlayPress = useCallback(() => {
-        setIsPlaying(true);
-        setIsLoading(true);
-        setHasError(false);
-        startSafetyTimeout();
-    }, [startSafetyTimeout]);
+        if (!youtubeId) {
+            // Cannot embed, must fallback to external intent immediately
+            if (trailerUrl) {
+                Linking.openURL(trailerUrl).catch(() => { });
+            }
+            return;
+        }
 
-    const handlePlaybackLoad = useCallback(() => {
-        setIsLoading(false);
+        setIsPlaying(true);
+        setIsPlayerReady(false);
+        setHasError(false);
+        setErrorReason(null);
+        startSafetyTimeout();
+    }, [youtubeId, trailerUrl, startSafetyTimeout]);
+
+    const handlePlayerReady = useCallback(() => {
+        setIsPlayerReady(true);
         if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
     }, []);
 
-    const handlePlaybackError = useCallback(() => {
+    const handlePlayerError = useCallback((error: string) => {
         if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
-
-        if (retryCount < 1) {
-            console.log('[TrailerSection] Retrying trailer playback load once...');
-            setRetryCount(prev => prev + 1);
-            setPlayerKey(prev => prev + 1);
-            startSafetyTimeout();
-        } else {
-            setHasError(true);
-            setIsLoading(false);
-        }
-    }, [retryCount, startSafetyTimeout]);
+        console.warn(`[TrailerSection] YouTube IFrame Error: ${error}`);
+        setHasError(true);
+        setErrorReason(error);
+        setIsPlaying(false);
+    }, []);
 
     const handleTryAgain = useCallback(() => {
-        setRetryCount(0);
         setHasError(false);
-        setIsLoading(true);
-        setPlayerKey(prev => prev + 1);
+        setErrorReason(null);
+        setIsPlaying(true);
+        setIsPlayerReady(false);
         startSafetyTimeout();
     }, [startSafetyTimeout]);
 
-    // Calculate proportional cinematic height bounded by layout width
+    // Maintain 16:9 widescreen ratio
     const horizontalPadding = spacing.M * 2;
     const containerWidth = Math.min(width - horizontalPadding, 800);
     const playerHeight = containerWidth * (9 / 16);
 
-    if (!youtubeId && (!trailerUrl || !trailerService.isValidUrl(trailerUrl))) {
-        return null; // Don't show anything if there is genuinely no trailer url or ID
+    if (!youtubeId && !trailerUrl) {
+        return null; // Don't show anything if there is genuinely no url
     }
+
+    // Determine specific error messaging logic per ToS / constraints
+    const getErrorCopy = () => {
+        if (errorReason === 'unplayable') return "This video is restricted or has been removed.";
+        if (errorReason === 'not_embeddable') return "The uploader has disabled embedding.";
+        if (errorReason === 'timeout') return "Player took too long to load. Check your network.";
+        return "An unknown error occurred while loading the player.";
+    };
 
     return (
         <View style={[styles.section, { width: containerWidth }]}>
@@ -143,7 +141,8 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
                     },
                 ]}
             >
-                {!isPlaying && (
+                {/* 1. INITIAL COVER STATE */}
+                {!isPlaying && !hasError && (
                     <TouchableOpacity
                         style={styles.thumbnailWrapper}
                         activeOpacity={0.8}
@@ -160,15 +159,13 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
                             <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface }]} />
                         )}
 
-                        {/* Soft backdrop vignette */}
                         <View style={[StyleSheet.absoluteFill, styles.thumbnailVignette]} />
 
-                        {/* Play Button Overlay */}
                         <Animated.View entering={FadeIn.duration(400)} style={styles.playButtonWrapper}>
                             <View
                                 style={[
                                     styles.playButtonCircle,
-                                    { backgroundColor: `${colors.primary}D8` },
+                                    { backgroundColor: `${colors.primary}E6` }, // Slight transparency
                                 ]}
                             >
                                 <Feather name="play" size={32} color="#FFF" fill="#FFF" style={{ marginLeft: 4 }} />
@@ -177,76 +174,75 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
                     </TouchableOpacity>
                 )}
 
-                {isPlaying && !hasError && (
-                    <View style={StyleSheet.absoluteFill}>
-                        {Platform.OS === 'web' ? (
-                            <iframe
-                                key={playerKey}
-                                src={embedUrl || trailerUrl}
-                                style={{ width: '100%', height: '100%', border: 0 }}
-                                allow="autoplay; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                onLoad={handlePlaybackLoad}
-                                onError={handlePlaybackError}
-                            />
-                        ) : WebView ? (
-                            <WebView
-                                key={playerKey}
-                                source={{ uri: embedUrl || trailerUrl }}
-                                style={styles.webView}
-                                allowsInlineMediaPlayback
-                                mediaPlaybackRequiresUserAction={false}
-                                javaScriptEnabled
-                                domStorageEnabled
-                                onLoadEnd={handlePlaybackLoad}
-                                onError={handlePlaybackError}
-                                onHttpError={handlePlaybackError}
-                            />
-                        ) : (
-                            // Fallback if WebView is not compiled/available
-                            <View style={[StyleSheet.absoluteFill, styles.center]}>
-                                <Text style={{ color: colors.text, marginBottom: spacing.md }}>
-                                    Native player unavailable
-                                </Text>
-                                <TouchableOpacity
-                                    style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                                    onPress={() => require('react-native').Linking.openURL(trailerUrl)}
-                                >
-                                    <Text style={styles.actionButtonText}>Open in YouTube</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
-                )}
-
-                {/* Loading Skeleton */}
-                {isPlaying && isLoading && !hasError && (
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface }]} pointerEvents="none">
+                {/* 2. ACTIVITY / BUFFERING OVERLAY WHILE YOUTUBE IFRAME BOOTS */}
+                {isPlaying && !isPlayerReady && !hasError && (
+                    <Animated.View exiting={FadeOut.duration(300)} style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface, zIndex: 5 }]} pointerEvents="none">
                         <SkeletonLoader width="100%" height="100%" style={StyleSheet.absoluteFill} />
                         <View style={[StyleSheet.absoluteFill, styles.center]}>
                             <ActivityIndicator color={colors.primary} size="large" />
-                            <Text style={[styles.loadingText, { color: colors.textDim }]}>Buffering video...</Text>
+                            <Text style={[styles.loadingText, { color: colors.textDim }]}>Buffering Video...</Text>
                         </View>
+                    </Animated.View>
+                )}
+
+                {/* 3. EMBEDDED IFRAME PLAYER */}
+                {isPlaying && !hasError && youtubeId && (
+                    <View style={StyleSheet.absoluteFill}>
+                        <YoutubeIframe
+                            videoId={youtubeId}
+                            height={playerHeight}
+                            width={containerWidth}
+                            play={true}
+                            forceAndroidAutoplay={true}
+                            onReady={handlePlayerReady}
+                            onError={handlePlayerError}
+                            webViewProps={{
+                                androidLayerType: 'hardware',
+                                allowsInlineMediaPlayback: true,
+                            }}
+                            initialPlayerParams={{
+                                modestbranding: true,
+                                rel: false,
+                                controls: true,
+                                ccloadpolicy: true
+                            }}
+                        />
                     </View>
                 )}
 
-                {/* Error State */}
+                {/* 4. EXPLICIT ERROR / FALLBACK STATE */}
                 {hasError && (
                     <Animated.View entering={FadeIn.duration(400)} style={[StyleSheet.absoluteFill, styles.errorContainer, { backgroundColor: colors.surface }]}>
-                        <Feather name="alert-circle" size={42} color={colors.error} style={{ marginBottom: spacing.sm }} />
+                        <Feather name="alert-triangle" size={36} color={colors.error} style={{ marginBottom: spacing.md }} />
                         <Text style={[styles.errorTitle, { color: colors.text }]}>
-                            This trailer couldn't be loaded right now.
+                            {errorReason === 'not_embeddable' ? "Embedded Playback Disabled" : "Playback Unavailable"}
                         </Text>
                         <Text style={[styles.errorSubtitle, { color: colors.textMuted }]}>
-                            Check your connection or try again.
+                            {getErrorCopy()}
                         </Text>
-                        <TouchableOpacity
-                            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                            onPress={handleTryAgain}
-                        >
-                            <Feather name="refresh-cw" size={16} color="#FFF" style={{ marginRight: 8 }} />
-                            <Text style={styles.actionButtonText}>Try Again</Text>
-                        </TouchableOpacity>
+
+                        <View style={styles.errorActionRow}>
+                            {/* Always offer external YouTube fallback if it's not a generic network timeout */}
+                            {youtubeId && trailerUrl && (
+                                <TouchableOpacity
+                                    style={[styles.actionButton, { backgroundColor: colors.surfaceVariant, borderColor: colors.border, borderWidth: 1 }]}
+                                    onPress={() => Linking.openURL(trailerUrl).catch(() => { })}
+                                >
+                                    <Feather name="external-link" size={16} color={colors.text} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.actionButtonText, { color: colors.text }]}>Open Externally</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            {errorReason === 'timeout' && (
+                                <TouchableOpacity
+                                    style={[styles.actionButton, { backgroundColor: colors.primary, marginLeft: spacing.sm }]}
+                                    onPress={handleTryAgain}
+                                >
+                                    <Feather name="refresh-cw" size={16} color="#FFF" style={{ marginRight: 8 }} />
+                                    <Text style={styles.actionButtonText}>Retry</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
                     </Animated.View>
                 )}
             </View>
@@ -261,16 +257,22 @@ const styles = StyleSheet.create({
         alignSelf: 'center',
     },
     sectionTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '800',
-        marginBottom: spacing.M,
+        marginBottom: spacing.sm,
+        letterSpacing: 0.3,
     },
     playerContainer: {
         width: '100%',
-        borderRadius: borderRadius.md,
+        borderRadius: borderRadius.lg,
         overflow: 'hidden',
         borderWidth: 1,
         position: 'relative',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5,
     },
     thumbnailWrapper: {
         width: '100%',
@@ -279,36 +281,32 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     thumbnailVignette: {
-        backgroundColor: 'rgba(0,0,0,0.3)',
+        backgroundColor: 'rgba(0,0,0,0.35)',
     },
     playButtonWrapper: {
         zIndex: 10,
     },
     playButtonCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-        elevation: 8,
-    },
-    webView: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: 'transparent',
+        shadowColor: '#E50914',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        elevation: 6,
     },
     center: {
         justifyContent: 'center',
         alignItems: 'center',
     },
     loadingText: {
-        marginTop: spacing.sm,
+        marginTop: spacing.md,
         fontSize: 14,
-        fontWeight: '600',
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
     errorContainer: {
         justifyContent: 'center',
@@ -316,22 +314,28 @@ const styles = StyleSheet.create({
         padding: spacing.md,
     },
     errorTitle: {
-        fontSize: 15,
-        fontWeight: '700',
+        fontSize: 16,
+        fontWeight: '800',
         textAlign: 'center',
-        marginBottom: 4,
+        marginBottom: 6,
     },
     errorSubtitle: {
-        fontSize: 13,
+        fontSize: 14,
         textAlign: 'center',
-        marginBottom: spacing.md,
+        marginBottom: spacing.L,
+        paddingHorizontal: spacing.md,
+    },
+    errorActionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     actionButton: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: borderRadius.lg,
+        paddingVertical: 12,
+        borderRadius: borderRadius.md,
     },
     actionButtonText: {
         color: '#FFF',

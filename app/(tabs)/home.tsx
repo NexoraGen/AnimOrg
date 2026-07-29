@@ -220,6 +220,11 @@ export default function HomeScreen() {
 
     } catch (error) {
       console.error('Error fetching home data:', error);
+      setIsTrendingLoading(false);
+      setIsTopLoading(false);
+      setIsSeasonalLoading(false);
+      setIsUpcomingLoading(false);
+      setCuratedLoading({});
     }
   }, []);
 

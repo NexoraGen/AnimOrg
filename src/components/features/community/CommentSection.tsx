@@ -49,14 +49,19 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ post, onClose, o
 
     const loadComments = async (refresh = false) => {
         setIsLoading(true);
-        const result = await firestoreService.getPostComments(post.id, refresh ? null : lastDoc);
-        if (refresh) {
-            setComments(result.comments);
-        } else {
-            setComments(prev => [...prev, ...result.comments]);
+        try {
+            const result = await firestoreService.getPostComments(post.id, refresh ? null : lastDoc);
+            if (refresh) {
+                setComments(result.comments);
+            } else {
+                setComments(prev => [...prev, ...result.comments]);
+            }
+            setLastDoc(result.lastDoc);
+        } catch (error) {
+            console.error('[CommentSection] Failed to load comments:', error);
+        } finally {
+            setIsLoading(false);
         }
-        setLastDoc(result.lastDoc);
-        setIsLoading(false);
     };
 
     const handleSend = async () => {

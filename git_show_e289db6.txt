@@ -1,0 +1,999 @@
+commit e289db66694714d45e0d5b92dae1c9bad657c537
+Author: itisnexora <itisnexora@gmail.com>
+Date:   Sat Jul 25 17:59:34 2026 +0530
+
+    Optimize AnimOrg loading performance, caching, search resilience, and add premium animated loader
+
+diff --git a/app/(tabs)/home.tsx b/app/(tabs)/home.tsx
+index cba08b5..b7216fa 100644
+--- a/app/(tabs)/home.tsx
++++ b/app/(tabs)/home.tsx
+@@ -89,68 +89,86 @@ export default function HomeScreen() {
+   const [upcomingAnime, setUpcomingAnime] = useState<Media[]>([]);
+   const [curatedAnime, setCuratedAnime] = useState<Record<string, Media[]>>({});
+ 
+-  const [isLoading, setIsLoading] = useState(true);
++  const [isTrendingLoading, setIsTrendingLoading] = useState(true);
++  const [isTopLoading, setIsTopLoading] = useState(true);
++  const [isSeasonalLoading, setIsSeasonalLoading] = useState(true);
++  const [isUpcomingLoading, setIsUpcomingLoading] = useState(true);
++  const [curatedLoading, setCuratedLoading] = useState<Record<string, boolean>>({});
++
+   const [refreshing, setRefreshing] = useState(false);
+ 
+   const fetchHomeData = useCallback(async () => {
+     try {
+       const { user, watchlist, getFavoriteGenres } = useAppStore.getState();
+ 
++      setIsTrendingLoading(true);
++      setIsTopLoading(true);
++      setIsSeasonalLoading(true);
++      setIsUpcomingLoading(true);
++
+       // Launch all 4 primary feeds concurrently; update state as soon as each stream arrives
+       const pTrending = animeApi.getTrendingAnime(1, (fresh) => {
+         setTrendingAnime(fresh);
+-        setIsLoading(false);
++        setIsTrendingLoading(false);
+       }).then(data => {
+         if (data && data.length > 0) {
+           setTrendingAnime(data);
+-          setIsLoading(false);
+         }
+-      }).catch(err => console.warn("Failed to fetch trending:", err));
++        setIsTrendingLoading(false);
++      }).catch(err => {
++        console.warn("Failed to fetch trending:", err);
++        setIsTrendingLoading(false);
++      });
+ 
+       const pTop = animeApi.getTopAnime(1, (fresh) => {
+         setTopRated(fresh);
+-        setIsLoading(false);
++        setIsTopLoading(false);
+       }).then(data => {
+         if (data && data.length > 0) {
+           setTopRated(data);
+-          setIsLoading(false);
+         }
+-      }).catch(err => console.warn("Failed to fetch top rated:", err));
++        setIsTopLoading(false);
++      }).catch(err => {
++        console.warn("Failed to fetch top rated:", err);
++        setIsTopLoading(false);
++      });
+ 
+       const pSeasonal = animeApi.getSeasonalAnime(1, (fresh) => {
+         setSeasonalAnime(fresh);
+-        setIsLoading(false);
++        setIsSeasonalLoading(false);
+       }).then(data => {
+         if (data && data.length > 0) {
+           setSeasonalAnime(data);
+-          setIsLoading(false);
+         }
+-      }).catch(err => console.warn("Failed to fetch seasonal:", err));
++        setIsSeasonalLoading(false);
++      }).catch(err => {
++        console.warn("Failed to fetch seasonal:", err);
++        setIsSeasonalLoading(false);
++      });
+ 
+       const pUpcoming = animeApi.getUpcomingAnime(1, (fresh) => {
+         setUpcomingAnime(fresh);
+-        setIsLoading(false);
++        setIsUpcomingLoading(false);
+       }).then(data => {
+         if (data && data.length > 0) {
+           setUpcomingAnime(data);
+-          setIsLoading(false);
+         }
+-      }).catch(err => console.warn("Failed to fetch upcoming:", err));
+-
+-      // Wait for primary feeds to settle so notification checking and curated lists can prepare
+-      await Promise.allSettled([pTrending, pTop, pSeasonal, pUpcoming]);
+-
+-      // Ensure loading spinner is turned off if any data exists
+-      setIsLoading(false);
++        setIsUpcomingLoading(false);
++      }).catch(err => {
++        console.warn("Failed to fetch upcoming:", err);
++        setIsUpcomingLoading(false);
++      });
+ 
+-      // Check for airing alerts for "Watching" anime
+-      const { notificationsEnabled } = useAppStore.getState();
+-      if (notificationsEnabled) {
+-        const watchingAnime = watchlist.filter(item => item.status === 'watching');
+-        notificationService.checkAndScheduleAiringAlerts(watchingAnime, seasonalAnime);
+-      }
++      // Airing alerts schedules after seasonal data completes
++      pSeasonal.then(() => {
++        const { notificationsEnabled } = useAppStore.getState();
++        if (notificationsEnabled) {
++          const watchingAnime = watchlist.filter(item => item.status === 'watching');
++          notificationService.checkAndScheduleAiringAlerts(watchingAnime, seasonalAnime);
++        }
++      });
+ 
+-      // Premium Curated Curation Engine
++      // Premium Curated Curation Engine based on genre taste
+       const baseCategories = ['All-Time Legends', 'Modern Masterpieces'];
+       const tasteCategories: Record<string, string[]> = {
+         'Action': ['Must Watch Shonen', 'Dark Masterpieces'],
+@@ -171,10 +189,7 @@ export default function HomeScreen() {
+         }
+       });
+ 
+-      // Deduplicate matched arrays
+       matchedCategories = [...new Set(matchedCategories)];
+-
+-      // Pick 2 random from matched categories, or use strict fallbacks
+       const shuffle = (array: any[]) => array.sort(() => 0.5 - Math.random());
+ 
+       let finalCategories = [...baseCategories];
+@@ -184,24 +199,27 @@ export default function HomeScreen() {
+         finalCategories.push('Must Watch Shonen', 'Psychological Peaks');
+       }
+ 
+-      // Keep only unique elements avoiding duplication
+       finalCategories = [...new Set(finalCategories)].slice(0, 4);
+ 
+-      // Load curated lists progressively without blocking main view
++      // Load curated lists progressively in background
+       finalCategories.forEach(category => {
++        setCuratedLoading(prev => ({ ...prev, [category]: true }));
+         animeApi.getCuratedList(category, (freshCurated) => {
+           setCuratedAnime(prev => ({ ...prev, [category]: freshCurated }));
++          setCuratedLoading(prev => ({ ...prev, [category]: false }));
+         }).then(data => {
+           if (data && data.length > 0) {
+             setCuratedAnime(prev => ({ ...prev, [category]: data }));
+           }
+-        }).catch(err => console.warn(`Failed to fetch curated list for ${category}:`, err));
++          setCuratedLoading(prev => ({ ...prev, [category]: false }));
++        }).catch(err => {
++          console.warn(`Failed to fetch curated list for ${category}:`, err);
++          setCuratedLoading(prev => ({ ...prev, [category]: false }));
++        });
+       });
+ 
+     } catch (error) {
+       console.error('Error fetching home data:', error);
+-    } finally {
+-      setIsLoading(false);
+     }
+   }, []);
+ 
+@@ -211,6 +229,24 @@ export default function HomeScreen() {
+     }
+   }, [user?.id, hasHydrated]);
+ 
++  // Background prefetch during idle times
++  useEffect(() => {
++    if (trendingAnime.length > 0 || seasonalAnime.length > 0) {
++      const idsToPrefetch = [
++        ...trendingAnime.slice(0, 3).map(a => String(a.id)),
++        ...seasonalAnime.slice(0, 3).map(a => String(a.id)),
++      ];
++      // Deduplicate
++      const uniqueIds = [...new Set(idsToPrefetch)];
++      try {
++        const { PrefetchManager } = require('../../src/services/api/PrefetchManager');
++        PrefetchManager.prefetchMultiple(uniqueIds);
++      } catch (err) {
++        console.warn('[Home Prefetch] Failed to initialize PrefetchManager:', err);
++      }
++    }
++  }, [trendingAnime, seasonalAnime]);
++
+   const onRefresh = useCallback(async () => {
+     setRefreshing(true);
+     await fetchHomeData();
+@@ -223,7 +259,7 @@ export default function HomeScreen() {
+ 
+   const isDesktop = width > 1024;
+ 
+-  if ((isLoading || !hasHydrated) && !refreshing) {
++  if (!hasHydrated && !refreshing) {
+     return (
+       <View style={[styles.container, { backgroundColor: themeColors.background }]}>
+         <StreamingHeader avatarUrl={user?.avatarUrl} />
+@@ -262,7 +298,13 @@ export default function HomeScreen() {
+           />
+         }
+       >
+-        <RotatingHeroBanner topRated={topRated} onPress={handleMediaPress} />
++        {isTopLoading ? (
++          <View style={styles.heroWrapper}>
++            <SkeletonLoader width="100%" height={420} style={{ borderRadius: borderRadius.lg }} />
++          </View>
++        ) : (
++          <RotatingHeroBanner topRated={topRated} onPress={handleMediaPress} />
++        )}
+ 
+         <WatchNextSection />
+ 
+@@ -270,6 +312,7 @@ export default function HomeScreen() {
+           title="Trending Now"
+           icon="zap"
+           data={trendingAnime}
++          isLoading={isTrendingLoading}
+           onPress={handleMediaPress}
+           onViewAll={() => router.push('/category/trending')}
+         />
+@@ -280,6 +323,7 @@ export default function HomeScreen() {
+           title="Airing This Season"
+           icon="activity"
+           data={seasonalAnime}
++          isLoading={isSeasonalLoading}
+           onPress={handleMediaPress}
+           onViewAll={() => router.push('/category/current-season')}
+         />
+@@ -290,6 +334,7 @@ export default function HomeScreen() {
+             title={category}
+             icon="award"
+             data={data}
++            isLoading={curatedLoading[category] ?? (data.length === 0)}
+             onPress={handleMediaPress}
+             onViewAll={() => router.push(`/category/${category.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)}
+           />
+@@ -299,6 +344,7 @@ export default function HomeScreen() {
+           title="Upcoming Hype"
+           icon="calendar"
+           data={upcomingAnime}
++          isLoading={isUpcomingLoading}
+           onPress={handleMediaPress}
+           onViewAll={() => router.push('/category/upcoming')}
+         />
+diff --git a/app/(tabs)/search.tsx b/app/(tabs)/search.tsx
+index e3e0f0a..32b4e85 100644
+--- a/app/(tabs)/search.tsx
++++ b/app/(tabs)/search.tsx
+@@ -1,4 +1,4 @@
+-import React, { useState, useEffect, useRef, useMemo } from 'react';
++import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+ import {
+   View,
+   Text,
+@@ -317,6 +317,8 @@ export default function SearchScreen() {
+   const [recommendationResult, setRecommendationResult] = useState<RecommendationResult | null>(null);
+   const [nextRecommendationMode, setNextRecommendationMode] = useState<'personalized' | 'community'>('personalized');
+   const [showRecModal, setShowRecModal] = useState(false);
++  const [isAddingToWatchlist, setIsAddingToWatchlist] = useState(false);
++  const [isAddedToWatchlist, setIsAddedToWatchlist] = useState(false);
+ 
+   // Keep reference of active abort controller to cancel in-flight queries
+   const abortControllerRef = useRef<AbortController | null>(null);
+@@ -338,22 +340,22 @@ export default function SearchScreen() {
+   const numColumns = width > 1024 ? 5 : width > 768 ? 4 : 2;
+   const cardWidth = (width - spacing.M * 2 - spacing.M * (numColumns - 1)) / numColumns;
+ 
+-  const triggerHaptic = () => {
++  const triggerHaptic = useCallback(() => {
+     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+-  };
++  }, []);
+ 
+-  const handleInputChange = (text: string) => {
++  const handleInputChange = useCallback((text: string) => {
+     lastKeystrokeTimeRef.current = Date.now();
+     setInputText(text);
+-  };
++  }, []);
+ 
+-  const toggleGenre = (id: number) => {
++  const toggleGenre = useCallback((id: number) => {
+     setSelectedGenres(prev =>
+       prev.includes(id) ? prev.filter(g => g !== id) : [...prev, id]
+     );
+-  };
++  }, []);
+ 
+-  const handleDiscover = async () => {
++  const handleDiscover = useCallback(async () => {
+     triggerHaptic();
+     setIsRecLoading(true);
+     setShowRecModal(true);
+@@ -381,14 +383,14 @@ export default function SearchScreen() {
+     } finally {
+       setIsRecLoading(false);
+     }
+-  };
++  }, [watchlist, userRatings, getFavoriteGenres, notInterested, recommendationHistory, nextRecommendationMode, triggerHaptic]);
+ 
+-  const handleNotInterested = async (id: string) => {
++  const handleNotInterested = useCallback(async (id: string) => {
+     await addToNotInterested(id);
+     setShowRecModal(false);
+-  };
++  }, [addToNotInterested]);
+ 
+-  const handleAddToWatchlist = async (media: Media) => {
++  const handleAddToWatchlist = useCallback(async (media: Media) => {
+     if (isAddedToWatchlist) return;
+ 
+     setIsAddingToWatchlist(true);
+@@ -407,10 +409,8 @@ export default function SearchScreen() {
+     } finally {
+       setIsAddingToWatchlist(false);
+     }
+-  };
++  }, [isAddedToWatchlist, addToWatchlist, triggerHaptic, router]);
+ 
+-  const [isAddingToWatchlist, setIsAddingToWatchlist] = useState(false);
+-  const [isAddedToWatchlist, setIsAddedToWatchlist] = useState(false);
+ 
+   useEffect(() => {
+     if (showRecModal) {
+@@ -512,27 +512,51 @@ export default function SearchScreen() {
+     };
+   }, [debouncedQuery, selectedGenres, minScore, status]);
+ 
+-  const loadMore = async () => {
++  const loadMore = useCallback(async () => {
+     if (isMoreLoading || !hasNextPage || isLoading || isDiscoverMode) return;
+ 
+     setIsMoreLoading(true);
+     const nextPage = page + 1;
++    const controller = abortControllerRef.current || new AbortController();
++    abortControllerRef.current = controller;
++
+     try {
+-      const response = await animeApi.searchAnime(debouncedQuery, nextPage, selectedGenres, undefined, 'score', 'desc');
+-      setResults(prev => [...prev, ...response.data]);
++      const response = await animeApi.searchAnime(
++        debouncedQuery,
++        nextPage,
++        selectedGenres,
++        undefined,
++        'score',
++        'desc',
++        undefined,
++        controller.signal
++      );
++
++      const newResults = [...results, ...response.data];
++      setResults(newResults);
+       setPage(nextPage);
+       setHasNextPage(response.hasNextPage);
+-    } catch (error) {
++
++      const cacheKey = `q:${debouncedQuery.trim().toLowerCase()}_g:${selectedGenres.slice().sort().join(',')}`;
++      SEARCH_SESSION_CACHE.set(cacheKey, {
++        results: newResults,
++        hasNextPage: response.hasNextPage
++      });
++    } catch (error: any) {
++      if (error.name === 'AbortError') {
++        console.log(`[Search] Load more cancelled.`);
++        return;
++      }
+       console.error('Load more error:', error);
+     } finally {
+       setIsMoreLoading(false);
+     }
+-  };
++  }, [isMoreLoading, hasNextPage, isLoading, isDiscoverMode, page, debouncedQuery, selectedGenres, results]);
+ 
+-  const handleMediaPress = (id: string) => {
++  const handleMediaPress = useCallback((id: string) => {
+     if (inputText.trim()) addToSearchHistory(inputText.trim());
+     router.push(`/details/${id}`);
+-  };
++  }, [inputText, addToSearchHistory, router]);
+ 
+ 
+ 
+diff --git a/app/_layout.tsx b/app/_layout.tsx
+index f139f15..1ffea4c 100644
+--- a/app/_layout.tsx
++++ b/app/_layout.tsx
+@@ -28,7 +28,7 @@ if (Platform.OS !== 'web') {
+ }
+ 
+ import { CinematicOverlay } from '../src/components/ui/CinematicOverlay';
+-import { NotificationPermissionDialog } from '../src/components/ui';
++import { NotificationPermissionDialog, AnimatedLoader } from '../src/components/ui';
+ import { notificationPermission } from '../src/services/notificationPermission';
+ import { AchievementUnlockModal } from '../src/components/ui/AchievementUnlockModal';
+ 
+@@ -260,7 +260,7 @@ function CinematicStartupSplash({ isReady }: { isReady: boolean }) {
+         style={StyleSheet.absoluteFillObject}
+       />
+       <Animated.View style={[splashStyles.content, { transform: [{ scale: pulseAnim }] }]}>
+-        <ActivityIndicator color={colors.primary} size="large" />
++        <AnimatedLoader size={80} />
+         <Text style={splashStyles.brand}>AnimOrg</Text>
+       </Animated.View>
+     </Animated.View>
+diff --git a/app/details/[id].tsx b/app/details/[id].tsx
+index 97a1218..4f0fa1f 100644
+--- a/app/details/[id].tsx
++++ b/app/details/[id].tsx
+@@ -201,6 +201,8 @@ function DetailsScreenInner() {
+   const [likeCount, setLikeCount] = useState(0);
+   const [userRating, setUserRating] = useState<number | null>(null);
+   const [isLoading, setIsLoading] = useState(true);
++  const [isCharactersLoading, setIsCharactersLoading] = useState(true);
++  const [isRecommendationsLoading, setIsRecommendationsLoading] = useState(true);
+   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
+   const [isPostingReview, setIsPostingReview] = useState(false);
+   const [showAuthGate, setShowAuthGate] = useState(false);
+@@ -244,10 +246,14 @@ function DetailsScreenInner() {
+   const fetchDetails = React.useCallback(async () => {
+     if (!id) {
+       setIsLoading(false);
++      setIsCharactersLoading(false);
++      setIsRecommendationsLoading(false);
+       return;
+     }
+ 
+     setIsLoading(true);
++    setIsCharactersLoading(true);
++    setIsRecommendationsLoading(true);
+     try {
+       // 1. MUST FETCH METADATA FIRST
+       const data = await animeApi.getAnimeDetails(id, (updatedData) => {
+@@ -274,6 +280,8 @@ function DetailsScreenInner() {
+       if (!data) {
+         console.warn(`Detail data was null for ID: ${id}`);
+         setIsLoading(false);
++        setIsCharactersLoading(false);
++        setIsRecommendationsLoading(false);
+         return;
+       }
+ 
+@@ -339,8 +347,15 @@ function DetailsScreenInner() {
+           setMedia(curr => curr ? { ...curr, trailerUrl } : null);
+         }
+ 
+-        if (results[4].status === 'fulfilled') setCharacters(results[4].value as Character[]);
+-        if (results[5].status === 'fulfilled') setRecommendations(results[5].value as Media[]);
++        if (results[4].status === 'fulfilled') {
++          setCharacters(results[4].value as Character[]);
++        }
++        setIsCharactersLoading(false);
++
++        if (results[5].status === 'fulfilled') {
++          setRecommendations(results[5].value as Media[]);
++        }
++        setIsRecommendationsLoading(false);
+ 
+         // Handle global episode total
+         if (results[6].status === 'fulfilled' && results[6].value) {
+@@ -355,10 +370,14 @@ function DetailsScreenInner() {
+         }
+       }).catch(err => {
+         console.warn('Non-critical secondary fetch error:', err);
++        setIsCharactersLoading(false);
++        setIsRecommendationsLoading(false);
+       });
+ 
+     } catch (error) {
+       console.error('Critical detail fetch error:', error);
++      setIsCharactersLoading(false);
++      setIsRecommendationsLoading(false);
+     } finally {
+       setIsLoading(false);
+     }
+@@ -806,7 +825,25 @@ function DetailsScreenInner() {
+             </View>
+ 
+             <SectionGuard>
+-              {characters.length > 0 && (
++              {isCharactersLoading ? (
++                <View style={styles.section}>
++                  <SectionHeader title="Characters" />
++                  <FlatList
++                    data={[1, 2, 3, 4, 5]}
++                    horizontal
++                    showsHorizontalScrollIndicator={false}
++                    keyExtractor={(item) => `char-skeleton-${item}`}
++                    renderItem={() => (
++                      <View style={{ marginHorizontal: spacing.sm, alignItems: 'center' }}>
++                        <SkeletonLoader circle width={80} height={80} style={{ marginBottom: spacing.xs }} />
++                        <SkeletonLoader width={70} height={12} style={{ marginBottom: 4 }} />
++                        <SkeletonLoader width={50} height={10} />
++                      </View>
++                    )}
++                    contentContainerStyle={{ paddingHorizontal: spacing.md }}
++                  />
++                </View>
++              ) : characters.length > 0 ? (
+                 <View style={styles.section}>
+                   <SectionHeader title="Characters" />
+                   <FlatList
+@@ -825,7 +862,7 @@ function DetailsScreenInner() {
+                     getItemLayout={(data, index) => ({ length: 156, offset: 156 * index, index })}
+                   />
+                 </View>
+-              )}
++              ) : null}
+             </SectionGuard>
+ 
+             {/* Reviews Section (Phase 4.5) */}
+@@ -875,10 +912,11 @@ function DetailsScreenInner() {
+             </View>
+ 
+             <SectionGuard>
+-              {recommendations.length > 0 && (
++              {(isRecommendationsLoading || recommendations.length > 0) && (
+                 <HorizontalCarousel
+                   title="You May Also Like"
+                   data={recommendations}
++                  isLoading={isRecommendationsLoading}
+                   onPress={(id) => router.push(`/details/${id}`)}
+                 />
+               )}
+diff --git a/scripts/runTests.ts b/scripts/runTests.ts
+index df868be..ad8532e 100644
+--- a/scripts/runTests.ts
++++ b/scripts/runTests.ts
+@@ -41,13 +41,12 @@ Module.prototype.require = function (id: string) {
+ // ============================================================================
+ // SAFE DYNAMIC IMPORTS
+ // ============================================================================
+-import { resolveAnimeTrackingStatus, getLocalAiringInfo } from '../src/utils/releaseHelper';
+-import { RecommendationService } from '../src/services/RecommendationService';
+-import { autoDetectTimezone, searchTimezones } from '../src/utils/timezoneHelper';
++const { resolveAnimeTrackingStatus, getLocalAiringInfo } = require('../src/utils/releaseHelper');
++import type { Media, WatchlistItem, UserRating } from '../src/types/index';
++const { RecommendationService } = require('../src/services/RecommendationService');
++const { autoDetectTimezone, searchTimezones } = require('../src/utils/timezoneHelper');
+ const { animeApi } = require('../src/services/animeApi');
+ 
+-import { Media, WatchlistItem, UserRating } from '../src/types/index';
+-
+ // ============================================================================
+ // COLORFUL LOGGING HELPERS FOR NODE CONSOLE
+ // ============================================================================
+diff --git a/scripts/verifyPerformance.ts b/scripts/verifyPerformance.ts
+new file mode 100644
+index 0000000..e88d367
+--- /dev/null
++++ b/scripts/verifyPerformance.ts
+@@ -0,0 +1,46 @@
++import { CacheManager, TTL } from '../src/services/api/CacheManager';
++
++async function run() {
++    console.log("=== Performance Verification Diagnostics ===");
++
++    // 1. Test Cache hit speed
++    console.log("\n1. Testing Cache / SWR retrieval latency...");
++    await CacheManager.setCacheEntry("test_perf_key", { data: "sample_payload" });
++    let start = Date.now();
++    const res = await CacheManager.fetchWithCache("test_perf_key", async () => {
++        return { data: "sample_payload_fresh" };
++    }, TTL.ANIME_DETAILS);
++    let end = Date.now();
++    console.log(`Cache Read Latency: ${(end - start)} ms`);
++    console.log(`Result retrieved: ${JSON.stringify(res)}`);
++
++    // 2. Test Deep JSON equality change detection during SWR background refresh
++    console.log("\n2. Testing Deep Equality refresh bypass...");
++    let onUpdateCallCount = 0;
++
++    // Seed the cache
++    await CacheManager.fetchWithCache("equality_test", async () => {
++        return { title: "One Piece", episodes: 1100 };
++    }, TTL.ANIME_DETAILS);
++
++    // Retrieve stale cache, triggering background refresh with identical data
++    // Using TTL = -1 to force it to be immediately stale and trigger background fetch
++    start = Date.now();
++    await CacheManager.fetchWithCache("equality_test", async () => {
++        // Returning identical data
++        return { title: "One Piece", episodes: 1100 };
++    }, -1, () => {
++        onUpdateCallCount++;
++    });
++
++    // Allow time for Promise microtasks to resolve background fetch
++    await new Promise(resolve => setTimeout(resolve, 100));
++
++    end = Date.now();
++    console.log(`Refresh triggering duration: ${(end - start)} ms`);
++    console.log(`UI onUpdate Call Count: ${onUpdateCallCount} (Expected: 0)`);
++
++    console.log("\n=== Diagnostics completed. All functions operational ===");
++}
++
++run().catch(console.error);
+diff --git a/src/components/ui/AnimatedLoader.tsx b/src/components/ui/AnimatedLoader.tsx
+new file mode 100644
+index 0000000..cc6a33f
+--- /dev/null
++++ b/src/components/ui/AnimatedLoader.tsx
+@@ -0,0 +1,198 @@
++import React, { useEffect, useState, useRef } from 'react';
++import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
++import { colors, spacing } from '../../theme';
++
++const LOADING_MESSAGES = [
++    "Gathering chakra...",
++    "Unlocking the Mangekyou...",
++    "Powering up to Super Saiyan...",
++    "Channelling nen reserves...",
++    "Locating the One Piece...",
++    "Accessing the Soul Society...",
++    "Synthesizing philosopher's stone...",
++    "Releasing the Bankai..."
++];
++
++export function AnimatedLoader({ size = 80 }: { size?: number }) {
++    const [message, setMessage] = useState(LOADING_MESSAGES[0]);
++    const rotateAnim = useRef(new Animated.Value(0)).current;
++    const rotateCounterAnim = useRef(new Animated.Value(0)).current;
++    const pulseAnim = useRef(new Animated.Value(0.8)).current;
++    const textFadeAnim = useRef(new Animated.Value(1)).current;
++    const messageIndex = useRef(0);
++
++    useEffect(() => {
++        // 1. Clockwise rotation
++        Animated.loop(
++            Animated.timing(rotateAnim, {
++                toValue: 1,
++                duration: 2000,
++                easing: Easing.linear,
++                useNativeDriver: true,
++            })
++        ).start();
++
++        // 2. Counter-clockwise rotation
++        Animated.loop(
++            Animated.timing(rotateCounterAnim, {
++                toValue: 1,
++                duration: 2500,
++                easing: Easing.linear,
++                useNativeDriver: true,
++            })
++        ).start();
++
++        // 3. Glowing Pulse
++        Animated.loop(
++            Animated.sequence([
++                Animated.timing(pulseAnim, {
++                    toValue: 1.2,
++                    duration: 1000,
++                    easing: Easing.inOut(Easing.ease),
++                    useNativeDriver: true,
++                }),
++                Animated.timing(pulseAnim, {
++                    toValue: 0.8,
++                    duration: 1000,
++                    easing: Easing.inOut(Easing.ease),
++                    useNativeDriver: true,
++                }),
++            ])
++        ).start();
++
++        // 4. Rotating Loading Messages
++        const messageInterval = setInterval(() => {
++            Animated.timing(textFadeAnim, {
++                toValue: 0,
++                duration: 350,
++                useNativeDriver: true,
++            }).start(() => {
++                messageIndex.current = (messageIndex.current + 1) % LOADING_MESSAGES.length;
++                setMessage(LOADING_MESSAGES[messageIndex.current]);
++                Animated.timing(textFadeAnim, {
++                    toValue: 1,
++                    duration: 350,
++                    useNativeDriver: true,
++                }).start();
++            });
++        }, 1800);
++
++        return () => clearInterval(messageInterval);
++    }, []);
++
++    const rotate = rotateAnim.interpolate({
++        inputRange: [0, 1],
++        outputRange: ['0deg', '360deg'],
++    });
++
++    const rotateCounter = rotateCounterAnim.interpolate({
++        inputRange: [0, 1],
++        outputRange: ['360deg', '0deg'],
++    });
++
++    return (
++        <View style={styles.container}>
++            <View style={[styles.loaderWrapper, { width: size, height: size }]}>
++                {/* Neon Glow Energy Orb Core */}
++                <Animated.View
++                    style={[
++                        styles.core,
++                        {
++                            width: size * 0.4,
++                            height: size * 0.4,
++                            borderRadius: (size * 0.4) / 2,
++                            transform: [{ scale: pulseAnim }],
++                        },
++                    ]}
++                />
++
++                {/* Ring 1: Clockwise Shuriken Blades */}
++                <Animated.View
++                    style={[
++                        styles.ring1,
++                        {
++                            width: size,
++                            height: size,
++                            borderRadius: size / 2,
++                            transform: [{ rotate }],
++                        },
++                    ]}
++                />
++
++                {/* Ring 2: Counter-Clockwise Energy Ring */}
++                <Animated.View
++                    style={[
++                        styles.ring2,
++                        {
++                            width: size * 0.8,
++                            height: size * 0.8,
++                            borderRadius: (size * 0.8) / 2,
++                            transform: [{ rotate: rotateCounter }],
++                        },
++                    ]}
++                />
++            </View>
++
++            {/* Rotating Anime loading message */}
++            <Animated.Text style={[styles.text, { opacity: textFadeAnim }]}>
++                {message}
++            </Animated.Text>
++        </View>
++    );
++}
++
++const styles = StyleSheet.create({
++    container: {
++        alignItems: 'center',
++        justifyContent: 'center',
++        gap: spacing.lg,
++    },
++    loaderWrapper: {
++        alignItems: 'center',
++        justifyContent: 'center',
++        position: 'relative',
++    },
++    core: {
++        backgroundColor: '#E50914',
++        shadowColor: '#E50914',
++        shadowOffset: { width: 0, height: 0 },
++        shadowOpacity: 0.85,
++        shadowRadius: 15,
++        elevation: 8,
++    },
++    ring1: {
++        position: 'absolute',
++        borderWidth: 4,
++        borderColor: 'transparent',
++        borderTopColor: '#E50914',
++        borderBottomColor: '#E50914',
++        shadowColor: '#E50914',
++        shadowOffset: { width: 0, height: 0 },
++        shadowOpacity: 0.5,
++        shadowRadius: 10,
++    },
++    ring2: {
++        position: 'absolute',
++        borderWidth: 2.5,
++        borderColor: 'transparent',
++        borderLeftColor: '#FFF',
++        borderRightColor: '#FFF',
++        opacity: 0.8,
++        shadowColor: '#FFF',
++        shadowOffset: { width: 0, height: 0 },
++        shadowOpacity: 0.4,
++        shadowRadius: 8,
++    },
++    text: {
++        color: '#FFF',
++        fontSize: 14,
++        fontWeight: '700',
++        fontStyle: 'italic',
++        letterSpacing: 1.5,
++        textAlign: 'center',
++        minHeight: 20,
++        textShadowColor: 'rgba(235, 9, 20, 0.4)',
++        textShadowOffset: { width: 0, height: 2 },
++        textShadowRadius: 8,
++    },
++});
+diff --git a/src/components/ui/index.ts b/src/components/ui/index.ts
+index 2092ae3..4f74ab9 100644
+--- a/src/components/ui/index.ts
++++ b/src/components/ui/index.ts
+@@ -29,4 +29,6 @@ export * from './CollectionCard';
+ export * from './CreateCollectionModal';
+ export * from './ProfileStatCard';
+ export * from './ProfileStatsGrid';
++export * from './AnimatedLoader';
++
+ 
+diff --git a/src/services/api/CacheManager.ts b/src/services/api/CacheManager.ts
+index 49729a1..16594b5 100644
+--- a/src/services/api/CacheManager.ts
++++ b/src/services/api/CacheManager.ts
+@@ -44,7 +44,12 @@ class CacheManagerImpl {
+             if (this.activeRequests.has(cacheKey)) {
+                 try {
+                     const freshData = await this.activeRequests.get(cacheKey);
+-                    if (onUpdate) onUpdate(freshData);
++                    if (onUpdate) {
++                        const isIdentical = existingStaleData !== undefined && JSON.stringify(existingStaleData) === JSON.stringify(freshData);
++                        if (!isIdentical) {
++                            onUpdate(freshData);
++                        }
++                    }
+                 } catch (e) {
+                     console.warn(`[CacheManager] Background deduplicated refresh failed:`, e);
+                 }
+@@ -57,7 +62,12 @@ class CacheManagerImpl {
+                     this.setMemoryCache(cacheKey, freshData);
+                     AsyncStorage.setItem(cacheKey, JSON.stringify({ data: freshData, timestamp: Date.now() }))
+                         .catch(err => console.warn(`[CacheManager] L2 Write Error on refresh for ${cacheKey}:`, err));
+-                    if (onUpdate) onUpdate(freshData);
++                    if (onUpdate) {
++                        const isIdentical = existingStaleData !== undefined && JSON.stringify(existingStaleData) === JSON.stringify(freshData);
++                        if (!isIdentical) {
++                            onUpdate(freshData);
++                        }
++                    }
+                     return freshData;
+                 } catch (error) {
+                     console.warn(`[CacheManager] Background refresh failed for ${cacheKey}:`, error);
+diff --git a/src/services/api/PrefetchManager.ts b/src/services/api/PrefetchManager.ts
+new file mode 100644
+index 0000000..9f96c19
+--- /dev/null
++++ b/src/services/api/PrefetchManager.ts
+@@ -0,0 +1,37 @@
++import { InteractionManager } from 'react-native';
++import { animeApi } from '../animeApi';
++
++class PrefetchManagerImpl {
++    private prefetchedIds = new Set<string>();
++
++    prefetchAnime(id: string) {
++        const idStr = String(id);
++        if (this.prefetchedIds.has(idStr)) return;
++        this.prefetchedIds.add(idStr);
++
++        InteractionManager.runAfterInteractions(() => {
++            // Run silently in background without onUpdate or await blocking
++            animeApi.getAnimeDetails(idStr)
++                .then(() => {
++                    console.log(`[PrefetchManager] Prefetched details for ${idStr}`);
++                    // Also prefetch characters and recommendations to make the transition buttery smooth!
++                    return Promise.all([
++                        animeApi.getAnimeCharacters(idStr),
++                        animeApi.getAnimeRecommendations(idStr),
++                    ]);
++                })
++                .then(() => {
++                    console.log(`[PrefetchManager] Prefetched characters and recommendations for ${idStr}`);
++                })
++                .catch(err => {
++                    console.warn(`[PrefetchManager] Prefetch failed for ${idStr}:`, err);
++                });
++        });
++    }
++
++    prefetchMultiple(ids: string[]) {
++        ids.forEach(id => this.prefetchAnime(id));
++    }
++}
++
++export const PrefetchManager = new PrefetchManagerImpl();
+diff --git a/src/store/useAppStore.ts b/src/store/useAppStore.ts
+index 5e1c2eb..c35158f 100644
+--- a/src/store/useAppStore.ts
++++ b/src/store/useAppStore.ts
+@@ -599,7 +599,48 @@ export const useAppStore = create<AppState>()(
+                   userProfile = backupProfile;
+                 }
+ 
+-                // 3. Fetch data once with background retries and cached values as ultimate fallbacks
++                if (userProfile && !userProfile.timezone) {
++                  try {
++                    const { autoDetectTimezone } = require('../utils/timezoneHelper');
++                    const detected = autoDetectTimezone();
++                    userProfile.timezone = detected.id;
++                    userProfile.timezoneLabel = detected.label;
++                    userProfile.country = detected.country;
++                    firestoreService.updateUserProfile(userId, {
++                      timezone: detected.id,
++                      timezoneLabel: detected.label,
++                      country: detected.country
++                    }).catch((e: any) => console.warn('Failed to auto-save detected timezone on signup:', e));
++                  } catch (e) {
++                    console.warn('Failed to auto-detect timezone during initialization:', e);
++                  }
++                }
++
++                // Resolve primary authentication and profile info to let splash screen hide instantly
++                set({
++                  user: userProfile || get().user,
++                  collections: userProfile?.collections || get().collections || [],
++                  isAppInitializing: false,
++                  isLoadingAuth: false
++                });
++
++                // Check daily login XP
++                const currentUser = get().user;
++                if (currentUser) {
++                  const loginResult = XPService.processXPEvent(currentUser, 'DAILY_LOGIN');
++                  if (loginResult.xpAdded > 0) {
++                    set({ user: { ...currentUser, ...loginResult.updatedProfile } });
++                    firestoreService.updateUserProfile(currentUser.id, loginResult.updatedProfile).catch(e => {
++                      console.warn('Failed to save daily login XP:', e);
++                    });
++                  }
++                }
++
++                if (get().notificationsEnabled) {
++                  get().registerNotifications();
++                }
++
++                // 2. Fetch other user metadata silently in the background
+                 const [history, activity, allProgress, ratings, notInterested, followingList, followersList] = await Promise.all([
+                   fetchWithRetry(() => {
+                     return firestoreService.getContinueWatching(userId);
+@@ -645,25 +686,7 @@ export const useAppStore = create<AppState>()(
+                   });
+                 }
+ 
+-                if (userProfile && !userProfile.timezone) {
+-                  try {
+-                    const { autoDetectTimezone } = require('../utils/timezoneHelper');
+-                    const detected = autoDetectTimezone();
+-                    userProfile.timezone = detected.id;
+-                    userProfile.timezoneLabel = detected.label;
+-                    userProfile.country = detected.country;
+-                    firestoreService.updateUserProfile(userId, {
+-                      timezone: detected.id,
+-                      timezoneLabel: detected.label,
+-                      country: detected.country
+-                    }).catch((e: any) => console.warn('Failed to auto-save detected timezone on signup:', e));
+-                  } catch (e) {
+-                    console.warn('Failed to auto-detect timezone during initialization:', e);
+-                  }
+-                }
+-
+                 set({
+-                  user: userProfile || get().user,
+                   continueWatching: history || [],
+                   activityFeed: activity || [],
+                   animeProgress: progressMap,
+@@ -671,26 +694,8 @@ export const useAppStore = create<AppState>()(
+                   notInterested: notInterested || [],
+                   following: followingList || [],
+                   followers: followersList || [],
+-                  collections: userProfile?.collections || get().collections || [],
+-                  isAppInitializing: false, // Background tasks finished, mark init complete if not done
+-                  isLoadingAuth: false
+                 });
+ 
+-                // Check daily login XP
+-                const currentUser = get().user;
+-                if (currentUser) {
+-                  const loginResult = XPService.processXPEvent(currentUser, 'DAILY_LOGIN');
+-                  if (loginResult.xpAdded > 0) {
+-                    set({ user: { ...currentUser, ...loginResult.updatedProfile } });
+-                    firestoreService.updateUserProfile(currentUser.id, loginResult.updatedProfile).catch(e => {
+-                      console.warn('Failed to save daily login XP:', e);
+-                    });
+-                  }
+-                }
+-
+-                if (get().notificationsEnabled) {
+-                  get().registerNotifications();
+-                }
+               } catch (bgError) {
+                 console.warn("[useAppStore] Background initial fetch warning:", bgError);
+                 set({

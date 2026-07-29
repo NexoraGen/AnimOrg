@@ -116,51 +116,10 @@ export const trailerService = {
   },
 
   /**
-   * Fallback to scrape a YouTube trailer if Jikan API is missing one.
-   * Tries multiple query strategies.
+   * Safe fallback stripped of HTML scraping to enforce YouTube ToS compliance.
+   * If a trailer doesn't exist legitimately via API, it degrades gracefully to null.
    */
   searchYoutubeTrailer: async (animeTitle: string): Promise<string | null> => {
-    // Web browsers will block this with CORS, so we skip the scrape fallback on Web
-    if (Platform.OS === 'web') return null;
-
-    const queries = [
-      `${animeTitle} official trailer anime`,
-      `${animeTitle} PV anime`,
-      `${animeTitle} anime trailer`
-    ];
-
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-    for (const q of queries) {
-      let attempts = 2;
-      for (let attempt = 1; attempt <= attempts; attempt++) {
-        try {
-          const query = encodeURIComponent(q);
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
-
-          const response = await fetch(`https://www.youtube.com/results?search_query=${query}`, {
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          const text = await response.text();
-
-          // Look for the first valid video ID that isn't a playlist or channel
-          const match = text.match(/\/watch\?v=([a-zA-Z0-9_-]{11})/);
-          if (match && match[1]) {
-            return `https://www.youtube.com/watch?v=${match[1]}`;
-          }
-          break; // If fetch succeeded but no match, no need to retry this query
-        } catch (error: any) {
-          console.warn(`Trailer fallback search failed for query "${q}" (Attempt ${attempt}/${attempts}):`, error.message);
-          if (attempt < attempts) {
-            await delay(1000 * Math.pow(2, attempt - 1));
-          }
-        }
-      }
-    }
-
     return null;
   },
 

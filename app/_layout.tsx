@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
-import { View, Platform, ActivityIndicator, Text, StyleSheet, Animated } from 'react-native';
+import { View, Platform, ActivityIndicator, Text, StyleSheet, Animated, AppState, TouchableOpacity } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../src/theme';
 import { useAppStore } from '../src/store/useAppStore';
+import { BackendWarmupService } from '../src/services/api/BackendWarmupService';
 import { ErrorBoundary } from '../src/components/common/ErrorBoundary';
+import { Feather } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -53,6 +55,15 @@ export default function RootLayout() {
   const modalCount = useAppStore(state => state.modalCount);
   const isAppInitializing = useAppStore(state => state.isAppInitializing);
   const hasHydrated = useAppStore(state => state.hasHydrated);
+  const profileError = useAppStore(state => state.profileError);
+  const retryInitializeProfile = useAppStore(state => state.retryInitializeProfile);
+
+  const [retryingAuth, setRetryingAuth] = useState(false);
+  const handleGlobalRetry = async () => {
+    setRetryingAuth(true);
+    await retryInitializeProfile();
+    setRetryingAuth(false);
+  };
 
   const achievementUnlockModalVisible = useAppStore(state => state.achievementUnlockModalVisible);
   const activeAchievementBadge = useAppStore(state => state.activeAchievementBadge);
@@ -61,7 +72,7 @@ export default function RootLayout() {
   const [showNotifDialog, setShowNotifDialog] = useState(false);
 
   useEffect(() => {
-    if (!hasHydrated) return;
+    if (!hasHydrated || isLoadingAuth) return;
     const checkOnboarding = async () => {
       const shown = await notificationPermission.hasOnboardingBeenShown();
       if (!shown) {
@@ -69,7 +80,7 @@ export default function RootLayout() {
       }
     };
     checkOnboarding();
-  }, [hasHydrated]);
+  }, [hasHydrated, isLoadingAuth]);
 
   const router = useRouter();
   const segments = useSegments();
@@ -77,6 +88,11 @@ export default function RootLayout() {
   // Root Layout Global Intercept and Onboarding Guardian
   useEffect(() => {
     if (isLoadingAuth || !hasHydrated || isAppInitializing) return;
+
+    if (profileError && !user) {
+      // Do not execute redirect logic if there's a fatal profile/auth error on mount
+      return;
+    }
 
     const performRedirect = () => {
       const segmentsList = segments as string[];
@@ -124,7 +140,14 @@ export default function RootLayout() {
     }
   }, [isAuthenticated, isGuest, user, isLoadingAuth, hasHydrated, isAppInitializing, segments]);
 
+  // Initialize Auth ONLY when hasHydrated is true
   useEffect(() => {
+    if (!hasHydrated) {
+      console.log('[AUTH] Waiting for Zustand hydration...');
+      return;
+    }
+
+    console.log('[AUTH] App launched & completely hydrated. Starting Firebase.');
     const timer = setTimeout(() => {
       if (!useAppStore.getState().hasHydrated) {
         console.log('[Layout] Enforcing hydration fallback');
@@ -133,6 +156,16 @@ export default function RootLayout() {
     }, 100);
 
     const unsubscribe = initializeAuth();
+
+    // Start background wake operation for Render backend 
+    BackendWarmupService.startWarmup();
+
+    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        console.log('[Warmup] Trigger: App Resume');
+        BackendWarmupService.startWarmup();
+      }
+    });
 
     // Aggressive cleanup sweep of legacy oversized cache objects
     // Fixes SQLite Full crashes globally on startup for corrupted devices
@@ -147,13 +180,19 @@ export default function RootLayout() {
         // fail silently 
       }
     };
-    performCleanupSweep();
+
+    // DEFER cleanup to prevent SQLite AsyncStorage locking during Firebase/Zustand boot
+    const sweepTimer = setTimeout(() => {
+      performCleanupSweep();
+    }, 5000);
 
     return () => {
       clearTimeout(timer);
+      clearTimeout(sweepTimer);
       unsubscribe();
+      appStateSubscription.remove();
     };
-  }, []);
+  }, [hasHydrated]);
 
   useEffect(() => {
     if (Platform.OS === 'web') {
@@ -220,6 +259,25 @@ export default function RootLayout() {
     <ErrorBoundary>
       <SafeAreaProvider initialMetrics={initialWindowMetrics}>
         <GestureHandlerRootView style={{ flex: 1, overflow: Platform.OS === 'web' ? 'hidden' : undefined }}>
+          {(!user && profileError && !isLoadingAuth) && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 24, zIndex: 9999 }]}>
+              <Feather name="wifi-off" size={48} color={colors.primary} style={{ marginBottom: 16 }} />
+              <Text style={{ color: colors.text, fontSize: 20, fontWeight: 'bold' }}>Unable to Connect</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginTop: 8 }}>{profileError}</Text>
+              <TouchableOpacity
+                style={{ backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, marginTop: 24 }}
+                onPress={handleGlobalRetry}
+                disabled={retryingAuth}
+              >
+                {retryingAuth ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>Retry Connection</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+
           {hasHydrated && (
             <Stack
               screenOptions={{

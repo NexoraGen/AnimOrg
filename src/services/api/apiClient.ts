@@ -1,4 +1,6 @@
 import Constants from 'expo-constants';
+import { BackendStatusManager, BackendStatus } from './BackendStatusManager';
+import { WarmupQueue, QueuePriority } from './WarmupQueue';
 
 /**
  * Dynamically resolves the backend base URL.
@@ -30,6 +32,22 @@ export const BACKEND_BASE = getBackendBaseUrl();
  */
 export const executeBackendQuery = async <T>(relativeUrl: string, signal?: AbortSignal): Promise<T> => {
     const cleanUrl = relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`;
+
+    if (cleanUrl !== '/healthz') {
+        const warmupStatus = BackendStatusManager.getStatus();
+        if (warmupStatus !== BackendStatus.READY && warmupStatus !== BackendStatus.FAILED && warmupStatus !== BackendStatus.OFFLINE) {
+            console.log(`[apiClient] Backend is waking. Queueing request for ${cleanUrl}...`);
+            let priority = QueuePriority.NORMAL;
+            if (cleanUrl.match(/^\/api\/anime\/\d+\/full/)) {
+                priority = QueuePriority.HIGH;
+            } else if (cleanUrl.includes('search')) {
+                priority = QueuePriority.HIGH;
+            }
+            await WarmupQueue.addRequest(priority);
+            console.log(`[apiClient] Backend woke. Resuming request for ${cleanUrl}.`);
+        }
+    }
+
     const url = `${BACKEND_BASE}${cleanUrl}`;
 
     console.log(`[apiClient] Initiating request to URL: ${url}`);

@@ -1,0 +1,12 @@
+7b48ea5 Fix infinite profile loading hang with timed promises and offline retry UI
+92c6f67 fix(web): resolve web app startup blank screen issue and safe area layout cropping
+b350105 fix(web): resolve web startup white screen root cause and bundler syntax errors
+f711ff8 chore: centralize app version with single source of truth
+e289db6 Optimize AnimOrg loading performance, caching, search resilience, and add premium animated loader
+5cf92ce Fix UI refresh issue and implement premium smart notifications
+195f22b Replace rank system with AnimOrg branded progression
+b511eac Implement premium smart notification system
+52102df AnimOrg v1.0.2 stable before backend migration
+8a46bac Fix splash screen and startup loading
+4220b17 feat: integrate AniList GraphQL and SWR caching framework
+c42f27d Initial commit
