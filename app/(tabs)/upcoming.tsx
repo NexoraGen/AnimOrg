@@ -10,6 +10,7 @@ import {
     Platform,
     useWindowDimensions
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { LinearGradient } from 'expo-linear-gradient';
 import { spacing, colors, borderRadius } from '../../src/theme';
 import { Media } from '../../src/types';
@@ -35,8 +36,6 @@ const DAY_SHORT: Record<string, string> = {
     Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed',
     Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun'
 };
-
-import { FlashList } from '@shopify/flash-list';
 
 interface UpcomingDayFeedProps {
     day: string;
@@ -98,11 +97,14 @@ const UpcomingDayFeed: React.FC<UpcomingDayFeedProps> = React.memo(({
             contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: 120, paddingHorizontal: edgePadding }}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
             {...{ estimatedItemSize: 220 } as any}
-            renderItem={({ item }) => {
+            renderItem={({ item, index }) => {
                 const progress = animeProgress[item.id] || { lastWatchedEpisode: 0 };
                 const nextEp = getNextEpisode(item, progress.lastWatchedEpisode);
+
+                const isLastInRow = index % numColumns === numColumns - 1;
+
                 return (
-                    <View style={[styles.gridItem, { width: cardWidth, marginRight: itemGap }]}>
+                    <View style={[styles.gridItem, { width: cardWidth, marginRight: isLastInRow ? 0 : itemGap }]}>
                         <AiringAnimeCard
                             anime={item}
                             width={cardWidth}
@@ -358,14 +360,29 @@ export default function UpcomingScreen() {
                 const freshSchedule = await animeApi.getAiringSchedule(undefined, (freshList) => {
                     const currentlyAiring = freshList.filter(item => item.status?.toLowerCase() !== 'finished airing' && item.status?.toLowerCase() !== 'finished');
                     console.log(`[ReleaseHub Debug] callback: loaded ${freshList.length} total, filtered currentlyAiring count: ${currentlyAiring.length}`);
-                    AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
+
+                    if (currentlyAiring.length > 50) {
+                        AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
+                    } else {
+                        console.warn(`[ReleaseHub Safety] Callback returned only ${currentlyAiring.length} anime. Ignoring cache overwrite.`);
+                    }
+
                     setAllAnime(currentlyAiring);
                     syncTrackedReleases(currentlyAiring, upcomingList);
                 });
 
                 const currentlyAiring = freshSchedule.filter(item => item.status?.toLowerCase() !== 'finished airing' && item.status?.toLowerCase() !== 'finished');
                 console.log(`[ReleaseHub Debug] loaded ${freshSchedule.length} total, filtered currentlyAiring count: ${currentlyAiring.length}`);
-                await AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
+
+                // CRITICAL FAIL-SAFE:
+                // Only overwrite the device's weekly cache slate if the incoming data payload contains a legitimate threshold of anime.
+                // A normal active anime broadcasting season usually contains 100-250 series.
+                if (currentlyAiring.length > 50) {
+                    await AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
+                } else {
+                    console.warn(`[ReleaseHub Safety] Fetch returned only ${currentlyAiring.length} anime. Ignoring cache overwrite to prevent blackout state.`);
+                }
+
                 setAllAnime(currentlyAiring);
                 await syncTrackedReleases(currentlyAiring, upcomingList);
             }
@@ -437,19 +454,14 @@ export default function UpcomingScreen() {
                         <Text style={[styles.trackedGroupCountText, { color: iconColor }]}>{items.length}</Text>
                     </View>
                 </View>
-                <FlatList
+                <FlashList
                     data={items}
                     keyExtractor={(item) => `${tickKey}-${item.id}`}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.trackedScroll}
-                    initialNumToRender={3}
-                    maxToRenderPerBatch={6}
-                    windowSize={3}
-                    removeClippedSubviews={Platform.OS === 'android'}
-                    scrollEventThrottle={16}
-                    keyboardShouldPersistTaps="handled"
-                    getItemLayout={(data, index) => ({ length: 332, offset: 332 * index, index })}
+                    // @ts-ignore
+                    estimatedItemSize={332}
                     renderItem={({ item }) => (
                         <TrackedAnimeCard
                             media={item}

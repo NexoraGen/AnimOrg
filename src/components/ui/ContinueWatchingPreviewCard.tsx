@@ -126,9 +126,14 @@ export const ContinueWatchingPreviewCard: React.FC<ContinueWatchingPreviewCardPr
                             Ep {nextEp}
                         </Text>
                         <View style={styles.dot} />
-                        <Text style={[styles.watchedText, { color: themeColors.textDim }]}>
-                            {total > 0 ? `${lastWatched}/${total} Watched` : `${lastWatched} Watched`}
-                        </Text>
+                        <View style={{ flexDirection: 'column', justifyContent: 'center' }}>
+                            <Text style={[styles.watchedText, { color: themeColors.textDim }]}>
+                                {total > 0 ? `${lastWatched}/${total}` : `${lastWatched}`}
+                            </Text>
+                            <Text style={[styles.watchedLabel, { color: themeColors.textDim }]}>
+                                Watched
+                            </Text>
+                        </View>
                     </View>
 
                     {/* Viewing Progress Bar */}
@@ -217,7 +222,13 @@ const styles = StyleSheet.create({
     },
     watchedText: {
         fontSize: 12,
+        fontWeight: '700',
+    },
+    watchedLabel: {
+        fontSize: 10,
         fontWeight: '600',
+        marginTop: 1,
+        opacity: 0.7,
     },
     progressBarBg: {
         height: 3,

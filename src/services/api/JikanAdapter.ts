@@ -67,6 +67,15 @@ export const JikanAdapter = {
         return mapJikanToMedia(data.data);
     },
 
+    getAnimeVideos: async (id: string): Promise<any> => {
+        try {
+            const data = await executeBackendQuery<any>(`${BASE_PATH}/${id}/videos`);
+            return data.data;
+        } catch (e) {
+            return null;
+        }
+    },
+
     getAnimeCharacters: async (id: string): Promise<Character[]> => {
         const data = await executeBackendQuery<any>(`${BASE_PATH}/${id}/characters`);
         return data.data.slice(0, 10).map((c: any) => {

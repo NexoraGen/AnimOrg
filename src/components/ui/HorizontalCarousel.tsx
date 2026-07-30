@@ -2,9 +2,9 @@ import React from 'react';
 import {
   StyleSheet,
   View,
-  Platform,
-  FlatList
+  Platform
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { PosterCard } from './PosterCard';
 import { SectionHeader } from './SectionHeader';
 import { Media, WatchHistoryEntry } from '../../types';
@@ -90,38 +90,35 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
       />
 
       {isLoading ? (
-        <FlatList
-          data={[1, 2, 3, 4, 5]}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          renderItem={() => (
-            <SkeletonLoader
-              width={width}
-              height={height}
-              style={{ marginHorizontal: spacing.sm, borderRadius: 12 }}
-            />
-          )}
-          keyExtractor={(item) => `skeleton-${title}-${item}`}
-        />
+        <View style={{ minHeight: height + spacing.md }}>
+          <FlashList
+            data={[1, 2, 3, 4, 5]}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            estimatedItemSize={width + 16}
+            renderItem={() => (
+              <SkeletonLoader
+                width={width}
+                height={height}
+                style={{ marginHorizontal: spacing.sm, borderRadius: 12 }}
+              />
+            )}
+            keyExtractor={(item) => `skeleton-${title}-${item}`}
+          />
+        </View>
       ) : (
-        <FlatList
-          data={data}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={disableSnap ? undefined : (itemWidth || (variant === 'wide' ? width : width + 16))}
-          decelerationRate={disableSnap ? "normal" : "fast"}
-          snapToAlignment={disableSnap ? undefined : "start"}
-          renderItem={renderItemInternal}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={styles.listContent}
-          initialNumToRender={5}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          removeClippedSubviews={Platform.OS === 'android'}
-          scrollEventThrottle={16}
-          keyboardShouldPersistTaps="handled"
-          getItemLayout={getItemLayout}
-        />
+        <View style={{ minHeight: height + spacing.md }}>
+          <FlashList
+            data={data}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            renderItem={renderItemInternal}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={styles.listContent}
+            estimatedItemSize={itemWidth || (variant === 'wide' ? width : width + 16)}
+            keyboardShouldPersistTaps="handled"
+          />
+        </View>
       )}
     </View>
   );

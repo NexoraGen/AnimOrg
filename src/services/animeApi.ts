@@ -115,11 +115,35 @@ export const animeApi = {
         }
       } else {
         const detailsData = mergedData as Media;
-        // AniList succeeded, but it lacks Jikan specific detail fields (Broadcast, Ranks, complete Episodes count if > than AniList holds, or Trailer).
+        // AniList succeeded, but it lacks Jikan specific detail fields
         if (!detailsData.broadcast || !detailsData.rank || !detailsData.rating_count || !(detailsData.trailerUrl || detailsData.trailerData)) {
           // Asynchronously fetch Jikan to fill in the blanks
-          JikanAdapter.getAnimeDetails(id).then(jikanData => {
+          JikanAdapter.getAnimeDetails(id).then(async (jikanData) => {
             if (jikanData) {
+              let updatedTrailerUrl = detailsData.trailerUrl || jikanData.trailerUrl;
+              let updatedTrailerData = detailsData.trailerData || jikanData.trailerData;
+
+              // Ultra-fallback: If no canonical trailer exists, scrape Jikan promo videos
+              if (!updatedTrailerUrl && !updatedTrailerData?.youtubeId) {
+                try {
+                  const videos = await JikanAdapter.getAnimeVideos(id);
+                  if (videos && videos.promo && videos.promo.length > 0) {
+                    const promoUrl = videos.promo[0].trailer?.url || (videos.promo[0].trailer?.youtube_id ? `https://www.youtube.com/watch?v=${videos.promo[0].trailer.youtube_id}` : undefined);
+                    const promoYTId = videos.promo[0].trailer?.youtube_id;
+                    if (promoYTId) {
+                      updatedTrailerUrl = promoUrl;
+                      updatedTrailerData = {
+                        youtubeId: promoYTId,
+                        url: promoUrl,
+                        embedUrl: `https://www.youtube.com/embed/${promoYTId}`
+                      };
+                    }
+                  }
+                } catch (e) {
+                  // Ignore promo scrape failures
+                }
+              }
+
               const fullyMergedObj: Media = {
                 ...detailsData,
                 broadcast: detailsData.broadcast || jikanData.broadcast,
@@ -127,8 +151,8 @@ export const animeApi = {
                 rating_count: detailsData.rating_count || jikanData.rating_count,
                 popularity: detailsData.popularity || jikanData.popularity,
                 episodes: detailsData.episodes || jikanData.episodes,
-                trailerUrl: detailsData.trailerUrl || jikanData.trailerUrl,
-                trailerData: detailsData.trailerData || jikanData.trailerData,
+                trailerUrl: updatedTrailerUrl,
+                trailerData: updatedTrailerData,
               };
               const healedMerged = EpisodeCountRegistry.checkAndFixMedia(fullyMergedObj) as Media;
               // Persist fully merged data to cache as details_${id}

@@ -582,50 +582,62 @@ export const useAppStore = create<AppState>()(
             });
             console.log('[AUTH] Auth finished');
 
-            // 2. Set up real-time listener for "trackedAnime" (Primary for Hub)
-            if (globalTrackedListener) {
-              globalTrackedListener();
-            }
+            // Failsafe watchdog to prevent infinite loading screens
+            setTimeout(() => {
+              if (useAppStore.getState().isAppInitializing) {
+                console.error("[useAppStore] Failsafe watchdog triggered: forcing isAppInitializing to false");
+                useAppStore.getState().setIsAppInitializing(false);
+              }
+            }, 10000);
 
-            globalTrackedListener = firestoreService.onTrackedAnimeSnapshot(userId, (trackedItems) => {
-              const currentWatchlist = get().watchlist;
-              let hasChanges = false;
-
-              if (currentWatchlist.length !== trackedItems.length) {
-                hasChanges = true;
+            try {
+              // 2. Set up real-time listener for "trackedAnime" (Primary for Hub)
+              if (globalTrackedListener) {
+                globalTrackedListener();
               }
 
-              const currentMap = new Map(currentWatchlist.map(w => [String(w.mediaId), w]));
-              const mergedMap = new Map();
+              globalTrackedListener = firestoreService.onTrackedAnimeSnapshot(userId, (trackedItems) => {
+                const currentWatchlist = get().watchlist;
+                let hasChanges = false;
 
-              trackedItems.forEach(ta => {
-                const taId = String(ta.mediaId);
-                const existing = currentMap.get(taId);
-
-                if (!existing) {
+                if (currentWatchlist.length !== trackedItems.length) {
                   hasChanges = true;
-                  mergedMap.set(taId, ta);
-                } else {
-                  const statusChanged = ta.status !== existing.status;
-                  const favoriteChanged = ta.isFavorite !== existing.isFavorite;
-                  const ratingChanged = ta.rating !== existing.rating;
-                  const broadcastChanged = JSON.stringify(ta.broadcast) !== JSON.stringify(existing.broadcast);
-                  const mediaStatusMismatched = ta.mediaStatus !== existing.mediaStatus;
-                  const thumbUpdated = !existing.posterImageMedium && ta.posterImageMedium;
+                }
 
-                  if (statusChanged || favoriteChanged || ratingChanged || broadcastChanged || mediaStatusMismatched || thumbUpdated) {
+                const currentMap = new Map(currentWatchlist.map(w => [String(w.mediaId), w]));
+                const mergedMap = new Map();
+
+                trackedItems.forEach(ta => {
+                  const taId = String(ta.mediaId);
+                  const existing = currentMap.get(taId);
+
+                  if (!existing) {
                     hasChanges = true;
-                    mergedMap.set(taId, { ...existing, ...ta });
+                    mergedMap.set(taId, ta);
                   } else {
-                    mergedMap.set(taId, existing);
+                    const statusChanged = ta.status !== existing.status;
+                    const favoriteChanged = ta.isFavorite !== existing.isFavorite;
+                    const ratingChanged = ta.rating !== existing.rating;
+                    const broadcastChanged = JSON.stringify(ta.broadcast) !== JSON.stringify(existing.broadcast);
+                    const mediaStatusMismatched = ta.mediaStatus !== existing.mediaStatus;
+                    const thumbUpdated = !existing.posterImageMedium && ta.posterImageMedium;
+
+                    if (statusChanged || favoriteChanged || ratingChanged || broadcastChanged || mediaStatusMismatched || thumbUpdated) {
+                      hasChanges = true;
+                      mergedMap.set(taId, { ...existing, ...ta });
+                    } else {
+                      mergedMap.set(taId, existing);
+                    }
                   }
+                });
+
+                if (hasChanges) {
+                  set({ watchlist: Array.from(mergedMap.values()) });
                 }
               });
-
-              if (hasChanges) {
-                set({ watchlist: Array.from(mergedMap.values()) });
-              }
-            });
+            } catch (snapshotErr) {
+              console.warn('[useAppStore] Failed to establish real-time snapshot for tracked items:', snapshotErr);
+            }
 
             // Asynchronously fetch other data in the background so it never blocks the startup splash screen transition
             get()._initializeProfileData(userId, firebaseUser, hasCachedProfile);
@@ -891,7 +903,7 @@ export const useAppStore = create<AppState>()(
         const { user, watchlist } = get();
         set({
           watchlist: watchlist.map(item =>
-            item.mediaId === mediaId ? { ...item, status } : item
+            String(item.mediaId) === String(mediaId) ? { ...item, status } : item
           )
         });
 
@@ -905,7 +917,7 @@ export const useAppStore = create<AppState>()(
 
         if (user) {
           try {
-            const updatedItem = get().watchlist.find(i => i.mediaId === mediaId);
+            const updatedItem = get().watchlist.find(i => String(i.mediaId) === String(mediaId));
             await Promise.all([
               firestoreService.updateWatchlistStatus(user.id, mediaId, status),
               updatedItem ? firestoreService.syncTrackedAnime(user.id, updatedItem) : Promise.resolve()
@@ -918,13 +930,13 @@ export const useAppStore = create<AppState>()(
 
       toggleFavorite: async (mediaId) => {
         const { user, watchlist, addActivityFeedItem } = get();
-        const existingItem = watchlist.find(item => item.mediaId === mediaId);
+        const existingItem = watchlist.find(item => String(item.mediaId) === String(mediaId));
         if (!existingItem) return;
 
         const newIsFavorite = !existingItem.isFavorite;
         set({
           watchlist: watchlist.map(item =>
-            item.mediaId === mediaId ? { ...item, isFavorite: newIsFavorite } : item
+            String(item.mediaId) === String(mediaId) ? { ...item, isFavorite: newIsFavorite } : item
           )
         });
 
@@ -939,7 +951,11 @@ export const useAppStore = create<AppState>()(
 
         if (user) {
           try {
-            await firestoreService.toggleFavorite(user.id, mediaId, newIsFavorite);
+            const updatedItem = get().watchlist.find(i => String(i.mediaId) === String(mediaId));
+            await Promise.all([
+              firestoreService.toggleFavorite(user.id, mediaId, newIsFavorite),
+              updatedItem ? firestoreService.syncTrackedAnime(user.id, updatedItem) : Promise.resolve()
+            ]);
           } catch (error) {
             console.error("Failed to toggle favorite:", error);
           }
@@ -948,7 +964,7 @@ export const useAppStore = create<AppState>()(
 
       removeFromWatchlist: async (mediaId) => {
         const { user, watchlist } = get();
-        set({ watchlist: watchlist.filter(item => item.mediaId !== mediaId) });
+        set({ watchlist: watchlist.filter(item => String(item.mediaId) !== String(mediaId)) });
 
         if (user) {
           try {
@@ -1499,9 +1515,24 @@ export const useAppStore = create<AppState>()(
     {
       name: 'animorg-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      merge: (persistedState: any, currentState: AppState) => {
+        // Strictly prevent legacy persistence bloat from silently overwriting critical boot sequence flags natively late in cycle
+        const incoming = { ...persistedState };
+        delete incoming.isAppInitializing;
+        delete incoming.isLoadingAuth;
+        delete incoming.hasHydrated;
+        delete incoming.profileError;
+        return { ...currentState, ...incoming };
+      },
       onRehydrateStorage: () => {
         console.log('[Store] AsyncStorage rehydration initiated');
+        const timer = setTimeout(() => {
+          console.warn('[Store] Hydration watchdog fired! Unlocking stuck app due to silent AsyncStorage failure.');
+          useAppStore.getState().setHasHydrated(true);
+        }, 3000);
+
         return (_hydratedState, error) => {
+          clearTimeout(timer);
           if (error) {
             console.error('[Store] AsyncStorage rehydration failed:', error);
           } else {
@@ -1510,33 +1541,44 @@ export const useAppStore = create<AppState>()(
           useAppStore.getState().setHasHydrated(true);
         };
       },
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-        isGuest: state.isGuest,
-        theme: state.theme,
-        notificationsEnabled: state.notificationsEnabled,
-        notificationSettings: state.notificationSettings,
-        notificationFrequency: state.notificationFrequency,
-        pushToken: state.pushToken,
-        autoplayTrailer: state.autoplayTrailer,
-        reduceHaptics: state.reduceHaptics,
-        videoQuality: state.videoQuality,
-        dataSaver: state.dataSaver,
-        appLanguage: state.appLanguage,
-        use24Hour: state.use24Hour,
-        episodeAlertsEnabled: state.episodeAlertsEnabled,
-        levelUpAnimationsEnabled: state.levelUpAnimationsEnabled,
-        // Severely prune massive datasets strictly prior to JSON serialization saving to SQLite
-        watchlist: state.watchlist,
-        animeProgress: Object.fromEntries(Object.entries(state.animeProgress || {}).slice(0, 150)),
-        searchHistory: (state.searchHistory || []).slice(0, 10),
-        recentlyViewed: (state.recentlyViewed || []).slice(0, 10),
-        continueWatching: (state.continueWatching || []).slice(0, 15),
-        notInterested: (state.notInterested || []).slice(0, 50),
-        userRatings: state.userRatings,
-        collections: state.collections || [],
-      }),
+      partialize: (state) => {
+        // Strip heavy nested arrays from user object before persisting to prevent 2MB SQLite crashes on Android
+        const userToSave = state.user ? { ...state.user } : null;
+        if (userToSave) {
+          delete userToSave.collections; // Prevent duplicate massive JSON bloat
+        }
+
+        return {
+          user: userToSave,
+          isAuthenticated: state.isAuthenticated,
+          isGuest: state.isGuest,
+          theme: state.theme,
+          notificationsEnabled: state.notificationsEnabled,
+          notificationSettings: state.notificationSettings,
+          notificationFrequency: state.notificationFrequency,
+          pushToken: state.pushToken,
+          autoplayTrailer: state.autoplayTrailer,
+          reduceHaptics: state.reduceHaptics,
+          videoQuality: state.videoQuality,
+          dataSaver: state.dataSaver,
+          appLanguage: state.appLanguage,
+          use24Hour: state.use24Hour,
+          episodeAlertsEnabled: state.episodeAlertsEnabled,
+          levelUpAnimationsEnabled: state.levelUpAnimationsEnabled,
+          // Severely prune massive datasets strictly prior to JSON serialization saving to SQLite
+          watchlist: (state.watchlist || []).slice(0, 150),
+          animeProgress: Object.fromEntries(Object.entries(state.animeProgress || {}).slice(0, 150)),
+          searchHistory: (state.searchHistory || []).slice(0, 10),
+          recentlyViewed: (state.recentlyViewed || []).slice(0, 10),
+          continueWatching: (state.continueWatching || []).slice(0, 15),
+          notInterested: (state.notInterested || []).slice(0, 50),
+          userRatings: (state.userRatings || []).slice(0, 100),
+          collections: (state.collections || []).slice(0, 20).map(c => ({
+            ...c,
+            animeIds: (c.animeIds || []).slice(0, 50)
+          })),
+        };
+      }
     }
   )
 );

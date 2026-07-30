@@ -442,37 +442,30 @@ export const AniListAdapter = {
     const items: Media[] = [];
     const seen = new Set();
     let page = 1;
-    let hasNextPage = true;
+    const promises = Array.from({ length: 5 }, (_, i) => i + 1).map(async (page) => {
+      console.log(`[AniListAdapter] Fetching airing schedule page ${page} concurrently...`);
+      return executeGraphQLQuery(query, { now, nextWeek, page });
+    });
 
-    while (hasNextPage && page <= 5) {
-      try {
-        console.log(`[AniListAdapter] Fetching airing schedule page ${page}...`);
-        const data = await executeGraphQLQuery(query, { now, nextWeek, page });
-        const schedules = data?.Page?.airingSchedules || [];
-        schedules.forEach((s: any) => {
-          if (s.media && !s.media.isAdult && !seen.has(s.media.idMal || s.media.id)) {
-            seen.add(s.media.idMal || s.media.id);
-            const mapped = mapAniListToMedia(s.media);
-            if (s.airingAt) {
-              mapped.nextAiringEpisode = {
-                airingAt: s.airingAt,
-                timeUntilAiring: s.airingAt - Math.floor(Date.now() / 1000),
-                episode: s.episode
-              };
-            }
-            items.push(mapped);
+    const results = await Promise.all(promises);
+
+    results.forEach((data) => {
+      const schedules = data?.Page?.airingSchedules || [];
+      schedules.forEach((s: any) => {
+        if (s.media && !s.media.isAdult && !seen.has(s.media.idMal || s.media.id)) {
+          seen.add(s.media.idMal || s.media.id);
+          const mapped = mapAniListToMedia(s.media);
+          if (s.airingAt) {
+            mapped.nextAiringEpisode = {
+              airingAt: s.airingAt,
+              timeUntilAiring: s.airingAt - Math.floor(Date.now() / 1000),
+              episode: s.episode
+            };
           }
-        });
-        hasNextPage = data?.Page?.pageInfo?.hasNextPage || false;
-        page++;
-      } catch (err) {
-        console.error(`[AniListAdapter] Error fetching airing schedule page ${page}:`, err);
-        if (items.length > 0) {
-          break;
+          items.push(mapped);
         }
-        throw err;
-      }
-    }
+      });
+    });
 
     console.log(`[AniListAdapter] Retrieved total ${items.length} unique weekly airing anime`);
     return items;

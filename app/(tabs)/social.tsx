@@ -123,8 +123,8 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
 
             const fetchedPosts = snapshot.docs.map(doc => {
                 const data = doc.data() as any;
+                // We no longer trigger aggressive backend updateDoc writes during frontend queries to prevent severe network bottlenecks on load. We grace-fallback to 'discussion' in memory.
                 if (!data.category) {
-                    updateDoc(doc.ref, { category: 'discussion' }).catch(e => console.warn('Migration update failed', e));
                     data.category = 'discussion';
                 }
                 return { id: doc.id, ...data };
@@ -182,14 +182,25 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                 finalPosts = scored.slice(0, limitCount);
             }
 
-            // Resolve likes and saves for the final posts being displayed
-            const resolvedLikes = user
-                ? await firestoreService.resolveLikesForPosts(user.id, finalPosts)
-                : finalPosts.map(p => ({ ...p, isLiked: false }));
+            // Resolve likes and saves in PARALLEL to massively drop sequential network lag!
+            let resolvedFinalPosts = finalPosts.map(p => ({ ...p, isLiked: false, isSaved: false }));
+            if (user && finalPosts.length > 0) {
+                const [resolvedLikes, resolvedSaves] = await Promise.all([
+                    firestoreService.resolveLikesForPosts(user.id, finalPosts),
+                    firestoreService.resolveSavesForPosts(user.id, finalPosts)
+                ]);
 
-            const resolvedFinalPosts = user
-                ? await firestoreService.resolveSavesForPosts(user.id, resolvedLikes)
-                : resolvedLikes.map(p => ({ ...p, isSaved: false }));
+                // Merge parallel results 
+                resolvedFinalPosts = finalPosts.map(post => {
+                    const likeObj = resolvedLikes.find(p => p.id === post.id);
+                    const saveObj = resolvedSaves.find(p => p.id === post.id);
+                    return {
+                        ...post,
+                        isLiked: likeObj ? likeObj.isLiked : false,
+                        isSaved: saveObj ? saveObj.isSaved : false
+                    };
+                });
+            }
 
             if (isLoadMore) {
                 setPosts(prev => [...prev, ...resolvedFinalPosts]);

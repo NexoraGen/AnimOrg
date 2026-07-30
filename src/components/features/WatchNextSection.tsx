@@ -6,9 +6,9 @@ import {
     TouchableOpacity,
     ScrollView,
     useWindowDimensions,
-    FlatList,
     Platform
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -443,19 +443,14 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         subtitle="Pick up where you left off"
                         onViewAll={() => router.push('/category/continue-watching')}
                     />
-                    <FlatList
+                    <FlashList
                         data={continueWatchingList.slice(0, 5)}
                         keyExtractor={(item) => `cw-${item.animeId}`}
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.scrollContent}
-                        initialNumToRender={4}
-                        maxToRenderPerBatch={5}
-                        windowSize={5}
-                        removeClippedSubviews={Platform.OS === 'android'}
-                        scrollEventThrottle={16}
-                        keyboardShouldPersistTaps="handled"
-                        getItemLayout={(data, index) => ({ length: 296, offset: 296 * index, index })}
+                        // @ts-ignore
+                        estimatedItemSize={296}
                         renderItem={({ item }) => (
                             <ContinueWatchingPreviewCard
                                 entry={item}
@@ -493,19 +488,14 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         subtitle="Caught up ongoing scheduled broadcasts"
                         onViewAll={() => router.push('/category/schedule')}
                     />
-                    <FlatList
+                    <FlashList
                         data={awaitingList}
                         keyExtractor={(item) => `await-${item.animeId}`}
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.scrollContent}
-                        initialNumToRender={4}
-                        maxToRenderPerBatch={8}
-                        windowSize={5}
-                        removeClippedSubviews={Platform.OS === 'android'}
-                        scrollEventThrottle={16}
-                        keyboardShouldPersistTaps="handled"
-                        getItemLayout={(data, index) => ({ length: 292, offset: 292 * index, index })}
+                        // @ts-ignore
+                        estimatedItemSize={292}
                         renderItem={({ item: progress }) => (
                             <AwaitingAnimeCard
                                 progress={progress}
@@ -527,19 +517,14 @@ export const WatchNextSection: React.FC = React.memo(() => {
                         subtitle="New confirmed sequel releases"
                         onViewAll={() => router.push('/category/upcoming')}
                     />
-                    <FlatList
+                    <FlashList
                         data={upcomingList}
                         keyExtractor={(item) => `sequel-${item.id}`}
                         horizontal
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.scrollContent}
-                        initialNumToRender={4}
-                        maxToRenderPerBatch={8}
-                        windowSize={5}
-                        removeClippedSubviews={Platform.OS === 'android'}
-                        scrollEventThrottle={16}
-                        keyboardShouldPersistTaps="handled"
-                        getItemLayout={(data, index) => ({ length: 292, offset: 292 * index, index })}
+                        // @ts-ignore
+                        estimatedItemSize={296}
                         renderItem={({ item: progress }) => (
                             <WatchNextUpcomingCard
                                 progress={progress}

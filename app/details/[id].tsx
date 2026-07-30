@@ -1142,8 +1142,9 @@ function DetailsScreenInner() {
           visible={isTrailerModalVisible}
           onClose={() => setTrailerModalVisible(false)}
           maxWidth={800}
+          widthPercentage={1}
         >
-          <View style={styles.trailerModalInner}>
+          <View style={[styles.trailerModalInner, { width: '100%', paddingHorizontal: spacing.M }]}>
             <TouchableOpacity
               style={styles.closeTrailerButton}
               onPress={() => setTrailerModalVisible(false)}
@@ -1251,6 +1252,8 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
   },
   year: {
     fontSize: typography.sizes.sm,

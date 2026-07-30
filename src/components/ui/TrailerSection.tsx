@@ -124,7 +124,7 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
         if (errorReason === 'unplayable') return "This video is restricted or has been removed.";
         if (errorReason === 'not_embeddable') return "The uploader has disabled embedding.";
         if (errorReason === 'timeout') return "Player took too long to load. Check your network.";
-        return "An unknown error occurred while loading the player.";
+        return `Playback error: ${errorReason || 'Unknown'}`;
     };
 
     return (
@@ -201,19 +201,19 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
                                 videoId={youtubeId}
                                 height={playerHeight}
                                 width={containerWidth}
-                                play={true}
+                                play={isPlayerReady}
                                 forceAndroidAutoplay={true}
                                 onReady={handlePlayerReady}
                                 onError={handlePlayerError}
                                 webViewProps={{
-                                    androidLayerType: 'hardware',
+                                    androidLayerType: 'software',
                                     allowsInlineMediaPlayback: true,
                                 }}
                                 initialPlayerParams={{
                                     modestbranding: true,
                                     rel: false,
                                     controls: true,
-                                    ccloadpolicy: true
+                                    cc_load_policy: true
                                 }}
                             />
                         )}

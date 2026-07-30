@@ -1,1 +1,0 @@
-﻿6d9993c Stabilize backend proxy and fix Jikan request handling

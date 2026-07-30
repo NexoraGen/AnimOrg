@@ -75,7 +75,7 @@ const ThemesAndOptionsView = React.memo(({
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 150 }}>
       {selectedGenres.length === 0 && (
         <>
-          <View style={{ marginBottom: spacing.S, paddingHorizontal: spacing.M }}>
+          <View style={{ marginBottom: spacing.S, paddingHorizontal: spacing.xl }}>
             <Text style={{ color: themeColors.text, fontSize: 18, fontWeight: '800' }}>Anime Themes</Text>
           </View>
           <ScrollView
@@ -85,14 +85,22 @@ const ThemesAndOptionsView = React.memo(({
             contentContainerStyle={styles.themeContent}
           >
             <View style={styles.themeGrid}>
-              {Object.entries(THEME_MAP).map(([name, id]) => (
-                <GenreChip
-                  key={id}
-                  label={name}
-                  selected={selectedGenres.includes(id)}
-                  onPress={() => toggleGenre(id)}
-                />
-              ))}
+              {Array.from({ length: Math.ceil(Object.entries(THEME_MAP).length / 2) }).map((_, i) => {
+                const entries = Object.entries(THEME_MAP);
+                const col = entries.slice(i * 2, i * 2 + 2);
+                return (
+                  <View key={i} style={{ flexDirection: 'column' }}>
+                    {col.map(([name, id]) => (
+                      <GenreChip
+                        key={id}
+                        label={name}
+                        selected={selectedGenres.includes(id)}
+                        onPress={() => toggleGenre(id)}
+                      />
+                    ))}
+                  </View>
+                );
+              })}
             </View>
           </ScrollView>
         </>
@@ -238,7 +246,7 @@ const ResultsListView = React.memo(({
       keyExtractor={(item, index) => `${item.id}-${index}`}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
-      contentContainerStyle={{ paddingBottom: 100 }}
+      contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: spacing.xl }}
       ListHeaderComponent={
         results.length > 0 ? (
           <View style={styles.listSectionHeader}>
@@ -246,16 +254,19 @@ const ResultsListView = React.memo(({
           </View>
         ) : null
       }
-      renderItem={({ item }) => (
-        <View style={[styles.gridItem, { width: cardWidth }]}>
-          <PosterCard
-            media={item}
-            onPress={handleMediaPress}
-            width={cardWidth}
-            height={cardWidth * 1.5}
-          />
-        </View>
-      )}
+      renderItem={({ item, index }) => {
+        const isLastInRow = index % numColumns === numColumns - 1;
+        return (
+          <View style={[styles.gridItem, { width: cardWidth, marginRight: isLastInRow ? 0 : spacing.M }]}>
+            <PosterCard
+              media={item}
+              onPress={handleMediaPress}
+              width={cardWidth}
+              height={cardWidth * 1.5}
+            />
+          </View>
+        );
+      }}
       ListFooterComponent={
         <>
           {results.length === 0 && !isLoading && (
@@ -339,7 +350,7 @@ export default function SearchScreen() {
   const addToWatchlist = useAppStore(state => state.addToWatchlist);
 
   const numColumns = width > 1024 ? 5 : width > 768 ? 4 : 2;
-  const cardWidth = (width - spacing.M * 2 - spacing.M * (numColumns - 1)) / numColumns;
+  const cardWidth = (width - spacing.xl * 2 - spacing.M * (numColumns - 1)) / numColumns;
 
   const triggerHaptic = useCallback(() => {
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -699,13 +710,13 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.M,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.M,
+    marginHorizontal: spacing.xl,
     height: 52,
     borderWidth: 1.5,
     marginBottom: spacing.XL,
@@ -731,16 +742,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.L,
   },
   themeContent: {
-    paddingRight: spacing.XL,
-    paddingLeft: spacing.M,
+    paddingRight: spacing.xl,
+    paddingLeft: spacing.xl,
   },
   themeGrid: {
-    flexDirection: 'column',
-    flexWrap: 'wrap',
-    height: 100, // Forces wrapping into 2 rows correctly across horizontal axis
-    alignContent: 'flex-start',
-    rowGap: spacing.S,
-    columnGap: spacing.S,
+    flexDirection: 'row',
+    height: 100,
+    alignItems: 'flex-start',
   },
   section: {
     marginBottom: spacing.XL,
@@ -752,6 +760,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.S,
+    paddingHorizontal: spacing.xl,
   },
   historyText: {
     fontSize: typography.sizes.md,
@@ -760,6 +769,7 @@ const styles = StyleSheet.create({
   trendingGrid: {
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.S,
+    marginHorizontal: spacing.xl,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -805,6 +815,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.xl,
     marginBottom: spacing.lg,
     overflow: 'hidden',
     shadowColor: colors.primary,

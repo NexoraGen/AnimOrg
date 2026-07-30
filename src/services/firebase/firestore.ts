@@ -903,7 +903,7 @@ export const firestoreService = {
   getTrackedAnime: async (userId: string): Promise<WatchlistItem[]> => {
     try {
       const trackedRef = collection(db, 'users', userId, 'trackedAnime');
-      const q = query(trackedRef, orderBy('updatedAt', 'desc'));
+      const q = query(trackedRef, orderBy('updatedAt', 'desc'), limit(300));
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => doc.data() as WatchlistItem);
     } catch (error) {
@@ -936,7 +936,7 @@ export const firestoreService = {
 
   onTrackedAnimeSnapshot: (userId: string, callback: (items: WatchlistItem[]) => void) => {
     const trackedRef = collection(db, 'users', userId, 'trackedAnime');
-    const q = query(trackedRef, orderBy('updatedAt', 'desc'));
+    const q = query(trackedRef, orderBy('updatedAt', 'desc'), limit(300));
     return onSnapshot(q, (snapshot) => {
       const items = snapshot.docs.map(doc => doc.data() as WatchlistItem);
       callback(items);
@@ -947,7 +947,7 @@ export const firestoreService = {
   getWatchlist: async (userId: string): Promise<WatchlistItem[]> => {
     try {
       const watchlistRef = collection(db, 'users', userId, 'watchlist');
-      const q = query(watchlistRef, orderBy('addedAt', 'desc'));
+      const q = query(watchlistRef, orderBy('addedAt', 'desc'), limit(300));
       const querySnapshot = await getDocs(q);
       return querySnapshot.docs.map(doc => doc.data() as WatchlistItem);
     } catch (error) {
@@ -1215,7 +1215,7 @@ export const firestoreService = {
   getAllProgress: async (userId: string): Promise<AnimeProgress[]> => {
     try {
       const progressRef = collection(db, 'users', userId, 'progress');
-      const q = query(progressRef, orderBy('updatedAt', 'desc'));
+      const q = query(progressRef, orderBy('updatedAt', 'desc'), limit(300));
       const snap = await getDocs(q);
       return snap.docs.map(doc => doc.data() as AnimeProgress);
     } catch (error) {
