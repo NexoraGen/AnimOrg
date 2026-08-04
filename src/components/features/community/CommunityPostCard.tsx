@@ -157,6 +157,7 @@ export const CommunityPostCard: React.FC<CommunityPostCardProps> = React.memo(({
                 postId={post.id}
                 postOwnerId={post.userId}
                 postContent={post.content}
+                postTitle={post.animeTitle || 'Community Discussion'}
                 onAuthRequired={onAuthRequired}
                 onComment={() => {
                     const user = useAppStore.getState().user;

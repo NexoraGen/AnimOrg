@@ -30,7 +30,7 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
     const { width } = useWindowDimensions();
 
     // Find posters for the anime inside the collection (up to 4)
-    const collectionAnime = collection.animeIds
+    const collectionAnime = (collection.animeIds || [])
         .map(id => watchlist.find(w => w.mediaId === id))
         .filter(Boolean);
 
@@ -127,7 +127,7 @@ export const CollectionCard: React.FC<CollectionCardProps> = ({
 
                 {/* Floating count tag */}
                 <View style={styles.countBadge}>
-                    <Text style={styles.countText}>{collection.animeIds.length} titles</Text>
+                    <Text style={styles.countText}>{collection.itemCount || 0} titles</Text>
                 </View>
             </View>
 

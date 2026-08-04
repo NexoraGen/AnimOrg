@@ -65,8 +65,9 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
 }) => {
     const theme = useThemeColors();
     const insets = useSafeAreaInsets();
+    const router = useRouter();
     const [posts, setPosts] = useState<CommunityPost[]>([]);
-    const [limitCount] = useState(10);
+    const [limitCount] = useState(15);
     const [hasMore, setHasMore] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [lastVisible, setLastVisible] = useState<any>(null);
@@ -92,9 +93,9 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
             };
 
             if (tabName === 'For You') {
-                q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount * 3));
+                q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
                 if (isLoadMore && lastVisible) {
-                    q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(limitCount * 3));
+                    q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(limitCount));
                 }
             } else if (tabName === 'Friend Activity') {
                 const followedIds = await firestoreService.getUserFollowing(user?.id || '');
@@ -119,9 +120,19 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                 q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
             }
 
-            const snapshot = await getDocs(q);
+            const timeoutPromise = new Promise<any>((_, reject) => {
+                setTimeout(() => reject(new Error("Social feed fetching timed out.")), 8000);
+            });
+            let snapshot = await Promise.race([getDocs(q), timeoutPromise]);
 
-            const fetchedPosts = snapshot.docs.map(doc => {
+            // Fallback for empty For You feed (e.g. legacy posts missing createdAt)
+            if (snapshot.empty && !isLoadMore && tabName === 'For You') {
+                console.log("[SocialFeed] For You feed empty using orderBy createdAt desc, falling back to unordered fetch for older posts");
+                q = query(postsRef, limit(limitCount));
+                snapshot = await Promise.race([getDocs(q), timeoutPromise]);
+            }
+
+            const fetchedPosts = snapshot.docs.map((doc: any) => {
                 const data = doc.data() as any;
                 // We no longer trigger aggressive backend updateDoc writes during frontend queries to prevent severe network bottlenecks on load. We grace-fallback to 'discussion' in memory.
                 if (!data.category) {
@@ -179,29 +190,13 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                 });
 
                 scored.sort((a, b) => (b.recommendationScore || 0) - (a.recommendationScore || 0));
-                finalPosts = scored.slice(0, limitCount);
+                finalPosts = scored;
             }
 
             // Resolve likes and saves in PARALLEL to massively drop sequential network lag!
             let resolvedFinalPosts = finalPosts.map(p => ({ ...p, isLiked: false, isSaved: false }));
-            if (user && finalPosts.length > 0) {
-                const [resolvedLikes, resolvedSaves] = await Promise.all([
-                    firestoreService.resolveLikesForPosts(user.id, finalPosts),
-                    firestoreService.resolveSavesForPosts(user.id, finalPosts)
-                ]);
 
-                // Merge parallel results 
-                resolvedFinalPosts = finalPosts.map(post => {
-                    const likeObj = resolvedLikes.find(p => p.id === post.id);
-                    const saveObj = resolvedSaves.find(p => p.id === post.id);
-                    return {
-                        ...post,
-                        isLiked: likeObj ? likeObj.isLiked : false,
-                        isSaved: saveObj ? saveObj.isSaved : false
-                    };
-                });
-            }
-
+            // 🚀 RENDER UI IMMEDIATELY 🚀 
             if (isLoadMore) {
                 setPosts(prev => [...prev, ...resolvedFinalPosts]);
             } else {
@@ -212,10 +207,42 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                 setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
             }
             setHasMore(snapshot.docs.length >= limitCount);
+
+            // Drop spinner instantly!
+            setIsLoading(false);
+            setRefreshing(false);
+
+            // 👻 RESOLVE IN BACKGROUND 👻
+            if (user && finalPosts.length > 0) {
+                try {
+                    const [resolvedLikes, resolvedSaves] = await Promise.all([
+                        firestoreService.resolveLikesForPosts(user.id, finalPosts),
+                        firestoreService.resolveSavesForPosts(user.id, finalPosts)
+                    ]);
+
+                    // Merge parallel results 
+                    const fullyResolved = finalPosts.map(post => {
+                        const likeObj = resolvedLikes.find(p => p.id === post.id);
+                        const saveObj = resolvedSaves.find(p => p.id === post.id);
+                        return {
+                            ...post,
+                            isLiked: likeObj ? likeObj.isLiked : false,
+                            isSaved: saveObj ? saveObj.isSaved : false
+                        };
+                    });
+
+                    // Silently patch UI
+                    setPosts(prev => prev.map(p => {
+                        const r = fullyResolved.find(f => f.id === p.id);
+                        return r ? { ...p, isLiked: r.isLiked, isSaved: r.isSaved } : p;
+                    }));
+                } catch (backgroundErr) {
+                    console.warn('[Feed Fetch Background Resolution] error:', backgroundErr);
+                }
+            }
         } catch (error) {
             console.error('[Feed Fetch] error:', error);
             if (!isLoadMore) setPosts([]);
-        } finally {
             setIsLoading(false);
             setRefreshing(false);
         }
@@ -259,6 +286,7 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                 return (
                     <CommunityPostCard
                         post={item as any}
+                        onPress={() => router.push(`/post/${item.id}`)}
                         onAuthRequired={handleAuthRequired}
                         onPressProfile={handleProfilePress}
                         onPostUpdated={(updatedPost) => {

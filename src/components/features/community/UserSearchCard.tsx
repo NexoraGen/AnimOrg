@@ -7,6 +7,7 @@ import { spacing, borderRadius } from '../../../theme';
 import { User } from '../../../types';
 import { useAppStore } from '../../../store/useAppStore';
 import { getAvatarSource } from '../../../constants/avatars';
+import { FollowButton } from '../../ui/FollowButton';
 
 interface UserSearchCardProps {
     user: User;
@@ -17,24 +18,7 @@ export const UserSearchCard: React.FC<UserSearchCardProps> = React.memo(({ user,
     const theme = useThemeColors();
     const router = useRouter();
     const currentUser = useAppStore(state => state.user);
-    const following = useAppStore(state => state.following);
-    const followUserAction = useAppStore(state => state.followUserAction);
-    const unfollowUserAction = useAppStore(state => state.unfollowUserAction);
-
-    const isFollowing = following.includes(user.id);
     const isMe = currentUser?.id === user.id;
-
-    const handleFollowToggle = async () => {
-        if (!currentUser) {
-            onAuthRequired?.();
-            return;
-        }
-        if (isFollowing) {
-            await unfollowUserAction(user.id);
-        } else {
-            await followUserAction(user.id);
-        }
-    };
 
     return (
         <TouchableOpacity
@@ -71,20 +55,12 @@ export const UserSearchCard: React.FC<UserSearchCardProps> = React.memo(({ user,
             </View>
 
             {!isMe && (
-                <TouchableOpacity
-                    style={[
-                        styles.followBtn,
-                        {
-                            backgroundColor: isFollowing ? 'rgba(255,255,255,0.05)' : theme.primary,
-                            borderColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent'
-                        }
-                    ]}
-                    onPress={handleFollowToggle}
-                >
-                    <Text style={[styles.followBtnText, { color: isFollowing ? theme.text : '#fff' }]}>
-                        {isFollowing ? 'Following' : 'Follow'}
-                    </Text>
-                </TouchableOpacity>
+                <FollowButton
+                    userId={user.id}
+                    onAuthRequired={onAuthRequired}
+                    style={styles.followBtn}
+                    textStyle={styles.followBtnText}
+                />
             )}
         </TouchableOpacity>
     );

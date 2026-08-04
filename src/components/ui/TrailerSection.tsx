@@ -25,6 +25,7 @@ interface TrailerSectionProps {
     trailerUrl: string;
     thumbnailPath?: string | null;
     themeColors: any;
+    autoPlayInit?: boolean;
 }
 
 export const TrailerSection: React.FC<TrailerSectionProps> = ({
@@ -32,6 +33,7 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
     title,
     trailerUrl,
     thumbnailPath,
+    autoPlayInit = false,
 }) => {
     const colors = useThemeColors();
     const { width } = useWindowDimensions();
@@ -88,6 +90,18 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
         setErrorReason(null);
         startSafetyTimeout();
     }, [youtubeId, trailerUrl, startSafetyTimeout]);
+
+    // Allows the component to be commanded externally to skip thumbnail and jump to player boot.
+    useEffect(() => {
+        let mounted = true;
+        if (autoPlayInit && youtubeId && !isPlaying) {
+            // Need a slight delay to ensure UI threads and Layouts are resolved for smooth scaling
+            setTimeout(() => {
+                if (mounted) handlePlayPress();
+            }, 300);
+        }
+        return () => { mounted = false; };
+    }, [autoPlayInit, youtubeId, isPlaying, handlePlayPress]);
 
     const handlePlayerReady = useCallback(() => {
         setIsPlayerReady(true);

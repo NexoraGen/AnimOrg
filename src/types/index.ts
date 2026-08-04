@@ -340,6 +340,19 @@ export interface UserCollection {
   emoji?: string;
   coverImage?: string;
   isPinned?: boolean;
-  animeIds: string[];
+  animeIds?: string[]; // Legacy compatibility
+  itemCount?: number;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CollectionItem {
+  id: string;
+  collectionId: string;
+  userId: string;
+  animeId: string;
+  title: string;
+  posterPath: string;
+  genres: string[];
+  addedAt: string;
 }

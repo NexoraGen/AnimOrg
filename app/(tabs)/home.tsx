@@ -38,35 +38,91 @@ import { PosterCard } from '../../src/components/ui/PosterCard';
 import { ForYouSection } from '../../src/components/features/ForYouSection';
 
 const RotatingHeroBanner = React.memo(({ topRated, onPress }: { topRated: Media[], onPress: (id: string) => void }) => {
-  const [heroAnime, setHeroAnime] = useState<Media | null>(null);
-  const heroInterval = useRef<any>(null);
+  const { width: screenWidth } = useWindowDimensions();
+  const itemWidth = screenWidth - (spacing.M * 2);
+  const listRef = useRef<any>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const timerRef = useRef<any>(null);
+
+  // Take only the top 5 to keep the carousel tight
+  const carouselData = React.useMemo(() => topRated.slice(0, 5), [topRated]);
+
+  const startTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setCurrentIndex((prev) => {
+        const nextIndex = (prev + 1) % carouselData.length;
+        listRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+        return nextIndex;
+      });
+    }, 8000);
+  }, [carouselData.length]);
 
   useEffect(() => {
-    if (topRated.length > 0) {
-      setHeroAnime(topRated[0]);
-      if (heroInterval.current) clearInterval(heroInterval.current);
-      heroInterval.current = setInterval(() => {
-        setHeroAnime(prev => {
-          if (!prev) return topRated[0];
-          const currentIndex = topRated.findIndex(a => a.id === prev.id);
-          const nextIndex = (currentIndex + 1) % Math.min(5, topRated.length);
-          return topRated[nextIndex];
-        });
-      }, 8000);
+    if (carouselData.length > 0) {
+      startTimer();
     }
     return () => {
-      if (heroInterval.current) clearInterval(heroInterval.current);
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [topRated]);
+  }, [carouselData, startTimer]);
 
-  if (!heroAnime) return null;
+  const handleMomentumScrollEnd = (event: any) => {
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / itemWidth);
+    setCurrentIndex(newIndex);
+    startTimer(); // Reset timer after manual interaction
+  };
+
+  const handleScrollBeginDrag = () => {
+    if (timerRef.current) clearInterval(timerRef.current); // Pause timer during swipe
+  };
+
+  const handleScroll = (event: any) => {
+    const newIndex = Math.round(event.nativeEvent.contentOffset.x / itemWidth);
+    if (newIndex >= 0 && newIndex < carouselData.length && newIndex !== currentIndex) {
+      setCurrentIndex(newIndex);
+    }
+  };
+
+  if (!carouselData || carouselData.length === 0) return null;
 
   return (
     <View style={styles.heroWrapper}>
-      <HeroBanner
-        media={heroAnime}
-        onPress={onPress}
+      <Animated.FlatList
+        ref={listRef}
+        data={carouselData}
+        keyExtractor={(item: Media) => item.id}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        onScrollBeginDrag={handleScrollBeginDrag}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        getItemLayout={(_, index) => ({
+          length: itemWidth,
+          offset: itemWidth * index,
+          index,
+        })}
+        renderItem={({ item }) => (
+          <View style={{ width: itemWidth }}>
+            <HeroBanner media={item} onPress={onPress} />
+          </View>
+        )}
       />
+
+      {/* Pagination Dots */}
+      <View style={styles.paginationContainer}>
+        {carouselData.map((_, index) => (
+          <View
+            key={`dot-${index}`}
+            style={[
+              styles.paginationDot,
+              currentIndex === index && styles.paginationDotActive
+            ]}
+          />
+        ))}
+      </View>
     </View>
   );
 });
@@ -107,7 +163,7 @@ export default function HomeScreen() {
       setIsUpcomingLoading(true);
 
       // Launch all 4 primary feeds concurrently; update state as soon as each stream arrives
-      const pTrending = animeApi.getTrendingAnime(1, (fresh) => {
+      const pTrending = animeApi.getTrendingAnime(1, 'popularity', (fresh) => {
         setTrendingAnime(fresh);
         setIsTrendingLoading(false);
       }).then(data => {
@@ -120,7 +176,7 @@ export default function HomeScreen() {
         setIsTrendingLoading(false);
       });
 
-      const pTop = animeApi.getTopAnime(1, (fresh) => {
+      const pTop = animeApi.getTopAnime(1, 'score', (fresh) => {
         setTopRated(fresh);
         setIsTopLoading(false);
       }).then(data => {
@@ -133,7 +189,7 @@ export default function HomeScreen() {
         setIsTopLoading(false);
       });
 
-      const pSeasonal = animeApi.getSeasonalAnime(1, (fresh) => {
+      const pSeasonal = animeApi.getSeasonalAnime(1, 'popularity', (fresh) => {
         setSeasonalAnime(fresh);
         setIsSeasonalLoading(false);
       }).then(data => {
@@ -146,7 +202,7 @@ export default function HomeScreen() {
         setIsSeasonalLoading(false);
       });
 
-      const pUpcoming = animeApi.getUpcomingAnime(1, (fresh) => {
+      const pUpcoming = animeApi.getUpcomingAnime(1, 'popularity', (fresh) => {
         setUpcomingAnime(fresh);
         setIsUpcomingLoading(false);
       }).then(data => {
@@ -381,6 +437,26 @@ const styles = StyleSheet.create({
   horizontalScroll: {
     paddingHorizontal: spacing.M,
     gap: spacing.M,
+  },
+  paginationContainer: {
+    position: 'absolute',
+    bottom: 15,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  paginationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  paginationDotActive: {
+    width: 24,
+    backgroundColor: '#E50914',
   },
 });
 

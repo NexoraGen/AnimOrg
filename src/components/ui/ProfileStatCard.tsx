@@ -57,10 +57,7 @@ export const ProfileStatCard: React.FC<ProfileStatCardProps> = ({
             bounciness: 4,
             useNativeDriver: true,
         }).start();
-
-        if (Platform.OS !== 'web') {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
-        }
+        // Haptics intentionally disabled per user request
     };
 
     const handlePressOut = () => {

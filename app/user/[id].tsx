@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
 import { colors, spacing, borderRadius } from '../../src/theme';
-import { GlassHeader, Button, HEADER_HEIGHT, AuthModal } from '../../src/components/ui';
+import { GlassHeader, Button, HEADER_HEIGHT, AuthModal, ProfileStatsStrip } from '../../src/components/ui';
 import { getSafeTopInset } from '../../src/utils/layout';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useAppStore } from '../../src/store/useAppStore';
@@ -28,6 +28,9 @@ import { CommunityPost } from '../../src/types';
 import { CommunityPostCard } from '../../src/components/features/community/CommunityPostCard';
 import { FeedTabs } from '../../src/components/features/community/FeedTabs';
 import { getAvatarSource } from '../../src/constants/avatars';
+import { FollowButton } from '../../src/components/ui/FollowButton';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../src/services/firebase/config'; // assuming standard firestore reference import
 
 import { SwipeableTabs } from '../../src/components/layout/SwipeableTabs';
 
@@ -130,7 +133,7 @@ export default function UserProfileScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const theme = useThemeColors();
-    const { user: currentUser, following, followUserAction, unfollowUserAction } = useAppStore();
+    const { user: currentUser } = useAppStore();
 
     const [userData, setUserData] = useState<any>(null);
     const [userPosts, setUserPosts] = useState<CommunityPost[]>([]);
@@ -139,15 +142,29 @@ export default function UserProfileScreen() {
     const [activeTab, setActiveTab] = useState('Posts');
     const [authModalVisible, setAuthModalVisible] = useState(false);
 
-    const isFollowing = following.includes(id);
-
     const loadData = useCallback(async () => {
         try {
-            const data = await firestoreService.getUserPublicData(id);
+            // Implement production timeout to prevent infinite suspension on stale Firebase sockets
+            const dataPromise = firestoreService.getUserPublicData(id);
+            let isTimeout = false;
+
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => {
+                    isTimeout = true;
+                    reject(new Error("Public profile fetching timed out."));
+                }, 8000);
+            });
+
+            const data = await Promise.race([dataPromise, timeoutPromise]) as any;
             setUserData(data);
 
             if (activeTab === 'Posts') {
-                const postsObj = await firestoreService.getCommunityFeed({ userId: id });
+                const postsPromise = firestoreService.getCommunityFeed({ userId: id });
+                const timeoutPostsPromise = new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error("Community feed fetching timed out.")), 8000);
+                });
+
+                const postsObj = await Promise.race([postsPromise, timeoutPostsPromise]) as any;
                 setUserPosts(postsObj.posts);
             }
         } catch (error) {
@@ -162,24 +179,28 @@ export default function UserProfileScreen() {
         loadData();
     }, [loadData]);
 
-    const handleFollowToggle = async () => {
-        if (!currentUser) {
-            setAuthModalVisible(true);
-            return;
-        }
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        if (isFollowing) {
-            await unfollowUserAction(id);
-            if (userData) {
-                setUserData({ ...userData, profile: { ...userData.profile, followersCount: Math.max((userData.profile.followersCount || 1) - 1, 0) } });
+    // Realtime Listener for Profile Counts
+    useEffect(() => {
+        if (!id) return;
+        const userRef = doc(db, 'users', id);
+        const unsubscribe = onSnapshot(userRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const liveData = docSnap.data();
+                setUserData((prev: any) => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        profile: {
+                            ...prev.profile,
+                            ...liveData
+                        }
+                    };
+                });
             }
-        } else {
-            await followUserAction(id);
-            if (userData) {
-                setUserData({ ...userData, profile: { ...userData.profile, followersCount: (userData.profile.followersCount || 0) + 1 } });
-            }
-        }
-    };
+        });
+        return () => unsubscribe();
+    }, [id]);
+
 
     if (loading) {
         return (
@@ -242,20 +263,12 @@ export default function UserProfileScreen() {
                             </View>
 
                             {currentUser?.id !== id && (
-                                <TouchableOpacity
-                                    style={[
-                                        styles.followPill,
-                                        {
-                                            backgroundColor: isFollowing ? 'rgba(255,255,255,0.05)' : theme.primary,
-                                            borderColor: isFollowing ? 'rgba(255,255,255,0.1)' : 'transparent'
-                                        }
-                                    ]}
-                                    onPress={handleFollowToggle}
-                                >
-                                    <Text style={[styles.followText, { color: isFollowing ? theme.text : '#fff' }]}>
-                                        {isFollowing ? 'Following' : 'Follow'}
-                                    </Text>
-                                </TouchableOpacity>
+                                <FollowButton
+                                    userId={id}
+                                    onAuthRequired={() => setAuthModalVisible(true)}
+                                    style={styles.followPill}
+                                    textStyle={styles.followText}
+                                />
                             )}
                         </View>
 
@@ -268,15 +281,14 @@ export default function UserProfileScreen() {
                             <Text style={[styles.bio, { color: theme.textDim }]}>{profile.bio}</Text>
                         )}
 
-                        <View style={styles.statsRow}>
-                            <View style={styles.statMetric}>
-                                <Text style={[styles.statValue, { color: theme.text }]}>{profile.followersCount || 0}</Text>
-                                <Text style={[styles.statLabel, { color: theme.textDim }]}>Followers</Text>
-                            </View>
-                            <View style={styles.statMetric}>
-                                <Text style={[styles.statValue, { color: theme.text }]}>{profile.followingCount || 0}</Text>
-                                <Text style={[styles.statLabel, { color: theme.textDim }]}>Following</Text>
-                            </View>
+                        <View style={{ marginHorizontal: -spacing.lg, marginBottom: spacing.sm }}>
+                            <ProfileStatsStrip
+                                followingCount={profile.followingCount || 0}
+                                followersCount={profile.followersCount || 0}
+                                postsCount={userPosts.length || 0}
+                                onFollowingPress={() => router.push(`/social/${id}?tab=following`)}
+                                onFollowersPress={() => router.push(`/social/${id}?tab=followers`)}
+                            />
                         </View>
                     </View>
                 </View>

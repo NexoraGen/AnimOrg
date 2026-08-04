@@ -431,30 +431,4 @@ export const animeApi = {
   },
 };
 
-// ─── STARTUP SILENT REVALIDATION ─────────────────────────────────────────────
-// When the Render backend successfully finishes its cold-start wake sequence,
-// we wait 3 seconds for the main user-intent priority queue to flush, then silently
-// pre-warm the heaviest caches (Top, Trending, Seasonal) so the user's
-// navigation feels instantly updated.
 
-import { BackendStatusManager, BackendStatus } from './api/BackendStatusManager';
-
-let hasPerformedWarmupRefreshes = false;
-
-BackendStatusManager.subscribe((status) => {
-  if (status === BackendStatus.READY && !hasPerformedWarmupRefreshes) {
-    hasPerformedWarmupRefreshes = true;
-    console.log('[animeApi] Commencing silent background cache revalidation...');
-
-    // Stagger to prevent blocking native UI frame or throttling the newly awoken server
-    setTimeout(() => {
-      animeApi.getTrendingAnime(1).catch(() => { });
-      setTimeout(() => {
-        animeApi.getTopAnime(1).catch(() => { });
-        setTimeout(() => {
-          animeApi.getSeasonalAnime(1).catch(() => { });
-        }, 1500);
-      }, 1500);
-    }, 3000);
-  }
-});

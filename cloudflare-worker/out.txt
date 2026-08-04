@@ -1,0 +1,8 @@
+
+ ⛅️ wrangler 4.118.0
+────────────────────
+Total Upload: 10.19 KiB / gzip: 3.07 KiB
+Uploaded animorg-proxy (12.62 sec)
+Deployed animorg-proxy triggers (8.64 sec)
+  https://animorg-proxy.itisnexora.workers.dev
+Current Version ID: b7686b13-4b24-44a0-954f-0c31d91bbcba

@@ -9,7 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
 import { getAvatarSource } from '../../../constants/avatars';
-import { notificationService } from '../../../services/notifications';
+import { FollowButton } from '../../ui/FollowButton';
 
 interface PostHeaderProps {
     username: string;
@@ -32,45 +32,6 @@ export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
 }) => {
     const theme = useThemeColors();
     const currentUser = useAppStore(state => state.user);
-    const [isFollowing, setIsFollowing] = React.useState(false);
-
-    React.useEffect(() => {
-        checkFollowStatus();
-    }, [userId, currentUser]);
-
-    const checkFollowStatus = async () => {
-        if (!currentUser || currentUser.id === userId) return;
-        const status = await firestoreService.isFollowing(currentUser.id, userId);
-        setIsFollowing(status);
-    };
-
-    const handleFollow = async () => {
-        if (!currentUser || currentUser.id === userId) return;
-        try {
-            const result = await firestoreService.toggleFollow(currentUser.id, userId);
-            setIsFollowing(result);
-            if (result) {
-                await firestoreService.createNotification({
-                    recipientId: userId,
-                    senderId: currentUser.id,
-                    senderName: currentUser.username,
-                    senderAvatar: currentUser.avatarUrl,
-                    type: 'follow',
-                    targetId: currentUser.id,
-                });
-                // Dispatch push notification to followed user
-                notificationService.dispatchSocialPush(
-                    userId,
-                    `${currentUser.username} started following you`,
-                    'You have a new follower!',
-                    { type: 'follow', targetId: currentUser.id }
-                ).catch(e => console.warn('[PostHeader] Push dispatch failed:', e));
-            }
-        } catch (error) {
-            console.error(error);
-        }
-    };
-
     return (
         <View style={styles.container}>
             <View style={styles.left}>
@@ -91,22 +52,12 @@ export const PostHeader: React.FC<PostHeaderProps> = React.memo(({
                             </Text>
                         </TouchableOpacity>
 
-                        {currentUser?.id !== userId && (
-                            <TouchableOpacity
-                                onPress={handleFollow}
-                                style={[
-                                    styles.followBtn,
-                                    { borderColor: isFollowing ? theme.border : theme.primary }
-                                ]}
-                            >
-                                <Text style={[
-                                    styles.followBtnText,
-                                    { color: isFollowing ? theme.textDim : theme.primary }
-                                ]}>
-                                    {isFollowing ? 'Following' : 'Follow'}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
+                        <FollowButton
+                            userId={userId}
+                            style={styles.followBtn}
+                            textStyle={styles.followBtnText}
+                            useDefaultStyles={false}
+                        />
 
                         {type === 'news' && (
                             <View style={[styles.badge, { backgroundColor: 'rgba(52, 152, 219, 0.15)' }]}>
@@ -169,14 +120,17 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     followBtn: {
-        marginLeft: 4,
+        marginLeft: 6,
         paddingHorizontal: 8,
         paddingVertical: 2,
         borderRadius: 12,
         borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.05)',
     },
     followBtnText: {
         fontSize: 11,
         fontWeight: '700',
+        color: 'rgba(255,255,255,0.8)',
     }
 });

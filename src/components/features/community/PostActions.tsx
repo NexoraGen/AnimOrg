@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Share } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Share, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { spacing, colors } from '../../../theme';
 import { useThemeColors } from '../../../hooks/useThemeColors';
@@ -8,6 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { firestoreService } from '../../../services/firebase/firestore';
 import { useAppStore } from '../../../store/useAppStore';
 import { notificationService } from '../../../services/notifications';
+import { WORKER_DOMAINS } from '../../../constants/config';
 
 interface PostActionsProps {
     likes: number;
@@ -18,6 +19,7 @@ interface PostActionsProps {
     postId: string;
     postOwnerId?: string;
     postContent?: string;
+    postTitle?: string;
     onLike?: () => void;
     onComment?: () => void;
     onShare?: () => void;
@@ -34,6 +36,7 @@ export const PostActions: React.FC<PostActionsProps> = ({
     postId,
     postOwnerId,
     postContent,
+    postTitle,
     onLike,
     onComment,
     onShare,
@@ -118,18 +121,26 @@ export const PostActions: React.FC<PostActionsProps> = ({
             setIsSaved(!newIsSaved);
         }
     };
-
     const handleShare = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         try {
-            const shareMessage = `Check out this post on AnimOrg:\n\n"${postContent || ''}"\n\nJoin the discussion on AnimOrg!`;
+            const shareUrl = `${WORKER_DOMAINS.SHARE_APP}/share/post/${postId}`;
+            const titleSegment = postTitle ? `\n\n${postTitle}` : '';
+            const shareMessage = Platform.OS === 'android' ? `Check out this discussion on AnimOrg!${titleSegment}\n\n${shareUrl}` : `Check out this discussion on AnimOrg!${titleSegment}`;
+
             const result = await Share.share({
                 message: shareMessage,
                 title: 'Share Community Post',
+                url: shareUrl,
             });
+
             if (result.action === Share.sharedAction) {
+                // Optimistic UI increment
                 setShares(prev => prev + 1);
-                await firestoreService.incrementPostShare(postId);
+                // Persist to Firestore
+                firestoreService.incrementPostShare(postId).catch(() => {
+                    setShares(prev => Math.max(0, prev - 1)); // Rollback on error
+                });
                 onShare?.();
             }
         } catch (error) {

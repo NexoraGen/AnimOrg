@@ -1,0 +1,23 @@
+app/(tabs)/social.tsx(144,36): error TS7006: Parameter 'a' implicitly has an 'any' type.
+app/(tabs)/social.tsx(144,39): error TS7006: Parameter 'b' implicitly has an 'any' type.
+app/(tabs)/social.tsx(152,49): error TS7006: Parameter 'post' implicitly has an 'any' type.
+app/(tabs)/social.tsx(191,30): error TS7006: Parameter 'a' implicitly has an 'any' type.
+app/(tabs)/social.tsx(191,33): error TS7006: Parameter 'b' implicitly has an 'any' type.
+app/(tabs)/social.tsx(196,53): error TS7006: Parameter 'p' implicitly has an 'any' type.
+app/(tabs)/social.tsx(223,58): error TS7006: Parameter 'post' implicitly has an 'any' type.
+app/(tabs)/social.tsx(235,54): error TS7006: Parameter 'f' implicitly has an 'any' type.
+app/achievements.tsx(65,17): error TS2322: Type 'UserCollection[]' is not assignable to type 'CollectionLike[]'.
+  Type 'UserCollection' is not assignable to type 'CollectionLike'.
+    Types of property 'animeIds' are incompatible.
+      Type 'string[] | undefined' is not assignable to type 'string[]'.
+        Type 'undefined' is not assignable to type 'string[]'.
+app/collections/[id].tsx(214,21): error TS2322: Type '{ data: CollectionItem[]; numColumns: number; estimatedItemSize: number; contentContainerStyle: { padding: number; paddingBottom: number; }; showsVerticalScrollIndicator: false; ListHeaderComponent: Element; ListEmptyComponent: Element; renderItem: ({ item: anime, index }: ListRenderItemInfo<...>) => Element; keyExt...' is not assignable to type 'IntrinsicAttributes & FlashListProps<CollectionItem> & { ref?: Ref<FlashListRef<CollectionItem>> | undefined; }'.
+  Property 'estimatedItemSize' does not exist on type 'IntrinsicAttributes & FlashListProps<CollectionItem> & { ref?: Ref<FlashListRef<CollectionItem>> | undefined; }'.
+app/user/followers.tsx(100,21): error TS2322: Type '{ data: User[]; renderItem: ({ item }: ListRenderItemInfo<User>) => Element; estimatedItemSize: number; onEndReached: () => Promise<void>; onEndReachedThreshold: number; ListFooterComponent: Element | null; ListEmptyComponent: Element; }' is not assignable to type 'IntrinsicAttributes & FlashListProps<User> & { ref?: Ref<FlashListRef<User>> | undefined; }'.
+  Property 'estimatedItemSize' does not exist on type 'IntrinsicAttributes & FlashListProps<User> & { ref?: Ref<FlashListRef<User>> | undefined; }'.
+app/user/following.tsx(100,21): error TS2322: Type '{ data: User[]; renderItem: ({ item }: ListRenderItemInfo<User>) => Element; estimatedItemSize: number; onEndReached: () => Promise<void>; onEndReachedThreshold: number; ListFooterComponent: Element | null; ListEmptyComponent: Element; }' is not assignable to type 'IntrinsicAttributes & FlashListProps<User> & { ref?: Ref<FlashListRef<User>> | undefined; }'.
+  Property 'estimatedItemSize' does not exist on type 'IntrinsicAttributes & FlashListProps<User> & { ref?: Ref<FlashListRef<User>> | undefined; }'.
+src/components/ui/HorizontalCarousel.tsx(102,13): error TS2322: Type '{ data: number[]; horizontal: true; showsHorizontalScrollIndicator: false; estimatedItemSize: number; renderItem: () => Element; keyExtractor: (item: number) => string; }' is not assignable to type 'IntrinsicAttributes & FlashListProps<number> & { ref?: Ref<FlashListRef<number>> | undefined; }'.
+  Property 'estimatedItemSize' does not exist on type 'IntrinsicAttributes & FlashListProps<number> & { ref?: Ref<FlashListRef<number>> | undefined; }'.
+src/components/ui/HorizontalCarousel.tsx(122,13): error TS2322: Type '{ data: (Media | WatchHistoryEntry)[]; horizontal: true; showsHorizontalScrollIndicator: false; renderItem: (info: { item: any; index: number; }) => Element | null; keyExtractor: (item: any) => string; contentContainerStyle: { ...; }; estimatedItemSize: number; keyboardShouldPersistTaps: "handled"; }' is not assignable to type 'IntrinsicAttributes & FlashListProps<Media | WatchHistoryEntry> & { ref?: Ref<FlashListRef<Media | WatchHistoryEntry>> | undefined; }'.
+  Property 'estimatedItemSize' does not exist on type 'IntrinsicAttributes & FlashListProps<Media | WatchHistoryEntry> & { ref?: Ref<FlashListRef<Media | WatchHistoryEntry>> | undefined; }'.

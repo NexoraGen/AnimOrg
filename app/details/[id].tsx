@@ -25,6 +25,7 @@ import { trailerService } from '../../src/services/trailerService';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { colors, spacing, borderRadius, typography } from '../../src/theme';
+import { WORKER_DOMAINS } from '../../src/constants/config';
 import {
   Button,
   GlassHeader,
@@ -168,9 +169,10 @@ export default function DetailsScreen() {
 }
 
 function DetailsScreenInner() {
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; playTrailer?: string }>();
   const rawId = params?.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId || '';
+  const playTrailer = Array.isArray(params?.playTrailer) ? params.playTrailer[0] : params?.playTrailer;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
@@ -208,6 +210,15 @@ function DetailsScreenInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCharactersLoading, setIsCharactersLoading] = useState(true);
   const [isRecommendationsLoading, setIsRecommendationsLoading] = useState(true);
+
+  // Auto-launch trailer modal on deep-link parameter trigger
+  useEffect(() => {
+    if (playTrailer === 'true' && media && media.trailerUrl) {
+      setTrailerModalVisible(true);
+      // Consume the parameter safely so back navigation or subsequent re-renders don't re-trigger it
+      router.setParams({ playTrailer: undefined });
+    }
+  }, [playTrailer, media?.trailerUrl, router]);
   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
   const [isPostingReview, setIsPostingReview] = useState(false);
   const [showAuthGate, setShowAuthGate] = useState(false);
@@ -416,7 +427,7 @@ function DetailsScreenInner() {
   const isFavorite = watchlistItem?.isFavorite || false;
 
   const isInAnyCollection = React.useMemo(() => {
-    return collections.some(col => col.animeIds.includes(String(id)));
+    return collections.some(col => (col.animeIds || []).includes(String(id)));
   }, [collections, id]);
 
   const STATUS_OPTIONS: { value: WatchStatus; label: string }[] = [
@@ -566,8 +577,13 @@ function DetailsScreenInner() {
     ]).start();
 
     try {
+      const shareUrl = `${WORKER_DOMAINS.SHARE_APP}/share/anime/${id}`;
+      const shareMessage = Platform.OS === 'android' ? `Check out ${media.title} on AnimOrg!\n\n${shareUrl}` : `Check out ${media.title} on AnimOrg!`;
+
       await Share.share({
-        message: `Check out ${media.title} on AnimOrg!`,
+        message: shareMessage,
+        url: shareUrl,
+        title: media.title,
       });
     } catch (error) {
       console.error(error);
@@ -1041,7 +1057,7 @@ function DetailsScreenInner() {
           ) : (
             <ScrollView style={styles.collectionListScroll} showsVerticalScrollIndicator={false}>
               {collections.map(col => {
-                const isSelected = col.animeIds.includes(String(id));
+                const isSelected = (col.animeIds || []).includes(String(id));
                 return (
                   <TouchableOpacity
                     key={col.id}
@@ -1054,7 +1070,12 @@ function DetailsScreenInner() {
                       if (isSelected) {
                         await removeAnimeFromCollectionAction(col.id, id);
                       } else {
-                        await addAnimeToCollectionAction(col.id, id);
+                        await addAnimeToCollectionAction(col.id, {
+                          id: media.id,
+                          title: media.title,
+                          posterPath: media.posterImageMedium || media.posterPath,
+                          genres: media.genres || []
+                        });
                       }
                     }}
                   >
@@ -1158,6 +1179,7 @@ function DetailsScreenInner() {
               trailerUrl={media.trailerUrl}
               thumbnailPath={media.backdropPath}
               themeColors={themeColors}
+              autoPlayInit={true}
             />
           </View>
         </CinematicModal>

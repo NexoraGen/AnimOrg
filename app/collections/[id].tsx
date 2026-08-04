@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -15,14 +15,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FlashList } from '@shopify/flash-list';
 
 import { colors, spacing, borderRadius, typography } from '../../src/theme';
-import { GlassHeader, Button, CreateCollectionModal } from '../../src/components/ui';
+import { GlassHeader, Button, CreateCollectionModal, AddAnimeToCollectionModal, PosterCard } from '../../src/components/ui';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { CollectionService } from '../../src/services/CollectionService';
 import { CinematicModal } from '../../src/components/layout/CinematicModal';
+import { collection as firestoreCollection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../../src/services/firebase/config';
+import { CollectionItem } from '../../src/types';
 
 export default function CollectionDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,6 +34,10 @@ export default function CollectionDetailsScreen() {
     const insets = useSafeAreaInsets();
     const themeColors = useThemeColors();
     const { width } = useWindowDimensions();
+
+    const numColumns = 2;
+    const itemGap = spacing.M;
+    const cardWidth = (width - spacing.xl * 2 - itemGap * (numColumns - 1)) / numColumns;
 
     const collections = useAppStore(state => state.collections);
     const watchlist = useAppStore(state => state.watchlist);
@@ -42,6 +50,7 @@ export default function CollectionDetailsScreen() {
     const [sortBy, setSortBy] = useState<'alphabetical' | 'newest_added' | 'oldest_added' | 'manual'>('manual');
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [shareModalVisible, setShareModalVisible] = useState(false);
+    const [addAnimeModalVisible, setAddAnimeModalVisible] = useState(false);
 
     // Find exact collection
     const collection = useMemo(() => {
@@ -67,64 +76,80 @@ export default function CollectionDetailsScreen() {
         );
     }
 
-    // Mapped list of anime details inside collection
-    const collectionAnime = useMemo(() => {
-        return collection.animeIds
-            .map(animeId => watchlist.find(w => w.mediaId === animeId))
-            .filter(Boolean);
-    }, [collection.animeIds, watchlist]);
+    const [collectionItems, setCollectionItems] = React.useState<CollectionItem[]>([]);
+    const [isLoadingItems, setIsLoadingItems] = React.useState(true);
 
-    // Apply sorting and searching
-    const processedAnimeIds = useMemo(() => {
-        // 1. Sort
-        const sorted = CollectionService.sortAnimeInCollection(
-            collection.animeIds,
-            watchlist,
-            sortBy
-        );
-        // 2. Search
-        return CollectionService.searchAnimeInCollection(sorted, watchlist, searchQuery);
-    }, [collection.animeIds, watchlist, sortBy, searchQuery]);
+    React.useEffect(() => {
+        if (!id) return;
+        const q = query(firestoreCollection(db, 'collection_items'), where('collectionId', '==', id));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const items = snapshot.docs.map(doc => doc.data() as CollectionItem);
+            setCollectionItems(items);
+            setIsLoadingItems(false);
+        }, (error) => {
+            console.error("Error fetching collection items:", error);
+            setIsLoadingItems(false);
+        });
+        return () => unsubscribe();
+    }, [id]);
 
-    const handleDeleteCollection = () => {
-        Alert.alert(
-            'Delete Collection',
-            `Are you sure you want to delete "${collection.name}"? This action cannot be undone.`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        router.back();
-                        await deleteCollectionAction(collection.id);
-                    }
-                }
-            ]
-        );
+    const processedAnimeItems = useMemo(() => {
+        let list = [...collectionItems];
+
+        // 1. Search
+        if (searchQuery.trim()) {
+            const cleanQuery = searchQuery.toLowerCase().trim();
+            list = list.filter(item =>
+                item.title.toLowerCase().includes(cleanQuery) ||
+                (item.genres && item.genres.some(g => g.toLowerCase().includes(cleanQuery)))
+            );
+        }
+
+        // 2. Sort
+        if (sortBy === 'alphabetical') {
+            list.sort((a, b) => a.title.localeCompare(b.title));
+        } else if (sortBy === 'newest_added') {
+            list.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+        } else if (sortBy === 'oldest_added') {
+            list.sort((a, b) => new Date(a.addedAt).getTime() - new Date(b.addedAt).getTime());
+        } else if (sortBy === 'manual' && collection?.animeIds) {
+            // Restore manual sorting order according to animeIds array
+            list.sort((a, b) => {
+                const indexA = collection.animeIds!.findIndex(id => String(id) === String(a.animeId));
+                const indexB = collection.animeIds!.findIndex(id => String(id) === String(b.animeId));
+                // -1 pushes to end (new items with missing manual indices)
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+                return indexA - indexB;
+            });
+        }
+
+        return list;
+    }, [collectionItems, searchQuery, sortBy, collection]);
+    useEffect(() => {
+        if (!isLoadingItems && collection && collectionItems.length !== (collection.itemCount || 0)) {
+            CollectionService.updateCollection(collection.id, { itemCount: collectionItems.length });
+        }
+    }, [isLoadingItems, collectionItems.length, collection?.itemCount]);
+
+    const handleDeleteCollection = async () => {
+        router.replace('/category/continue-watching');
+        try {
+            router.replace('/collections');
+        } catch (e) { }
+        await deleteCollectionAction(collection.id);
     };
 
     const handleRemoveAnime = async (animeId: string, title: string) => {
-        Alert.alert(
-            'Remove Anime',
-            `Remove "${title}" from "${collection.name}"?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Remove',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await removeAnimeFromCollectionAction(collection.id, animeId);
-                    }
-                }
-            ]
-        );
+        // Optimistic mutation guarantees immediate visuals
+        setCollectionItems(prev => prev.filter(a => String(a.animeId) !== String(animeId)));
+        await removeAnimeFromCollectionAction(collection.id, animeId);
     };
 
     // Reordering helpers
     const handleMoveUp = async (index: number) => {
         if (index === 0) return;
-        const newOrder = [...collection.animeIds];
+        const newOrder = [...(collection.animeIds || [])];
         const temp = newOrder[index];
         newOrder[index] = newOrder[index - 1];
         newOrder[index - 1] = temp;
@@ -132,8 +157,9 @@ export default function CollectionDetailsScreen() {
     };
 
     const handleMoveDown = async (index: number) => {
-        if (index === collection.animeIds.length - 1) return;
-        const newOrder = [...collection.animeIds];
+        const orderLen = (collection.animeIds || []).length;
+        if (index === orderLen - 1) return;
+        const newOrder = [...(collection.animeIds || [])];
         const temp = newOrder[index];
         newOrder[index] = newOrder[index + 1];
         newOrder[index + 1] = temp;
@@ -141,8 +167,23 @@ export default function CollectionDetailsScreen() {
     };
 
     const shareBlueprintText = useMemo(() => {
-        return CollectionService.exportCollectionBlueprint(collection, watchlist);
-    }, [collection, watchlist]);
+        const blueprint = {
+            version: '1.0.0',
+            exportedAt: new Date().toISOString(),
+            metadata: {
+                name: collection.name,
+                description: collection.description || '',
+                emoji: collection.emoji || '📂',
+                coverImage: collection.coverImage || '',
+            },
+            animeList: collectionItems.map(item => ({
+                id: item.animeId,
+                title: item.title,
+                posterPath: item.posterPath,
+            }))
+        };
+        return JSON.stringify(blueprint, null, 2);
+    }, [collection, collectionItems]);
 
     return (
         <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
@@ -154,12 +195,15 @@ export default function CollectionDetailsScreen() {
                     </TouchableOpacity>
                 }
                 rightComponent={
-                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <TouchableOpacity onPress={() => setAddAnimeModalVisible(true)} style={{ padding: 8, marginRight: 8 }}>
+                            <Feather name="plus-circle" size={20} color={themeColors.text} />
+                        </TouchableOpacity>
                         <TouchableOpacity onPress={() => setShareModalVisible(true)} style={{ padding: 8 }}>
-                            <Feather name="share-2" size={20} color="white" />
+                            <Feather name="share-2" size={20} color={themeColors.text} />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => setEditModalVisible(true)} style={{ padding: 8 }}>
-                            <Feather name="edit-3" size={20} color="white" />
+                            <Feather name="edit-2" size={20} color={themeColors.text} />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={handleDeleteCollection} style={{ padding: 8 }}>
                             <Feather name="trash-2" size={20} color="#FF3B30" />
@@ -168,158 +212,107 @@ export default function CollectionDetailsScreen() {
                 }
             />
 
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Collection banner */}
-                <View style={styles.bannerContainer}>
-                    {collection.coverImage ? (
-                        <Image source={{ uri: collection.coverImage }} style={styles.bannerImage} contentFit="cover" />
-                    ) : (
-                        <LinearGradient
-                            colors={['#1f1f1f', '#0f0f0f']}
-                            style={styles.bannerGradient}
-                        />
-                    )}
-                    <View style={styles.bannerOverlay}>
-                        <Text style={styles.bannerEmoji}>{collection.emoji || '📂'}</Text>
-                        <Text style={styles.bannerTitle} numberOfLines={2}>{collection.name}</Text>
-                        {collection.description ? (
-                            <Text style={[styles.bannerDesc, { color: themeColors.textDim }]}>{collection.description}</Text>
-                        ) : null}
-                        <Text style={[styles.bannerMeta, { color: themeColors.textMuted }]}>
-                            {collection.animeIds.length} items • Created {new Date(collection.createdAt).toLocaleDateString()}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Search Input within this Collection */}
-                <View style={[styles.searchBar, { backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255,255,255,0.06)' }]}>
-                    <Feather name="search" size={18} color={themeColors.textDim} style={{ marginRight: 8 }} />
-                    <TextInput
-                        placeholder="Search inside collection..."
-                        placeholderTextColor="rgba(255,255,255,0.3)"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        style={[styles.searchInput, { color: 'white' }]}
-                    />
-                    {searchQuery ? (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Feather name="x" size={18} color={themeColors.textDim} />
-                        </TouchableOpacity>
-                    ) : null}
-                </View>
-
-                {/* Sorting buttons */}
-                <View style={styles.sortRow}>
-                    <Text style={[styles.sortLabel, { color: themeColors.textMuted }]}>Sort:</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortOptions}>
-                        {(['manual', 'alphabetical', 'newest_added', 'oldest_added'] as const).map((method) => {
-                            const label = method === 'manual' ? 'Manual' : method === 'alphabetical' ? 'A-Z' : method === 'newest_added' ? 'Newest' : 'Oldest';
-                            return (
-                                <TouchableOpacity
-                                    key={method}
-                                    style={[
-                                        styles.sortBtn,
-                                        {
-                                            backgroundColor: sortBy === method ? `${themeColors.primary}18` : 'transparent',
-                                            borderColor: sortBy === method ? themeColors.primary : 'rgba(255, 255, 255, 0.05)'
-                                        }
-                                    ]}
-                                    onPress={() => setSortBy(method)}
-                                >
-                                    <Text style={[styles.sortBtnText, { color: sortBy === method ? themeColors.primary : themeColors.textDim }]}>
-                                        {label}
+            <View style={styles.scrollView}>
+                <FlashList
+                    data={isLoadingItems ? [] : processedAnimeItems}
+                    numColumns={numColumns}
+                    contentContainerStyle={{ padding: spacing.xl, paddingBottom: insets.bottom + spacing.xl }}
+                    showsVerticalScrollIndicator={false}
+                    ListHeaderComponent={
+                        <View style={{ gap: spacing.md, marginBottom: spacing.md, paddingTop: 85 - spacing.xl }}>
+                            {/* Collection banner */}
+                            <View style={styles.bannerContainer}>
+                                {collection.coverImage ? (
+                                    <Image source={{ uri: collection.coverImage }} style={styles.bannerImage} contentFit="cover" />
+                                ) : (
+                                    <LinearGradient
+                                        colors={['#1f1f1f', '#0f0f0f']}
+                                        style={styles.bannerGradient}
+                                    />
+                                )}
+                                <View style={styles.bannerOverlay}>
+                                    <Text style={styles.bannerEmoji}>{collection.emoji || '📂'}</Text>
+                                    <Text style={styles.bannerTitle} numberOfLines={2}>{collection.name}</Text>
+                                    {collection.description ? (
+                                        <Text style={[styles.bannerDesc, { color: themeColors.textDim }]}>{collection.description}</Text>
+                                    ) : null}
+                                    <Text style={[styles.bannerMeta, { color: themeColors.textMuted }]}>
+                                        {collectionItems.length} items • Created {new Date(collection.createdAt).toLocaleDateString()}
                                     </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                </View>
-
-                {/* Show list of anime in collection */}
-                {processedAnimeIds.length === 0 ? (
-                    <View style={styles.emptyItemsContainer}>
-                        <Feather name="video-off" size={40} color="rgba(255, 255, 255, 0.15)" style={{ marginBottom: spacing.md }} />
-                        <Text style={[styles.emptyItemsText, { color: themeColors.textDim }]}>
-                            {searchQuery ? 'No matching titles found in this list.' : 'This collection is empty. Go to details page of any anime to add it.'}
-                        </Text>
-                    </View>
-                ) : (
-                    <View style={styles.itemsList}>
-                        {processedAnimeIds.map((animeId, index) => {
-                            const anime = watchlist.find(w => w.mediaId === animeId);
-                            if (!anime) return null;
-
-                            // Find manual index of this anime in the unsorted collection.animeIds array
-                            const originalIndex = collection.animeIds.indexOf(animeId);
-
-                            return (
-                                <View
-                                    key={anime.mediaId}
-                                    style={[
-                                        styles.animeItemRow,
-                                        { backgroundColor: 'rgba(255, 255, 255, 0.02)', borderColor: 'rgba(255, 255, 255, 0.04)' }
-                                    ]}
-                                >
-                                    {/* Poster image */}
-                                    <TouchableOpacity
-                                        style={styles.animeItemDetails}
-                                        onPress={() => router.push(`/details/${anime.mediaId}`)}
-                                    >
-                                        <Image
-                                            source={{ uri: anime.posterImageMedium || anime.posterPath }}
-                                            style={styles.animePoster}
-                                            contentFit="cover"
-                                        />
-                                        <View style={styles.animeTextDetails}>
-                                            <Text style={[styles.animeTitle, { color: 'white' }]} numberOfLines={1}>
-                                                {anime.title}
-                                            </Text>
-                                            <Text style={[styles.animeMetaText, { color: themeColors.textDim }]} numberOfLines={1}>
-                                                {(anime.genres || []).slice(0, 2).join(' • ')}
-                                            </Text>
-                                        </View>
-                                    </TouchableOpacity>
-
-                                    {/* Actions / Reordering row */}
-                                    <View style={styles.animeRowActions}>
-                                        {/* Manual controls (Move up and down) - Only active in manual sorting mode */}
-                                        {sortBy === 'manual' && !searchQuery && (
-                                            <View style={styles.reorderControls}>
-                                                <TouchableOpacity
-                                                    disabled={originalIndex === 0}
-                                                    onPress={() => handleMoveUp(originalIndex)}
-                                                    style={[styles.reorderBtn, originalIndex === 0 && styles.disabledBtn]}
-                                                >
-                                                    <Feather name="chevron-up" size={18} color={originalIndex === 0 ? 'rgba(255,255,255,0.1)' : 'white'} />
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    disabled={originalIndex === collection.animeIds.length - 1}
-                                                    onPress={() => handleMoveDown(originalIndex)}
-                                                    style={[styles.reorderBtn, originalIndex === collection.animeIds.length - 1 && styles.disabledBtn]}
-                                                >
-                                                    <Feather name="chevron-down" size={18} color={originalIndex === collection.animeIds.length - 1 ? 'rgba(255,255,255,0.1)' : 'white'} />
-                                                </TouchableOpacity>
-                                            </View>
-                                        )}
-
-                                        {/* Remove button */}
-                                        <TouchableOpacity
-                                            onPress={() => handleRemoveAnime(anime.mediaId, anime.title)}
-                                            style={styles.removeBtn}
-                                        >
-                                            <Feather name="x-circle" size={18} color="rgba(255,255,255,0.3)" />
-                                        </TouchableOpacity>
-                                    </View>
                                 </View>
-                            );
-                        })}
-                    </View>
-                )}
-            </ScrollView>
+                            </View>
+
+                            {/* Search Input within this Collection */}
+                            <View style={[styles.searchBar, { backgroundColor: 'rgba(255, 255, 255, 0.03)', borderColor: 'rgba(255,255,255,0.06)' }]}>
+                                <Feather name="search" size={18} color={themeColors.textDim} style={{ marginRight: 8 }} />
+                                <TextInput
+                                    placeholder="Search inside collection..."
+                                    placeholderTextColor="rgba(255,255,255,0.3)"
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                    style={[styles.searchInput, { color: 'white' }]}
+                                />
+                                {searchQuery ? (
+                                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                        <Feather name="x" size={18} color={themeColors.textDim} />
+                                    </TouchableOpacity>
+                                ) : null}
+                            </View>
+
+                        </View>
+                    }
+                    ListEmptyComponent={
+                        isLoadingItems ? (
+                            <View style={styles.emptyItemsContainer}>
+                                <Text style={{ color: themeColors.textDim }}>Loading collection...</Text>
+                            </View>
+                        ) : (
+                            <View style={styles.emptyItemsContainer}>
+                                <Feather name="video-off" size={64} color={themeColors.textDim} style={{ opacity: 0.5, marginBottom: spacing.md }} />
+                                <Text style={[styles.emptyItemsText, { color: themeColors.textDim }]}>
+                                    This collection is empty.
+                                </Text>
+                                <Button
+                                    title="Add Anime"
+                                    onPress={() => setAddAnimeModalVisible(true)}
+                                    style={{ marginTop: spacing.xl, paddingHorizontal: spacing.xxl }}
+                                />
+                            </View>
+                        )
+                    }
+                    renderItem={({ item: anime, index }) => {
+                        const isLastInRow = index % numColumns === numColumns - 1;
+
+                        return (
+                            <View
+                                style={[
+                                    { marginBottom: spacing.L, width: cardWidth, marginRight: isLastInRow ? 0 : itemGap }
+                                ]}
+                            >
+                                <PosterCard
+                                    media={anime as any}
+                                    onPress={() => router.push(`/details/${anime.animeId}`)}
+                                    width={cardWidth}
+                                    height={cardWidth * 1.5}
+                                    disableEntryAnimation
+                                />
+
+                                {/* Floating Delete Icon */}
+                                <TouchableOpacity
+                                    onPress={() => handleRemoveAnime(anime.animeId, anime.title)}
+                                    style={styles.gridRemoveBtn}
+                                >
+                                    <View style={styles.gridRemoveBg}>
+                                        <Feather name="trash-2" size={14} color="#FF3B30" />
+                                    </View>
+                                </TouchableOpacity>
+
+                            </View>
+                        );
+                    }}
+                    keyExtractor={(item) => item.id || item.animeId}
+                />
+            </View>
 
             {/* Share / Blueprint Modal */}
             <CinematicModal
@@ -352,6 +345,12 @@ export default function CollectionDetailsScreen() {
                 visible={editModalVisible}
                 onClose={() => setEditModalVisible(false)}
                 collectionToEdit={collection}
+            />
+
+            <AddAnimeToCollectionModal
+                visible={addAnimeModalVisible}
+                onClose={() => setAddAnimeModalVisible(false)}
+                collectionId={collection.id}
             />
         </AnimatedScreen>
     );
@@ -473,52 +472,22 @@ const styles = StyleSheet.create({
     itemsList: {
         gap: spacing.sm,
     },
-    animeItemRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 10,
-        borderRadius: 14,
-        borderWidth: 1,
+    gridRemoveBtn: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        zIndex: 10,
+        elevation: 10,
     },
-    animeItemDetails: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    animePoster: {
-        width: 40,
-        height: 56,
-        borderRadius: 6,
-        marginRight: spacing.md,
-    },
-    animeTextDetails: {
-        flex: 1,
-    },
-    animeTitle: {
-        fontSize: 13,
-        fontWeight: 'bold',
-    },
-    animeMetaText: {
-        fontSize: 10,
-        marginTop: 2,
-    },
-    animeRowActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-    },
-    reorderControls: {
-        flexDirection: 'row',
-        gap: 4,
-    },
-    reorderBtn: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: 'rgba(255,255,255,0.04)',
+    gridRemoveBg: {
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        borderRadius: 12,
+        width: 24,
+        height: 24,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,0,0,0.3)',
     },
     disabledBtn: {
         opacity: 0.3,

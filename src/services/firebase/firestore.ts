@@ -317,11 +317,26 @@ export const firestoreService = {
     }
     try {
       const savedPostIds = new Set<string>();
+      const postIds = posts.map(p => p.id);
+
+      const chunks: string[][] = [];
+      for (let i = 0; i < postIds.length; i += 30) {
+        chunks.push(postIds.slice(i, i + 30));
+      }
+
       const savedPostsRef = collection(db, 'users', userId, 'savedPosts');
-      const snap = await getDocs(savedPostsRef);
-      snap.docs.forEach(docSnap => {
-        savedPostIds.add(docSnap.id);
-      });
+
+      await Promise.all(chunks.map(async (chunk) => {
+        const q = query(savedPostsRef, where('postId', 'in', chunk));
+        const snap = await getDocs(q);
+        snap.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          if (data && data.postId) {
+            savedPostIds.add(data.postId);
+          }
+        });
+      }));
+
       return posts.map(p => ({
         ...p,
         isSaved: savedPostIds.has(p.id)
@@ -567,20 +582,33 @@ export const firestoreService = {
     const followRef = doc(db, 'follows', followId);
     const followerRef = doc(db, 'users', followerId);
     const followingRef = doc(db, 'users', followingId);
-    const snap = await getDoc(followRef);
 
-    const batch = writeBatch(db);
-    if (snap.exists()) {
-      batch.delete(followRef);
-      batch.update(followerRef, { followingCount: increment(-1) });
-      batch.update(followingRef, { followersCount: increment(-1) });
-    } else {
-      batch.set(followRef, { followerId, followingId, createdAt: serverTimestamp() });
-      batch.update(followerRef, { followingCount: increment(1) });
-      batch.update(followingRef, { followersCount: increment(1) });
+    try {
+      return await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(followRef);
+        const followerSnap = await transaction.get(followerRef);
+        const followingSnap = await transaction.get(followingRef);
+
+        const followerData = followerSnap.data() || { followingCount: 0 };
+        const followingData = followingSnap.data() || { followersCount: 0 };
+
+        if (snap.exists()) {
+          transaction.delete(followRef);
+          transaction.update(followerRef, { followingCount: Math.max((followerData.followingCount || 1) - 1, 0) });
+          transaction.update(followingRef, { followersCount: Math.max((followingData.followersCount || 1) - 1, 0) });
+          return false;
+        } else {
+          transaction.set(followRef, { followerId, followingId, createdAt: serverTimestamp() });
+          transaction.update(followerRef, { followingCount: increment(1) });
+          transaction.update(followingRef, { followersCount: increment(1) });
+          return true;
+        }
+      });
+    } catch (e) {
+      console.error('[FirestoreService] toggleFollow Transaction Failed: ', e);
+      // Fallback for optimistic UI reverts
+      throw e;
     }
-    await batch.commit();
-    return !snap.exists();
   },
 
   isFollowing: async (followerId: string, followingId: string) => {
@@ -608,6 +636,30 @@ export const firestoreService = {
     } catch (error) {
       console.error('[FirestoreService] Error getting followers list:', error);
       return [];
+    }
+  },
+
+  onSocialFollowingSnapshot: (userId: string, callback: (followingIds: string[]) => void) => {
+    const q = query(collection(db, 'follows'), where('followerId', '==', userId));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => doc.data().followingId));
+    });
+  },
+
+  onSocialFollowersSnapshot: (userId: string, callback: (followerIds: string[]) => void) => {
+    const q = query(collection(db, 'follows'), where('followingId', '==', userId));
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => doc.data().followerId));
+    });
+  },
+
+  getCommunityPost: async (postId: string): Promise<CommunityPost | null> => {
+    try {
+      const snap = await getDoc(doc(db, 'posts', postId));
+      return snap.exists() ? ({ id: snap.id, ...snap.data() } as CommunityPost) : null;
+    } catch (error) {
+      console.error('[FirestoreService] Error fetching single post:', error);
+      return null;
     }
   },
 
@@ -895,7 +947,7 @@ export const firestoreService = {
       return null;
     } catch (error) {
       console.error(`[FirestoreService] Error getting user profile for ${userId}:`, error);
-      return null; // Graceful failure for profile fetch
+      throw error; // IMPORTANT: Do not swallow network errors, or the startup sequence will fatally mistake a connection error for a missing user document and attempt recreation.
     }
   },
 

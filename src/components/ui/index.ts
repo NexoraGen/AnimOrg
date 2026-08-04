@@ -32,5 +32,5 @@ export * from './ProfileStatCard';
 export * from './ProfileStatsGrid';
 export * from './AnimatedLoader';
 export * from './TrailerSection';
-
-
+export * from './SocialUserRow';
+export * from './AddAnimeToCollectionModal';

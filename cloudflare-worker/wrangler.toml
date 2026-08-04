@@ -1,0 +1,6 @@
+name = "animorg-proxy"
+main = "index.js"
+compatibility_date = "2023-01-01"
+
+[observability]
+enabled = false

@@ -24,11 +24,28 @@
         "backgroundColor": "#0F0F0F"
       },
       "package": "com.nexora.animorg",
-      "versionCode": 27,
+      "versionCode": 29,
       "googleServicesFile": "./google-services.json",
       "splash": {
         "backgroundColor": "#0B0B0B"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "animorg-proxy.itisnexora.workers.dev",
+              "pathPrefix": "/share/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

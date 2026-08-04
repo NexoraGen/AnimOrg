@@ -5,7 +5,6 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../src/theme';
 import { useAppStore } from '../src/store/useAppStore';
-import { BackendWarmupService } from '../src/services/api/BackendWarmupService';
 import { ErrorBoundary } from '../src/components/common/ErrorBoundary';
 import { Feather } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,8 +12,10 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
 import { VersionCheckService } from '../src/services/VersionCheckService';
 import { UpdateAvailableModal } from '../src/components/ui/UpdateAvailableModal';
+import { useFonts } from 'expo-font';
 
 let isHotRefresh = false;
 
@@ -43,6 +44,29 @@ export default function RootLayout() {
     isHotRefresh = true;
     return isCold;
   });
+
+  const [fontsLoaded, fontError] = useFonts({
+    ...Feather.font,
+  });
+
+  useEffect(() => {
+    if (fontError) {
+      console.warn("[Layout] Ignored font loading error:", fontError);
+    }
+  }, [fontError]);
+
+  const url = Linking.useURL();
+  const setPendingDeepLink = useAppStore(state => state.setPendingDeepLink);
+
+  useEffect(() => {
+    if (url) {
+      console.log('App captured incoming deep link: ', url);
+      const parsed = Linking.parse(url);
+      if (parsed.path) {
+        setPendingDeepLink('/' + parsed.path);
+      }
+    }
+  }, [url]);
 
   const initializeAuth = useAppStore(state => state.initializeAuth);
   const isLoadingAuth = useAppStore(state => state.isLoadingAuth);
@@ -122,6 +146,7 @@ export default function RootLayout() {
   }, [hasHydrated, isLoadingAuth, segments]);
 
   // Root Layout Global Intercept and Onboarding Guardian
+  const pendingDeepLink = useAppStore(state => state.pendingDeepLink);
   useEffect(() => {
     if (isLoadingAuth || !hasHydrated || isAppInitializing) return;
 
@@ -137,10 +162,20 @@ export default function RootLayout() {
       const isLoginScreen = segmentsList[0] === '(auth)' && segmentsList[1] === 'login';
       const isRegisterScreen = segmentsList[0] === '(auth)' && segmentsList[1] === 'register';
 
+      // Deep link content routes that should NEVER be forcefully redirected away from
+      const isDeepLinkRoute = segmentsList[0] === 'post' || segmentsList[0] === 'share' || segmentsList[0] === 'details';
+
       if (isGuest) {
         // Guest users are allowed anywhere EXCEPT auth screens
         if (inAuthGroup) {
-          router.replace('/(tabs)/home');
+          // Check for pending deep link before going to Home
+          const storedLink = useAppStore.getState().pendingDeepLink;
+          if (storedLink) {
+            useAppStore.getState().setPendingDeepLink(null);
+            router.replace(storedLink as any);
+          } else {
+            router.replace('/(tabs)/home');
+          }
         }
       } else if (isAuthenticated) {
         // Check if the authenticated user has a complete and claimed unique username
@@ -150,19 +185,35 @@ export default function RootLayout() {
 
         if (needsOnboarding) {
           if (!isOnOnboarding) {
+            // Store deep link before redirecting to onboarding
+            if (isDeepLinkRoute) {
+              setPendingDeepLink('/' + segmentsList.join('/'));
+            }
             router.replace('/(auth)/onboarding' as any);
           }
         } else {
-          // Fully onboarded — redirect out of auth stack
+          // Fully onboarded — redirect out of auth stack, but NEVER redirect deep link routes
           if (inAuthGroup) {
-            router.replace('/(tabs)/home');
+            // Check for pending deep link before going to Home
+            const storedLink = useAppStore.getState().pendingDeepLink;
+            if (storedLink) {
+              useAppStore.getState().setPendingDeepLink(null);
+              router.replace(storedLink as any);
+            } else {
+              router.replace('/(tabs)/home');
+            }
           }
+          // If on a deep link route, do NOT redirect — let the screen render naturally
         }
       } else {
         // Unauthenticated -> force into login (allow register screen too)
         const inTabs = segmentsList[0] === '(tabs)';
 
         if (inTabs || isOnOnboarding || !segmentsList[0]) {
+          router.replace('/(auth)/login');
+        } else if (isDeepLinkRoute) {
+          // Store the deep link before sending to login so we can resume after authentication
+          setPendingDeepLink('/' + segmentsList.join('/'));
           router.replace('/(auth)/login');
         }
       }
@@ -174,7 +225,17 @@ export default function RootLayout() {
     } else {
       performRedirect();
     }
-  }, [isAuthenticated, isGuest, user, isLoadingAuth, hasHydrated, isAppInitializing, segments]);
+  }, [isAuthenticated, isGuest, user, isLoadingAuth, hasHydrated, isAppInitializing, segments, pendingDeepLink]);
+
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (!useAppStore.getState().hasHydrated) {
+        console.log('[Layout] Enforcing hydration fallback (timeout hit)');
+        useAppStore.getState().setHasHydrated(true);
+      }
+    }, 500);
+    return () => clearTimeout(fallbackTimer);
+  }, [hasHydrated]);
 
   // Initialize Auth ONLY when hasHydrated is true
   useEffect(() => {
@@ -184,24 +245,9 @@ export default function RootLayout() {
     }
 
     console.log('[AUTH] App launched & completely hydrated. Starting Firebase.');
-    const timer = setTimeout(() => {
-      if (!useAppStore.getState().hasHydrated) {
-        console.log('[Layout] Enforcing hydration fallback');
-        useAppStore.getState().setHasHydrated(true);
-      }
-    }, 100);
-
     const unsubscribe = initializeAuth();
 
-    // Start background wake operation for Render backend 
-    BackendWarmupService.startWarmup();
 
-    const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        console.log('[Warmup] Trigger: App Resume');
-        BackendWarmupService.startWarmup();
-      }
-    });
 
     // Aggressive cleanup sweep of legacy oversized cache objects
     // Fixes SQLite Full crashes globally on startup for corrupted devices
@@ -223,10 +269,8 @@ export default function RootLayout() {
     }, 5000);
 
     return () => {
-      clearTimeout(timer);
       clearTimeout(sweepTimer);
       unsubscribe();
-      appStateSubscription.remove();
     };
   }, [hasHydrated]);
 
@@ -329,6 +373,8 @@ export default function RootLayout() {
               <Stack.Screen name="details/[id]" options={{ presentation: Platform.OS === 'web' ? 'card' : 'modal' }} />
               <Stack.Screen name="category/[type]" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
               <Stack.Screen name="ranks" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
+              <Stack.Screen name="post/[id]" options={{ animation: Platform.OS === 'web' ? 'none' : 'slide_from_right' }} />
+              <Stack.Screen name="share/post/[id]" options={{ animation: 'none' }} />
               <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
               <Stack.Screen name="create-post" options={{ animation: 'slide_from_bottom' }} />
             </Stack>

@@ -41,6 +41,7 @@ class ProfileLoadingManager {
     private isFetching: boolean = false;
     private currentUserId: string | null = null;
     private abortController: AbortController | null = null;
+    private socialUnsubscribes: Array<() => void> = [];
 
     private constructor() { }
 
@@ -65,6 +66,10 @@ class ProfileLoadingManager {
                 return;
             }
         }
+
+        // Cancel previous listeners
+        this.socialUnsubscribes.forEach(unsub => unsub());
+        this.socialUnsubscribes = [];
 
         this.isFetching = true;
         this.currentUserId = userId;
@@ -134,21 +139,18 @@ class ProfileLoadingManager {
                 useAppStore.setState({ notInterested: notInterested || [] });
             }),
             executeTask('SocialFollowing', async () => {
-                const followingList = await promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getUserFollowing(userId)),
-                    8000,
-                    "Timeout fetch getFollowing"
-                );
-                useAppStore.setState({ following: followingList || [] });
+                const unsubscribe = firestoreService.onSocialFollowingSnapshot(userId, (followingList) => {
+                    useAppStore.setState({ following: followingList });
+                });
+                this.socialUnsubscribes.push(unsubscribe);
             }),
             executeTask('SocialFollowers', async () => {
-                const followersList = await promiseWithTimeout(
-                    fetchWithRetry(() => firestoreService.getUserFollowers(userId)),
-                    8000,
-                    "Timeout fetch getFollowers"
-                );
-                useAppStore.setState({ followers: followersList || [] });
+                const unsubscribe = firestoreService.onSocialFollowersSnapshot(userId, (followersList) => {
+                    useAppStore.setState({ followers: followersList });
+                });
+                this.socialUnsubscribes.push(unsubscribe);
             })
+
         ];
 
         // Wait for all to settle, completely isolated from main initialization flow.

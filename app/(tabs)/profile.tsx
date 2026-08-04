@@ -54,6 +54,32 @@ const COMPLETED_SILHOUETTE = require('../../assets/list-completed.png');
 const PLANNED_SILHOUETTE = require('../../assets/list-planned.png');
 const DROPPED_SILHOUETTE = require('../../assets/list-dropped.png');
 
+function LoadingGuardWithTimeout({ onTimeout, showHint, themeColors }: {
+  onTimeout: () => void;
+  showHint: boolean;
+  themeColors: any;
+}) {
+  React.useEffect(() => {
+    const timer = setTimeout(onTimeout, 1000);
+    return () => clearTimeout(timer);
+  }, [onTimeout]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+      <ActivityIndicator color={themeColors.primary} size="large" />
+      <Text style={{ color: themeColors.textDim, marginTop: 16, fontSize: 15 }}>Loading profile...</Text>
+      {showHint && (
+        <View style={{ marginTop: 24, alignItems: 'center', padding: 16, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+          <Text style={{ color: themeColors.text, fontSize: 14, fontWeight: '600', marginBottom: 6 }}>This is taking longer than expected</Text>
+          <Text style={{ color: themeColors.textDim, fontSize: 13, textAlign: 'center', lineHeight: 20 }}>
+            Try closing and restarting the app.{'\n'}If the issue persists, check your internet connection.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -88,14 +114,30 @@ export default function ProfileScreen() {
   const [userPosts, setUserPosts] = React.useState<CommunityPost[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
   const [retrying, setRetrying] = React.useState(false);
+  const [loadingTooLong, setLoadingTooLong] = React.useState(false);
+  const [forceAbortedLoader, setForceAbortedLoader] = React.useState(false);
 
   React.useEffect(() => {
     console.log("[DEBUG PROFILE] [0] Profile screen mounted");
     return () => console.log("[DEBUG PROFILE] [CLEANUP] Profile screen unmounted");
   }, []);
 
+  // Ultimate Failsafe: No matter what React or Zustand says, the UI MUST NOT hang here.
+  React.useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isLoadingAuth || !hasHydrated) {
+      timer = setTimeout(() => {
+        console.warn("[ProfileScreen] FAILSFE TRIGGERED: Bypassing stuck loader.");
+        setForceAbortedLoader(true);
+      }, 1500);
+    }
+    return () => clearTimeout(timer);
+  }, [isLoadingAuth, hasHydrated]);
+
   const handleRetry = React.useCallback(async () => {
     setRetrying(true);
+    setForceAbortedLoader(false);
+    setLoadingTooLong(false);
     try {
       if (user?.id) {
         await refreshUserData();
@@ -279,14 +321,13 @@ export default function ProfileScreen() {
     );
   }
 
-  // Guard includes isAppInitializing so we never render the profile during Firestore hydration
-  if (isLoadingAuth || !hasHydrated || isAppInitializing) {
-    console.log(`[DEBUG PROFILE] Still loading: isLoadingAuth=${isLoadingAuth}, hasHydrated=${hasHydrated}, isAppInitializing=${isAppInitializing}`);
+  // Guard: only block on initial auth load and hydration. 
+  // isAppInitializing is NOT included here — profile renders immediately once auth settles.
+  // Firestore profile data loads in background via _initializeProfileData without blocking UI.
+  if ((isLoadingAuth || !hasHydrated) && !forceAbortedLoader) {
+    console.log(`[DEBUG PROFILE] Still loading: isLoadingAuth=${isLoadingAuth}, hasHydrated=${hasHydrated}`);
     return (
-      <View style={[styles.container, { backgroundColor: themeColors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color={themeColors.primary} size="large" />
-        <Text style={{ color: themeColors.textDim, marginTop: spacing.md }}>Loading profile...</Text>
-      </View>
+      <LoadingGuardWithTimeout onTimeout={() => setLoadingTooLong(true)} showHint={loadingTooLong} themeColors={themeColors} />
     );
   }
 
@@ -499,8 +540,8 @@ export default function ProfileScreen() {
           followingCount={following?.length || 0}
           followersCount={followers?.length || 0}
           postsCount={userPosts?.length || 0}
-          onFollowingPress={() => { }}
-          onFollowersPress={() => { }}
+          onFollowingPress={() => router.push('/social/me?tab=following')}
+          onFollowersPress={() => router.push('/social/me?tab=followers')}
           onPostsPress={() => { }}
         />
 
@@ -595,6 +636,7 @@ export default function ProfileScreen() {
             ].map((list, i) => (
               <AnimatedPressable
                 key={i}
+                haptic={false}
                 style={[
                   styles.listCard,
                   { width: (width - (spacing.xl * 2) - 16) / 2 }
@@ -622,7 +664,7 @@ export default function ProfileScreen() {
 
         {/* --- CUSTOM COLLECTIONS --- */}
         <SectionHeader title="Custom Collections" onViewAll={() => router.push('/collections')} />
-        {collections.length === 0 ? (
+        {!(collections?.length > 0) ? (
           <View style={styles.section}>
             <TouchableOpacity
               style={[styles.emptyCollectionsCard, { borderColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(255,255,255,0.02)' }]}
@@ -640,7 +682,7 @@ export default function ProfileScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: spacing.md, paddingHorizontal: spacing.xl, paddingVertical: 4 }}
           >
-            {collections.map(col => (
+            {(collections || []).map(col => (
               <TouchableOpacity
                 key={col.id}
                 style={[styles.miniCollectionCard, { backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.05)' }]}
@@ -652,7 +694,7 @@ export default function ProfileScreen() {
                     {col.name}
                   </Text>
                   <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>
-                    {col.animeIds.length} titles
+                    {col.itemCount || 0} titles
                   </Text>
                 </View>
               </TouchableOpacity>

@@ -57,8 +57,10 @@ export default function NotificationsScreen() {
         // Navigate to related content
         if (notif.type === 'follow') {
             router.push({ pathname: '/user/[id]', params: { id: notif.senderId } });
+        } else if (notif.targetId) {
+            // For like/comment/reply, go directly to the post
+            router.push(`/post/${notif.targetId}`);
         } else {
-            // For like/comment/reply, go to post tab
             router.push('/(tabs)/social');
         }
     };

@@ -10,6 +10,7 @@ import { resolveAnimeTrackingStatus, getCurrentlyReleasedEpisodesCount } from '.
 import { XPService } from '../services/XPService';
 import { AchievementService } from '../services/AchievementService';
 import { RankService } from '../services/RankService';
+import { CollectionService } from '../services/CollectionService';
 
 interface AppState {
   // Auth State
@@ -20,10 +21,16 @@ interface AppState {
   setIsGuest: (val: boolean) => void;
   loginAsGuest: () => void;
   clearSession: () => void;
-  setUser: (user: User | null) => void;
+
+  // Deep Link Storage
+  pendingDeepLink: string | null;
+  setPendingDeepLink: (link: string | null) => void;
+
+  // Auth / Initialization
   initializeAuth: () => () => void;
   retryInitializeProfile: () => Promise<void>;
   _initializeProfileData: (userId: string, firebaseUser: any, hasCachedProfile: boolean) => Promise<void>;
+  setUser: (user: User | null) => void;
   updateProfile: (data: Partial<User>) => Promise<void>;
   refreshUserData: () => Promise<void>;
   isAppInitializing: boolean;
@@ -137,11 +144,13 @@ interface AppState {
 
   createCollectionAction: (name: string, description?: string, emoji?: string, coverImage?: string) => Promise<void>;
   updateCollectionAction: (collectionId: string, updates: Partial<UserCollection>) => Promise<void>;
-  addAnimeToCollectionAction: (collectionId: string, animeId: string) => Promise<void>;
+  addAnimeToCollectionAction: (collectionId: string, animeData: { id: string, title: string, posterPath: string, genres: string[] }) => Promise<void>;
   removeAnimeFromCollectionAction: (collectionId: string, animeId: string) => Promise<void>;
   deleteCollectionAction: (collectionId: string) => Promise<void>;
   togglePinCollectionAction: (collectionId: string) => Promise<void>;
   reorderCollectionAnimeAction: (collectionId: string, animeIds: string[]) => Promise<void>;
+
+  fetchUserCollectionsAction: () => Promise<void>;
 
   showNextAchievementUnlock: () => void;
   closeAchievementUnlockModal: () => void;
@@ -240,139 +249,123 @@ export const useAppStore = create<AppState>()(
         await get().updateProfile({ favoriteBadgeId: badgeId });
       },
 
+      fetchUserCollectionsAction: async () => {
+        const { user } = get();
+        if (!user) return;
+        try {
+          const { collection, query, where, orderBy, onSnapshot } = require('firebase/firestore');
+          const { db } = require('../services/firebase/config');
+
+          const q = query(collection(db, 'collections'), where('userId', '==', user.id), orderBy('createdAt', 'desc'));
+          onSnapshot(q, (snap: any) => {
+            const fetchedCols = snap.docs.map((doc: any) => ({
+              id: doc.id,
+              ...doc.data(),
+              createdAt: doc.data().createdAt?.toDate().toISOString() || new Date().toISOString()
+            }));
+            set({ collections: fetchedCols });
+          });
+        } catch (e) {
+          console.warn('[Zustand] error fetching top level collections:', e);
+        }
+      },
+
       createCollectionAction: async (name, description, emoji, coverImage) => {
         const { user, collections } = get();
-        const newCol: UserCollection = {
-          id: `col_${Date.now()}`,
-          name,
-          description,
-          emoji: emoji || '📂',
-          coverImage: coverImage || '',
-          isPinned: false,
-          animeIds: [],
-          createdAt: new Date().toISOString()
-        };
-        const updated = [...collections, newCol];
-        set({ collections: updated });
+        if (!user) return;
 
-        if (user) {
-          try {
-            await firestoreService.updateUserProfile(user.id, { collections: updated });
-          } catch (e) {
-            console.warn('Firestore collections sync failed:', e);
-          }
-        }
+        const newCol = await CollectionService.createCollection(user.id, {
+          name, description, emoji, coverImage
+        });
 
+        set({ collections: [newCol, ...collections] });
         await get().awardXpAction('CREATE_COLLECTION');
       },
 
       updateCollectionAction: async (collectionId, updates) => {
-        const { user, collections } = get();
-        const updated = collections.map(col => {
-          if (col.id === collectionId) {
-            return {
-              ...col,
-              ...updates
-            };
-          }
-          return col;
-        });
+        const { collections } = get();
+        const updated = collections.map(col => col.id === collectionId ? { ...col, ...updates } : col);
         set({ collections: updated });
-
-        if (user) {
-          try {
-            await firestoreService.updateUserProfile(user.id, { collections: updated });
-          } catch (e) {
-            console.warn('Firestore collections sync failed:', e);
-          }
+        try {
+          await CollectionService.updateCollection(collectionId, updates);
+        } catch (e) {
+          console.warn('Firestore collections sync failed:', e);
         }
       },
 
-      addAnimeToCollectionAction: async (collectionId, animeId) => {
+      addAnimeToCollectionAction: async (collectionId, animeData) => {
         const { user, collections } = get();
+        if (!user) return;
+
         const updated = collections.map(col => {
           if (col.id === collectionId) {
-            if (col.animeIds.includes(animeId)) return col;
+            // Optimistically update counts if legacy animeIds aren't tracking it
             return {
               ...col,
-              animeIds: [...col.animeIds, animeId]
+              itemCount: (col.itemCount || 0) + 1,
+              animeIds: col.animeIds ? [...col.animeIds, animeData.id] : undefined
             };
           }
           return col;
         });
         set({ collections: updated });
 
-        if (user) {
-          try {
-            await firestoreService.updateUserProfile(user.id, { collections: updated });
-          } catch (e) {
-            console.warn('Firestore collections sync failed:', e);
-          }
+        try {
+          await CollectionService.addItemToCollection(collectionId, user.id, animeData);
+        } catch (e) {
+          console.error(e);
         }
 
         await get().awardXpAction('ADD_TO_COLLECTION');
       },
 
       removeAnimeFromCollectionAction: async (collectionId, animeId) => {
-        const { user, collections } = get();
+        const { collections } = get();
         const updated = collections.map(col => {
           if (col.id === collectionId) {
             return {
               ...col,
-              animeIds: col.animeIds.filter(id => id !== animeId)
+              itemCount: Math.max(0, (col.itemCount || 1) - 1),
+              animeIds: col.animeIds ? col.animeIds.filter(id => String(id) !== String(animeId)) : undefined
             };
           }
           return col;
         });
         set({ collections: updated });
 
-        if (user) {
-          try {
-            await firestoreService.updateUserProfile(user.id, { collections: updated });
-          } catch (e) {
-            console.warn('Firestore collections sync failed:', e);
-          }
+        try {
+          await CollectionService.removeItem(collectionId, animeId);
+        } catch (e) {
+          console.warn('Firestore collections sync failed:', e);
         }
 
         await get().awardXpAction('REMOVE_FROM_COLLECTION');
       },
 
       deleteCollectionAction: async (collectionId) => {
-        const { user, collections } = get();
+        const { collections } = get();
         const updated = collections.filter(col => col.id !== collectionId);
         set({ collections: updated });
 
-        if (user) {
-          try {
-            await firestoreService.updateUserProfile(user.id, { collections: updated });
-          } catch (e) {
-            console.warn('Firestore collections sync failed:', e);
-          }
+        try {
+          await CollectionService.deleteCollection(collectionId);
+        } catch (e) {
+          console.warn('Firestore collections sync failed:', e);
         }
 
         await get().awardXpAction('DELETE_COLLECTION');
       },
 
       togglePinCollectionAction: async (collectionId) => {
-        const { user, collections } = get();
+        const { collections } = get();
         const updated = collections.map(col => {
           if (col.id === collectionId) {
-            return {
-              ...col,
-              isPinned: !col.isPinned
-            };
+            CollectionService.updateCollection(collectionId, { isPinned: !col.isPinned });
+            return { ...col, isPinned: !col.isPinned };
           }
           return col;
         });
         set({ collections: updated });
-
-        if (user) {
-          try {
-            await firestoreService.updateUserProfile(user.id, { collections: updated });
-          } catch (e) {
-            console.warn('Firestore collections sync failed:', e);
-          }
-        }
       },
 
       reorderCollectionAnimeAction: async (collectionId, animeIds) => {
@@ -412,7 +405,7 @@ export const useAppStore = create<AppState>()(
           {
             longestStreak: xpResult.updatedProfile.longestStreak || user.longestStreak || 0,
             userRatings: get().userRatings,
-            collections: get().collections,
+            collections: get().collections.map(c => ({ ...c, animeIds: c.animeIds || [] })),
             totalReviews: user.totalReviews || 0,
             reviewLikes: 0 // Future extension
           }
@@ -506,6 +499,8 @@ export const useAppStore = create<AppState>()(
       user: null,
       isAuthenticated: false,
       isLoadingAuth: true,
+      pendingDeepLink: null,
+      setPendingDeepLink: (link) => set({ pendingDeepLink: link }),
       setUser: (user) => set({ user, isAuthenticated: !!user, isGuest: user ? false : get().isGuest }),
 
       loginAsGuest: () => set({
@@ -558,7 +553,7 @@ export const useAppStore = create<AppState>()(
               profileError: 'Authentication connection timed out. Please check your network and try again.'
             });
           }
-        }, 8000);
+        }, 2000);
 
         const unsubscribeAuth = firebaseAuthService.onAuthStateChanged(async (firebaseUser) => {
           hasFiredAuth = true;
@@ -588,7 +583,7 @@ export const useAppStore = create<AppState>()(
                 console.error("[useAppStore] Failsafe watchdog triggered: forcing isAppInitializing to false");
                 useAppStore.getState().setIsAppInitializing(false);
               }
-            }, 10000);
+            }, 2500);
 
             try {
               // 2. Set up real-time listener for "trackedAnime" (Primary for Hub)
@@ -642,36 +637,49 @@ export const useAppStore = create<AppState>()(
             // Asynchronously fetch other data in the background so it never blocks the startup splash screen transition
             get()._initializeProfileData(userId, firebaseUser, hasCachedProfile);
           } else {
-            console.log('[AUTH] No user found');
-            // Unauthenticated state
-            if (get().isGuest) {
-              set({
-                isLoadingAuth: false,
-                isAppInitializing: false,
-                profileError: null
-              });
-              console.log('[AUTH] Auth finished (Guest)');
-            } else {
-              set({
-                user: null,
-                isAuthenticated: false,
-                isLoadingAuth: false,
-                isAppInitializing: false,
-                watchlist: [],
-                activityFeed: [],
-                continueWatching: [],
-                searchHistory: [],
-                recentlyViewed: [],
-                userRatings: [],
-                animeProgress: {},
-                notInterested: [],
-                recommendationHistory: [],
-                collections: [],
-                isGuest: false,
-                profileError: null
-              });
-              console.log('[AUTH] Auth finished (Unauthenticated)');
-            }
+            console.log('[AUTH] No user received from Firebase. Immediately resolving isLoadingAuth to unblock UI...');
+
+            // CRITICAL: Resolve isLoadingAuth immediately so the UI never stays frozen.
+            // We do NOT wipe the user identity yet — Android Activity warm-resumes cause Firebase
+            // to momentarily broadcast null before re-reading from the Keystore.
+            set({ isLoadingAuth: false });
+
+            // Debounce the STATE WIPE: wait 2000ms to confirm this is a true sign-out, not a native token flash
+            setTimeout(() => {
+              // If Firebase Auth fired again and a valid user now exists, abort the wipe!
+              if (useAppStore.getState().isAuthenticated && firebaseAuthService.getCurrentUser()) {
+                console.log('[AUTH] Null flash absorbed. User still authenticated, skipping state wipe.');
+                return;
+              }
+
+              const currentState = useAppStore.getState();
+              if (currentState.isGuest) {
+                set({
+                  isAppInitializing: false,
+                  profileError: null
+                });
+                console.log('[AUTH] Auth finished (Guest)');
+              } else {
+                set({
+                  user: null,
+                  isAuthenticated: false,
+                  isAppInitializing: false,
+                  watchlist: [],
+                  activityFeed: [],
+                  continueWatching: [],
+                  searchHistory: [],
+                  recentlyViewed: [],
+                  userRatings: [],
+                  animeProgress: {},
+                  notInterested: [],
+                  recommendationHistory: [],
+                  collections: [],
+                  isGuest: false,
+                  profileError: null
+                });
+                console.log('[AUTH] State wiped after 2000ms verification (confirmed sign-out).');
+              }
+            }, 2000);
           }
         });
 
@@ -712,21 +720,10 @@ export const useAppStore = create<AppState>()(
             return get().user;
           });
 
-          // Polling database on cold new users (bypassed if explicit network timeout occurred)
-          if (!userProfile && !hasCachedProfile && !fetchError) {
-            console.warn("[useAppStore] Profile document not found. Polling database...");
-            for (let i = 0; i < 7; i++) {
-              await new Promise(resolve => setTimeout(resolve, 500));
-              userProfile = await promiseWithTimeout(
-                firestoreService.getUserProfile(userId),
-                3000,
-                `Polling user profile timed out on attempt ${i + 1}`
-              ).catch(() => null);
-              if (userProfile) {
-                break;
-              }
-            }
-          }
+          // Note: The legacy 7x database polling loop for new users was removed. 
+          // Since the centralized proxy backend was deprecated, we no longer need to wait
+          // 4+ seconds for a phantom server to generate the document. The client will instantly
+          // drop down and self-heal (create) the profile document itself.
 
           // Self-heal: If profile document is still absent, auto-create it now
           if (!userProfile && !hasCachedProfile) {
@@ -1353,27 +1350,39 @@ export const useAppStore = create<AppState>()(
         }
       },
       followUserAction: async (targetUserId) => {
-        const { user } = get();
+        const { user, following } = get();
         if (!user) return;
+
+        // Optimistic UI Update
+        if (!following.includes(targetUserId)) {
+          set((state) => ({ following: [...state.following, targetUserId] }));
+        }
+
         try {
           await firestoreService.toggleFollow(user.id, targetUserId);
-          set((state) => ({
-            following: [...state.following, targetUserId],
-          }));
         } catch (error) {
-          console.error("Follow failed", error);
+          console.error("Follow failed, rolling back", error);
+          // Rollback
+          set((state) => ({ following: state.following.filter(id => id !== targetUserId) }));
         }
       },
       unfollowUserAction: async (targetUserId) => {
-        const { user } = get();
+        const { user, following } = get();
         if (!user) return;
+
+        // Optimistic UI Update
+        if (following.includes(targetUserId)) {
+          set((state) => ({ following: state.following.filter(id => id !== targetUserId) }));
+        }
+
         try {
           await firestoreService.toggleFollow(user.id, targetUserId);
-          set((state) => ({
-            following: state.following.filter(id => id !== targetUserId)
-          }));
         } catch (error) {
-          console.error("Unfollow failed", error);
+          console.error("Unfollow failed, rolling back", error);
+          // Rollback
+          if (!get().following.includes(targetUserId)) {
+            set((state) => ({ following: [...state.following, targetUserId] }));
+          }
         }
       },
 

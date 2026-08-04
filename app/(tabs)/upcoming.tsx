@@ -51,6 +51,7 @@ interface UpcomingDayFeedProps {
     onRefresh: () => void;
     totalTracked: number;
     totalAiringCount: number;
+    isLoading: boolean;
 }
 
 const UpcomingDayFeed: React.FC<UpcomingDayFeedProps> = React.memo(({
@@ -66,8 +67,23 @@ const UpcomingDayFeed: React.FC<UpcomingDayFeedProps> = React.memo(({
     refreshing,
     onRefresh,
     totalTracked,
-    totalAiringCount
+    totalAiringCount,
+    isLoading
 }) => {
+    if (isLoading && dayAnime.length === 0) {
+        return (
+            <View style={{ flex: 1, paddingHorizontal: edgePadding, paddingTop: spacing.md, flexDirection: 'row', flexWrap: 'wrap' }}>
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                    <View key={i} style={[styles.gridItem, { width: cardWidth, marginRight: i % numColumns === 0 ? 0 : itemGap }]}>
+                        <SkeletonLoader width={cardWidth} height={(cardWidth * 1.45)} style={{ borderRadius: 12, marginBottom: spacing.xs }} />
+                        <SkeletonLoader width={cardWidth * 0.8} height={14} style={{ borderRadius: 6, marginVertical: 4 }} />
+                        <SkeletonLoader width={cardWidth * 0.5} height={12} style={{ borderRadius: 6 }} />
+                    </View>
+                ))}
+            </View>
+        );
+    }
+
     if (dayAnime.length === 0) {
         return (
             <ScrollView
@@ -79,10 +95,10 @@ const UpcomingDayFeed: React.FC<UpcomingDayFeedProps> = React.memo(({
                         <Feather name="calendar" size={36} color={colors.primary} />
                     </View>
                     <Text style={[styles.emptyDayTitle, { color: themeColors.text }]}>
-                        No Anime on {day}
+                        Accessing New Releases...
                     </Text>
                     <Text style={[styles.emptyDaySub, { color: themeColors.textDim }]}>
-                        Check other days for scheduled releases
+                        Downloading new airing schedules for {day}
                     </Text>
                 </View>
             </ScrollView>
@@ -161,6 +177,7 @@ const UpcomingDayFeed: React.FC<UpcomingDayFeedProps> = React.memo(({
     if (prevProps.totalTracked !== nextProps.totalTracked) return false;
     if (prevProps.totalAiringCount !== nextProps.totalAiringCount) return false;
     if (prevProps.themeColors !== nextProps.themeColors) return false;
+    if (prevProps.isLoading !== nextProps.isLoading) return false;
 
     // Check if dayAnime lists are shallowly identical
     if (prevProps.dayAnime !== nextProps.dayAnime) {
@@ -525,6 +542,7 @@ export default function UpcomingScreen() {
                                 onRefresh={onRefresh}
                                 totalTracked={totalTracked}
                                 totalAiringCount={enrichedAnimeList.length}
+                                isLoading={loading}
                             />
                         ))}
                     </SwipeableTabs>

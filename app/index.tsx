@@ -11,9 +11,18 @@ export default function SplashIndex() {
   const user = useAppStore(state => state.user);
   const isAppInitializing = useAppStore(state => state.isAppInitializing);
   const hasHydrated = useAppStore(state => state.hasHydrated);
+  const pendingDeepLink = useAppStore(state => state.pendingDeepLink);
+  const setPendingDeepLink = useAppStore(state => state.setPendingDeepLink);
 
   useEffect(() => {
     const executeRedirect = () => {
+      // If there's an incoming deep link caught by Layout, redirect to IT instead of wiping it!
+      if (pendingDeepLink) {
+        router.replace(pendingDeepLink as any);
+        setPendingDeepLink(null); // Clear the intent
+        return;
+      }
+
       if (isGuest) {
         router.replace('/(tabs)/home');
       } else if (isAuthenticated) {

@@ -11,11 +11,7 @@
     "preview": {
       "distribution": "internal"
     },
-    "production": {
-      "env": {
-        "EXPO_PUBLIC_API_URL": "https://animorg-backend.onrender.com"
-      }
-    }
+    "production": {}
   },
   "submit": {
     "production": {}

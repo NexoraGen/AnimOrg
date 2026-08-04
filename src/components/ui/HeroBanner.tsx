@@ -1,14 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, useWindowDimensions, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { spacing, borderRadius, typography } from '../../theme';
 import { formatRating } from '../../utils/formatters';
 import { PLACEHOLDER_BACKDROP, PLACEHOLDER_POSTER } from '../../constants/images';
-import { TrailerModal } from './TrailerModal';
+import { SkeletonLoader } from './SkeletonLoader';
 
 // Creating an Animated wrapper for expo-image to enable scale transforms
 const AnimatedImage = Animated.createAnimatedComponent(Image);
@@ -26,7 +27,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
   const zoomAnim = useRef(new Animated.Value(1)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const [showTrailer, setShowTrailer] = useState(false);
+  const router = useRouter();
 
   const isMobile = screenWidth < 768;
 
@@ -106,7 +107,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
         locations={[0, 0.4, 0.7, 0.85, 1]}
         style={styles.gradient}
       >
-        <View style={[styles.content, { paddingBottom: 20 }]}>
+        <View style={[styles.content, { paddingBottom: 40 }]}>
           <Text
             style={[
               styles.title,
@@ -151,7 +152,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
               <Animated.View style={[styles.secondaryButtonWrapper, { transform: [{ scale: pulseAnim }] }]}>
                 <TouchableOpacity
                   style={[styles.glassButton, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}
-                  onPress={() => setShowTrailer(true)}
+                  onPress={() => router.push({ pathname: `/details/${media.id}`, params: { playTrailer: 'true' } })}
                   activeOpacity={0.8}
                 >
                   <Feather name="video" size={18} color="#FFF" />
@@ -163,13 +164,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = React.memo(({ media, onPres
         </View>
       </LinearGradient>
 
-      {media.trailerUrl && (
-        <TrailerModal
-          visible={showTrailer}
-          trailerUrl={media.trailerUrl}
-          onClose={() => setShowTrailer(false)}
-        />
-      )}
     </Animated.View>
   );
 });

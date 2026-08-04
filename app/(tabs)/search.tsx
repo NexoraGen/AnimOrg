@@ -35,7 +35,6 @@ import { useDebounce } from '../../src/hooks/useDebounce';
 import { Media } from '../../src/types';
 import { RecommendationResult, RecommendationService } from '../../src/services/RecommendationService';
 import { RecommendationModal } from '../../src/components/features/RecommendationModal';
-import { BackendWarmupService } from '../../src/services/api/BackendWarmupService';
 
 const THEME_MAP: Record<string, number> = {
   'Action': 1, 'Adventure': 2, 'Comedy': 4, 'Romance': 22,
@@ -359,9 +358,6 @@ export default function SearchScreen() {
   const handleInputChange = useCallback((text: string) => {
     lastKeystrokeTimeRef.current = Date.now();
     setInputText(text);
-    if (text.length > 0) {
-      BackendWarmupService.triggerFeatureWarmup('Search Typing');
-    }
   }, []);
 
   const toggleGenre = useCallback((id: number) => {
@@ -491,7 +487,11 @@ export default function SearchScreen() {
 
         const apiStart = Date.now();
         console.log(`[Search Metrics] [search.tsx] Request start timestamp: ${apiStart} | query: "${debouncedQuery}"`);
-        const animeResponse = await animeApi.searchAnime(debouncedQuery, 1, selectedGenres, undefined, 'score', 'desc', onRetryStatus, controller.signal);
+        const searchPromise = animeApi.searchAnime(debouncedQuery, 1, selectedGenres, undefined, 'score', 'desc', onRetryStatus, controller.signal);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Search fetching timed out.")), 8000);
+        });
+        const animeResponse = await Promise.race([searchPromise, timeoutPromise]) as any;
 
         const apiDuration = Date.now() - apiStart;
         console.log(`[Search Metrics] API response time: ${apiDuration}ms`);
@@ -527,10 +527,7 @@ export default function SearchScreen() {
     };
   }, [debouncedQuery, selectedGenres, minScore, status]);
 
-  // Initial trigger for Search page index
-  useEffect(() => {
-    BackendWarmupService.triggerFeatureWarmup('Search Index Opened');
-  }, []);
+
 
   const loadMore = useCallback(async () => {
     if (isMoreLoading || !hasNextPage || isLoading || isDiscoverMode) return;
@@ -541,7 +538,7 @@ export default function SearchScreen() {
     abortControllerRef.current = controller;
 
     try {
-      const response = await animeApi.searchAnime(
+      const searchPromise = animeApi.searchAnime(
         debouncedQuery,
         nextPage,
         selectedGenres,
@@ -551,6 +548,10 @@ export default function SearchScreen() {
         undefined,
         controller.signal
       );
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Search fetch more timed out.")), 8000);
+      });
+      const response = await Promise.race([searchPromise, timeoutPromise]) as any;
 
       const newResults = [...results, ...response.data];
       setResults(newResults);

@@ -80,6 +80,10 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
     };
   }, [variant, width, itemWidth]);
 
+  if (!isLoading && (!data || data.length === 0)) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       <SectionHeader
@@ -95,7 +99,6 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
             data={[1, 2, 3, 4, 5]}
             horizontal
             showsHorizontalScrollIndicator={false}
-            estimatedItemSize={width + 16}
             renderItem={() => (
               <SkeletonLoader
                 width={width}
@@ -115,7 +118,6 @@ const HorizontalCarouselComponent: React.FC<HorizontalCarouselProps> = ({
             renderItem={renderItemInternal}
             keyExtractor={keyExtractor}
             contentContainerStyle={styles.listContent}
-            estimatedItemSize={itemWidth || (variant === 'wide' ? width : width + 16)}
             keyboardShouldPersistTaps="handled"
           />
         </View>
