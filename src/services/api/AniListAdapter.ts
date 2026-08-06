@@ -442,7 +442,9 @@ export const AniListAdapter = {
     const items: Media[] = [];
     const seen = new Set();
     let page = 1;
-    const promises = Array.from({ length: 5 }, (_, i) => i + 1).map(async (page) => {
+    const promises = Array.from({ length: 5 }, (_, i) => i + 1).map(async (page, index) => {
+      // Stagger requests by 300ms each to avoid IP burst limits (HTTP 429)
+      if (index > 0) await new Promise(r => setTimeout(r, index * 300));
       console.log(`[AniListAdapter] Fetching airing schedule page ${page} concurrently...`);
       return executeGraphQLQuery(query, { now, nextWeek, page });
     });

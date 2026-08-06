@@ -227,7 +227,8 @@ export const JikanAdapter = {
         let currentPage = 1;
         let hasNext = true;
 
-        while (hasNext && currentPage <= 15) {
+        // Capped to 5 pages (approx 125 schedule items) to prevent Jikan 504 timeouts on cold start.
+        while (hasNext && currentPage <= 5) {
             const data = await executeJikanQuery<any>(`${BASE_PATH}/schedules?page=${currentPage}&limit=25`);
             const items = (data.data || []).filter((item: any) => !isJikanExplicitContent(item)).map(mapJikanToMedia);
             allItems = allItems.concat(items);

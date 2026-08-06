@@ -204,7 +204,6 @@ const WatchNextUpcomingCard = React.memo(({ progress, onPress, themeColors }: an
 export const WatchNextSection: React.FC = React.memo(() => {
     const themeColors = useThemeColors();
     const router = useRouter();
-    // Individual selectors to prevent full-store rerender cascades
     const user = useAppStore(s => s.user);
     const animeProgress = useAppStore(s => s.animeProgress);
     const watchlist = useAppStore(s => s.watchlist);

@@ -41,6 +41,7 @@ import { CommunityPost } from '../../src/types';
 import { APP_VERSION_DISPLAY } from '../../src/constants/version';
 import { firestoreService } from '../../src/services/firebase/firestore';
 import { getAvatarSource } from '../../src/constants/avatars';
+import { getSafeTopInset } from '../../src/utils/layout';
 import { LevelService } from '../../src/services/LevelService';
 import { ACHIEVEMENTS } from '../../src/config/achievements';
 import { LevelUpModal } from '../../src/components/ui/LevelUpModal';
@@ -373,8 +374,8 @@ export default function ProfileScreen() {
           />
         }
       >
-        <View style={[styles.headerHero, { paddingTop: insets.top + spacing.sm }]}>
-          <View style={{ position: 'absolute', top: insets.top + spacing.sm, right: spacing.md, zIndex: 100 }}>
+        <View style={[styles.headerHero, { paddingTop: getSafeTopInset(insets) + spacing.sm }]}>
+          <View style={{ position: 'absolute', top: getSafeTopInset(insets) + spacing.sm, right: spacing.md, zIndex: 100 }}>
             <View style={styles.headerActions}>
               {!isGuest && (
                 <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/saved-posts')}>
@@ -894,6 +895,7 @@ const styles = StyleSheet.create({
   headerTextContainer: {
     flex: 1,
     justifyContent: 'center',
+    paddingRight: 120, // Prevents long usernames from overflowing under the absolute-positioned action bar
   },
   username: {
     fontSize: 28,

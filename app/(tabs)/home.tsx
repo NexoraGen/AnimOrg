@@ -31,6 +31,7 @@ import { useAppStore } from '../../src/store/useAppStore';
 import { animeApi } from '../../src/services/animeApi';
 import { Media } from '../../src/types';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
+import { getSafeTopInset } from '../../src/utils/layout';
 import { WatchNextSection } from '../../src/components/features/WatchNextSection';
 import { notificationService } from '../../src/services/notifications';
 import { RecommendationService, RecommendationResult } from '../../src/services/RecommendationService';
@@ -347,7 +348,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: insets.top + 90 } // Adds crisp visual spacing between the header and the hero pic section
+          { paddingTop: getSafeTopInset(insets) + 90 } // Adds crisp visual spacing between the header and the hero pic section
         ]}
         showsVerticalScrollIndicator={false}
         decelerationRate="normal"

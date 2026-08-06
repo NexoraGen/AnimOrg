@@ -23,6 +23,7 @@ import { useThemeColors } from '../src/hooks/useThemeColors';
 import { ANIME_AVATARS, getAvatarSource } from '../src/constants/avatars';
 import { CinematicModal } from '../src/components/layout/CinematicModal';
 import { firestoreService } from '../src/services/firebase/firestore';
+import { getSafeTopInset } from '../src/utils/layout';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -51,11 +52,6 @@ export default function EditProfileScreen() {
 
   // Preset picker extra features state
   const [recentAvatars, setRecentAvatars] = useState<string[]>([]);
-  const [recommendedAvatars] = useState<string[]>([
-    'preset_1',
-    'preset_2',
-    'preset_3'
-  ]);
 
   // Load recently used avatars on modal open
   React.useEffect(() => {
@@ -64,7 +60,13 @@ export default function EditProfileScreen() {
         try {
           const stored = await AsyncStorage.getItem('animorg_recently_used_avatars');
           if (stored) {
-            setRecentAvatars(JSON.parse(stored));
+            const parsed: string[] = JSON.parse(stored);
+            // Filter out any broken presets or empty strings so we don't show the guest avatar fallback repeatedly
+            const validRecents = parsed.filter(url =>
+              url &&
+              (!url.startsWith('preset_') || ANIME_AVATARS.some(p => p.url === url))
+            );
+            setRecentAvatars(validRecents);
           }
         } catch (err) {
           console.warn('[EditProfile] Error loading recent presets:', err);
@@ -175,7 +177,7 @@ export default function EditProfileScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[styles.container, { backgroundColor: themeColors.background, paddingTop: Math.max(insets.top, spacing.md) }]}
+      style={[styles.container, { backgroundColor: themeColors.background, paddingTop: Math.max(getSafeTopInset(insets), spacing.md) }]}
     >
       <View style={[styles.pageWrapper, { maxWidth: Math.min(width, 540) }]}>
         <View style={[styles.header, { borderBottomColor: themeColors.border }]}>
@@ -400,25 +402,6 @@ export default function EditProfileScreen() {
                 </View>
               </View>
             )}
-
-            {/* B. RECOMMENDED HOT TOP PICKS */}
-            <View style={styles.recentSection}>
-              <Text style={styles.presetCategoryHeader}>Recommended Picks</Text>
-              <View style={styles.recentRow}>
-                {recommendedAvatars.map((url, i) => (
-                  <TouchableOpacity
-                    key={'rec-' + i}
-                    style={[
-                      styles.presetOption,
-                      selectedAvatar === url && styles.selectedGlowingPreset
-                    ]}
-                    onPress={() => handleSelectPreset(url)}
-                  >
-                    <Image source={getAvatarSource(url)} style={styles.presetThumb} contentFit="cover" />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
 
             {/* D. PRESETS GRID */}
             <ScrollView
@@ -693,7 +676,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.md,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     paddingVertical: spacing.xs,
   },
   presetOption: {

@@ -44,6 +44,7 @@ interface UserPostsTabProps {
     theme: any;
     setAuthModalVisible: (v: boolean) => void;
     setUserPosts: React.Dispatch<React.SetStateAction<CommunityPost[]>>;
+    postsLoading?: boolean;
 }
 
 const UserPostsTab: React.FC<UserPostsTabProps> = ({
@@ -51,8 +52,17 @@ const UserPostsTab: React.FC<UserPostsTabProps> = ({
     userPosts,
     theme,
     setAuthModalVisible,
-    setUserPosts
+    setUserPosts,
+    postsLoading
 }) => {
+    if (postsLoading && userPosts.length === 0) {
+        return (
+            <View style={styles.emptyContainer}>
+                <ActivityIndicator color={theme.primary} />
+            </View>
+        );
+    }
+
     if (userPosts.length === 0) {
         return (
             <View style={styles.emptyContainer}>
@@ -138,46 +148,49 @@ export default function UserProfileScreen() {
     const [userData, setUserData] = useState<any>(null);
     const [userPosts, setUserPosts] = useState<CommunityPost[]>([]);
     const [loading, setLoading] = useState(true);
+    const [postsLoading, setPostsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState('Posts');
     const [authModalVisible, setAuthModalVisible] = useState(false);
 
-    const loadData = useCallback(async () => {
+    const loadProfile = useCallback(async () => {
         try {
-            // Implement production timeout to prevent infinite suspension on stale Firebase sockets
             const dataPromise = firestoreService.getUserPublicData(id);
-            let isTimeout = false;
-
             const timeoutPromise = new Promise<never>((_, reject) => {
-                setTimeout(() => {
-                    isTimeout = true;
-                    reject(new Error("Public profile fetching timed out."));
-                }, 8000);
+                setTimeout(() => reject(new Error("Profile fetching timed out.")), 8000);
             });
-
             const data = await Promise.race([dataPromise, timeoutPromise]) as any;
             setUserData(data);
-
-            if (activeTab === 'Posts') {
-                const postsPromise = firestoreService.getCommunityFeed({ userId: id });
-                const timeoutPostsPromise = new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error("Community feed fetching timed out.")), 8000);
-                });
-
-                const postsObj = await Promise.race([postsPromise, timeoutPostsPromise]) as any;
-                setUserPosts(postsObj.posts);
-            }
         } catch (error) {
-            console.error("Failed to fetch user data:", error);
+            console.error("Failed to fetch user profile:", error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [id, activeTab]);
+    }, [id]);
+
+    const loadPosts = useCallback(async () => {
+        try {
+            setPostsLoading(true);
+            const postsObj = await firestoreService.getCommunityFeed({ userId: id });
+            if (postsObj) setUserPosts(postsObj.posts);
+        } catch (error) {
+            console.error("Failed to fetch user posts:", error);
+        } finally {
+            setPostsLoading(false);
+        }
+    }, [id]);
+
+    const handleRefresh = useCallback(() => {
+        setRefreshing(true);
+        loadProfile();
+        loadPosts();
+    }, [loadProfile, loadPosts]);
 
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        loadProfile();
+        loadPosts();
+    }, [loadProfile, loadPosts]);
 
     // Realtime Listener for Profile Counts
     useEffect(() => {
@@ -235,7 +248,7 @@ export default function UserProfileScreen() {
             <ScrollView
                 style={{ flex: 1 }}
                 contentContainerStyle={{ flexGrow: 1, paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT }}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} tintColor={theme.primary} progressViewOffset={getSafeTopInset(insets) + HEADER_HEIGHT} />}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.primary} progressViewOffset={getSafeTopInset(insets) + HEADER_HEIGHT} />}
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.headerWrapper}>
@@ -305,6 +318,7 @@ export default function UserProfileScreen() {
                             theme={theme}
                             setAuthModalVisible={setAuthModalVisible}
                             setUserPosts={setUserPosts}
+                            postsLoading={postsLoading}
                         />
                         <UserStatsTab
                             stats={stats}

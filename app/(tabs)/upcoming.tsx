@@ -20,6 +20,7 @@ import { SectionHeader } from '../../src/components/ui/SectionHeader';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSafeTopInset } from '../../src/utils/layout';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -363,46 +364,56 @@ export default function UpcomingScreen() {
             await syncTrackedReleases(cachedList, upcomingList);
             if (isCacheFresh && isUpcomingFresh && !isBackground) return;
 
+            const fetchTasks: Promise<void>[] = [];
+
             if (!isUpcomingFresh) {
-                try {
-                    const upResults = await animeApi.getUpcomingAnime(1);
-                    if (upResults?.length > 0) {
-                        upcomingList = upResults;
-                        await AsyncStorage.setItem(upcomingCacheKey, JSON.stringify({ anime: upResults, timestamp: Date.now() }));
+                fetchTasks.push((async () => {
+                    try {
+                        const upResults = await animeApi.getUpcomingAnime(1);
+                        if (upResults?.length > 0) {
+                            upcomingList = upResults;
+                            await AsyncStorage.setItem(upcomingCacheKey, JSON.stringify({ anime: upResults, timestamp: Date.now() }));
+                        }
+                    } catch (e) {
+                        console.warn('[ReleaseHub] upcoming fetch error:', e);
                     }
-                } catch (e) { console.warn('[ReleaseHub] upcoming fetch error:', e); }
+                })());
             }
 
             if (!isCacheFresh || isBackground) {
-                const freshSchedule = await animeApi.getAiringSchedule(undefined, (freshList) => {
-                    const currentlyAiring = freshList.filter(item => item.status?.toLowerCase() !== 'finished airing' && item.status?.toLowerCase() !== 'finished');
-                    console.log(`[ReleaseHub Debug] callback: loaded ${freshList.length} total, filtered currentlyAiring count: ${currentlyAiring.length}`);
+                fetchTasks.push((async () => {
+                    const freshSchedule = await animeApi.getAiringSchedule(undefined, (freshList) => {
+                        const currentlyAiring = freshList.filter(item => item.status?.toLowerCase() !== 'finished airing' && item.status?.toLowerCase() !== 'finished');
+                        console.log(`[ReleaseHub Debug] callback: loaded ${freshList.length} total, filtered currentlyAiring count: ${currentlyAiring.length}`);
 
+                        if (currentlyAiring.length > 50) {
+                            AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
+                        } else {
+                            console.warn(`[ReleaseHub Safety] Callback returned only ${currentlyAiring.length} anime. Ignoring cache overwrite.`);
+                        }
+
+                        setAllAnime(currentlyAiring);
+                        syncTrackedReleases(currentlyAiring, upcomingList);
+                    });
+
+                    const currentlyAiring = freshSchedule.filter(item => item.status?.toLowerCase() !== 'finished airing' && item.status?.toLowerCase() !== 'finished');
+                    console.log(`[ReleaseHub Debug] loaded ${freshSchedule.length} total, filtered currentlyAiring count: ${currentlyAiring.length}`);
+
+                    // CRITICAL FAIL-SAFE:
+                    // Only overwrite the device's weekly cache slate if the incoming data payload contains a legitimate threshold of anime.
+                    // A normal active anime broadcasting season usually contains 100-250 series.
                     if (currentlyAiring.length > 50) {
-                        AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
+                        await AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
                     } else {
-                        console.warn(`[ReleaseHub Safety] Callback returned only ${currentlyAiring.length} anime. Ignoring cache overwrite.`);
+                        console.warn(`[ReleaseHub Safety] Fetch returned only ${currentlyAiring.length} anime. Ignoring cache overwrite to prevent blackout state.`);
                     }
 
                     setAllAnime(currentlyAiring);
-                    syncTrackedReleases(currentlyAiring, upcomingList);
-                });
-
-                const currentlyAiring = freshSchedule.filter(item => item.status?.toLowerCase() !== 'finished airing' && item.status?.toLowerCase() !== 'finished');
-                console.log(`[ReleaseHub Debug] loaded ${freshSchedule.length} total, filtered currentlyAiring count: ${currentlyAiring.length}`);
-
-                // CRITICAL FAIL-SAFE:
-                // Only overwrite the device's weekly cache slate if the incoming data payload contains a legitimate threshold of anime.
-                // A normal active anime broadcasting season usually contains 100-250 series.
-                if (currentlyAiring.length > 50) {
-                    await AsyncStorage.setItem(cacheKey, JSON.stringify({ anime: currentlyAiring, timestamp: Date.now() }));
-                } else {
-                    console.warn(`[ReleaseHub Safety] Fetch returned only ${currentlyAiring.length} anime. Ignoring cache overwrite to prevent blackout state.`);
-                }
-
-                setAllAnime(currentlyAiring);
-                await syncTrackedReleases(currentlyAiring, upcomingList);
+                    await syncTrackedReleases(currentlyAiring, upcomingList);
+                })());
             }
+
+            await Promise.all(fetchTasks);
         } catch (error) { console.error('Schedule fetch error:', error); }
         finally { setLoading(false); }
     };
@@ -500,7 +511,7 @@ export default function UpcomingScreen() {
             />
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 70 }}
+                contentContainerStyle={{ flexGrow: 1, paddingTop: getSafeTopInset(insets) + 70 }}
                 keyboardShouldPersistTaps="handled"
             >
                 {/* ═══ MY ANIMES ═══ */}

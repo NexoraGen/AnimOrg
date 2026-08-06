@@ -208,6 +208,7 @@ export const AddAnimeToCollectionModal: React.FC<AddAnimeToCollectionModalProps>
                                 keyExtractor={item => item.id.toString()}
                                 // @ts-ignore - TS signature clash
                                 estimatedItemSize={80}
+                                extraData={{ addingIds, addedIds }}
                                 keyboardShouldPersistTaps="handled"
                                 contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
                                 ListEmptyComponent={() => (

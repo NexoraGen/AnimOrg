@@ -7,6 +7,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { spacing, borderRadius, typography } from '../../theme';
 import { ANIME_LOGO } from '../../constants/images';
 import { getAvatarSource } from '../../constants/avatars';
+import { getSafeTopInset } from '../../utils/layout';
 
 type StreamingHeaderProps = {
   avatarUrl?: string;
@@ -24,8 +25,8 @@ export const StreamingHeader: React.FC<StreamingHeaderProps> = ({ avatarUrl, onA
       style={[
         styles.header,
         {
-          paddingTop: insets.top,
-          height: 70 + insets.top
+          paddingTop: getSafeTopInset(insets),
+          height: 70 + getSafeTopInset(insets)
         }
       ]}
     >

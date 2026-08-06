@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { getHeaderContentTopOffset } from '../../src/utils/layout';
 
 import { useAppStore } from '../../src/store/useAppStore';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
@@ -596,7 +597,7 @@ export default function SearchScreen() {
     <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
       <GlassHeader title="Discovery" showLogo={true} />
 
-      <View style={[styles.content, { paddingTop: insets.top + HEADER_HEIGHT + spacing.M }]}>
+      <View style={[styles.content, { paddingTop: getHeaderContentTopOffset(insets, spacing.M) }]}>
         <View style={[styles.searchContainer, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
           <Feather name="search" color={themeColors.primary} size={20} />
           <TextInput

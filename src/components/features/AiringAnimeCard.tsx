@@ -40,7 +40,7 @@ export const AiringAnimeCard: React.FC<AiringAnimeCardProps> = React.memo(({
         >
             {/* 1. Poster Image */}
             <Image
-                source={anime.posterPath ? { uri: anime.posterPath } : { uri: PLACEHOLDER_POSTER }}
+                source={(anime.posterImageMedium || anime.posterPath) ? { uri: anime.posterImageMedium || anime.posterPath } : { uri: PLACEHOLDER_POSTER }}
                 style={styles.image}
                 contentFit="cover"
                 transition={250}

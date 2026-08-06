@@ -19,6 +19,7 @@ import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { CollectionService } from '../../src/services/CollectionService';
+import { getHeaderContentTopOffset } from '../../src/utils/layout';
 
 export default function CollectionsScreen() {
     const router = useRouter();
@@ -74,7 +75,13 @@ export default function CollectionsScreen() {
 
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + spacing.xl }]}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    {
+                        paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0) + spacing.xl,
+                        paddingTop: getHeaderContentTopOffset(insets, spacing.lg)
+                    }
+                ]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Header Summary Banner */}
@@ -164,7 +171,6 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: spacing.xl,
-        paddingTop: 85, // Account for GlassHeader height
         gap: spacing.md,
     },
     summaryCard: {

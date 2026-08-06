@@ -215,12 +215,13 @@ export const TrailerSection: React.FC<TrailerSectionProps> = ({
                                 videoId={youtubeId}
                                 height={playerHeight}
                                 width={containerWidth}
-                                play={isPlayerReady}
+                                play={true}
                                 forceAndroidAutoplay={true}
                                 onReady={handlePlayerReady}
                                 onError={handlePlayerError}
+                                webViewStyle={{ opacity: 0.99 }} // Forces Android compositor to render hardware textures
                                 webViewProps={{
-                                    androidLayerType: 'software',
+                                    androidLayerType: 'hardware',
                                     allowsInlineMediaPlayback: true,
                                 }}
                                 initialPlayerParams={{

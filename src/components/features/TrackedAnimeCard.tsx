@@ -47,10 +47,11 @@ export const TrackedAnimeCard: React.FC<TrackedAnimeCardProps> = React.memo(({
                 {/* 1. Left Side: Poster Image */}
                 <View style={styles.imageContainer}>
                     <Image
-                        source={media.posterPath ? { uri: media.posterPath } : { uri: 'https://images.unsplash.com/photo-1578632738908-48c104e8d89e?q=80&w=600' }}
+                        source={(media.posterImageMedium || media.posterPath) ? { uri: media.posterImageMedium || media.posterPath } : { uri: 'https://images.unsplash.com/photo-1578632738908-48c104e8d89e?q=80&w=600' }}
                         style={styles.image}
                         contentFit="cover"
-                        transition={300}
+                        transition={250}
+                        cachePolicy="memory-disk"
                     />
                     <LinearGradient
                         colors={['transparent', 'rgba(0,0,0,0.4)']}

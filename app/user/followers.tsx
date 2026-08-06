@@ -9,6 +9,7 @@ import { UserSearchCard } from '../../src/components/features/community/UserSear
 import { Feather } from '@expo/vector-icons';
 import { User } from '../../src/types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSafeTopInset } from '../../src/utils/layout';
 
 export default function FollowersScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -76,7 +77,7 @@ export default function FollowersScreen() {
     }, [id]); // Initial fetch
 
     const renderHeader = () => (
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={[styles.header, { paddingTop: getSafeTopInset(insets) + 12 }]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
                 <Feather name="chevron-left" size={28} color={theme.text} />
             </TouchableOpacity>

@@ -228,7 +228,8 @@ export const CreateCollectionModal: React.FC<CreateCollectionModalProps> = ({
 
 const styles = StyleSheet.create({
     container: {
-        paddingTop: spacing.sm,
+        padding: spacing.lg,
+        paddingBottom: spacing.xl,
         gap: spacing.md,
     },
     headerTitle: {
@@ -255,8 +256,10 @@ const styles = StyleSheet.create({
         fontSize: 14,
     },
     textArea: {
-        height: 80,
-        paddingTop: spacing.sm,
+        minHeight: 100,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.md,
+        textAlignVertical: 'top',
     },
     errorText: {
         color: '#FF3B30',
@@ -267,8 +270,8 @@ const styles = StyleSheet.create({
     emojiGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 8,
-        marginVertical: 4,
+        gap: 12,
+        marginVertical: spacing.sm,
     },
     emojiBubble: {
         width: 38,
@@ -282,7 +285,7 @@ const styles = StyleSheet.create({
         fontSize: 18,
     },
     coverRow: {
-        gap: spacing.sm,
+        gap: spacing.md,
         paddingVertical: 4,
     },
     coverCard: {

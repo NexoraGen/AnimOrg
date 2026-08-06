@@ -127,6 +127,8 @@ interface AppState {
   // Hydration State
   hasHydrated: boolean;
   setHasHydrated: (val: boolean) => void;
+  isSecondaryDataLoaded: boolean;
+  setIsSecondaryDataLoaded: (val: boolean) => void;
 
   // Level Up Modal & Progression State
   levelUpModalVisible: boolean;
@@ -186,6 +188,8 @@ export const useAppStore = create<AppState>()(
       // Hydration Initial State
       hasHydrated: false,
       setHasHydrated: (val) => set({ hasHydrated: val }),
+      isSecondaryDataLoaded: false,
+      setIsSecondaryDataLoaded: (val) => set({ isSecondaryDataLoaded: val }),
 
       isAppInitializing: true,
       setIsAppInitializing: (val) => set({ isAppInitializing: val }),
@@ -274,12 +278,32 @@ export const useAppStore = create<AppState>()(
         const { user, collections } = get();
         if (!user) return;
 
-        const newCol = await CollectionService.createCollection(user.id, {
-          name, description, emoji, coverImage
-        });
+        const tempId = `temp_${Date.now()}`;
+        const tempCol = {
+          id: tempId,
+          userId: user.id,
+          name, description, emoji, coverImage,
+          itemCount: 0,
+          animeIds: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isPublic: false
+        };
 
-        set({ collections: [newCol, ...collections] });
-        await get().awardXpAction('CREATE_COLLECTION');
+        // @ts-ignore
+        set({ collections: [tempCol, ...collections] });
+
+        // Fire-and-forget to Firestore
+        CollectionService.createCollection(user.id, {
+          name, description, emoji, coverImage
+        }).then(newCol => {
+          set((state) => ({ collections: state.collections.map(c => c.id === tempId ? newCol : c) }));
+          get().awardXpAction('CREATE_COLLECTION');
+        }).catch(e => {
+          console.warn('Failed to create collection', e);
+          // Revert optimistic update
+          set((state) => ({ collections: state.collections.filter(c => c.id !== tempId) }));
+        });
       },
 
       updateCollectionAction: async (collectionId, updates) => {
@@ -675,6 +699,7 @@ export const useAppStore = create<AppState>()(
                   recommendationHistory: [],
                   collections: [],
                   isGuest: false,
+                  isSecondaryDataLoaded: false,
                   profileError: null
                 });
                 console.log('[AUTH] State wiped after 2000ms verification (confirmed sign-out).');

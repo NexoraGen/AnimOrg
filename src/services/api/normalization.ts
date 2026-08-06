@@ -37,6 +37,7 @@ export const mapAniListToMedia = (item: any): Media => {
         title: title,
         description: item.description?.replace(/<[^>]*>/g, '') || 'No description available.',
         posterPath: item.coverImage?.extraLarge || item.coverImage?.large || item.coverImage?.medium,
+        posterImageMedium: item.coverImage?.large || item.coverImage?.medium || item.coverImage?.extraLarge,
         backdropPath: backdrop,
         rating: mappedRating,
         releaseYear: item.seasonYear || item.startDate?.year || undefined,

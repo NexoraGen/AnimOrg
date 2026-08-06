@@ -277,9 +277,15 @@ export const firestoreService = {
     const likeId = `${userId}_${postId}`;
     const likeRef = doc(db, 'likes', likeId);
     const postRef = doc(db, 'posts', postId);
-    const snap = await getDoc(likeRef);
+
+    const [snap, postSnap, userSnap] = await Promise.all([
+      getDoc(likeRef),
+      getDoc(postRef),
+      getDoc(doc(db, 'users', userId))
+    ]);
 
     const batch = writeBatch(db);
+    let isLiked = false;
     if (snap.exists()) {
       batch.delete(likeRef);
       batch.update(postRef, {
@@ -287,6 +293,7 @@ export const firestoreService = {
         engagementScore: increment(-1)
       });
     } else {
+      isLiked = true;
       batch.set(likeRef, { userId, postId, createdAt: serverTimestamp() });
       batch.update(postRef, {
         likes: increment(1),
@@ -294,6 +301,22 @@ export const firestoreService = {
       });
     }
     await batch.commit();
+
+    if (isLiked && postSnap.exists() && userSnap.exists()) {
+      const postOwnerId = postSnap.data().userId;
+      const userData = userSnap.data();
+      if (postOwnerId && postOwnerId !== userId) {
+        firestoreService.createNotification({
+          recipientId: postOwnerId,
+          senderId: userId,
+          senderName: userData.username || 'Someone',
+          senderAvatar: userData.avatarUrl,
+          type: 'like',
+          targetId: postId
+        }).catch(console.error);
+      }
+    }
+
     return !snap.exists();
   },
 
@@ -521,6 +544,11 @@ export const firestoreService = {
     try {
       const commentsRef = collection(db, 'posts', postId, 'comments');
       const postRef = doc(db, 'posts', postId);
+
+      const postSnap = await getDoc(postRef);
+      if (!postSnap.exists()) throw new Error("Post not found");
+      const postOwnerId = postSnap.data().userId;
+
       const batch = writeBatch(db);
 
       const newCommentRef = doc(commentsRef);
@@ -545,12 +573,43 @@ export const firestoreService = {
       });
 
       // Handle reply count if it's a nested comment
+      let parentOwnerId = null;
       if (commentData.parentId) {
         const parentRef = doc(db, 'posts', postId, 'comments', commentData.parentId);
         batch.update(parentRef, { replyCount: increment(1) });
+
+        const parentSnap = await getDoc(parentRef);
+        if (parentSnap.exists()) {
+          parentOwnerId = parentSnap.data().userId;
+        }
       }
 
       await batch.commit();
+
+      if (postOwnerId && postOwnerId !== commentData.userId) {
+        firestoreService.createNotification({
+          recipientId: postOwnerId,
+          senderId: commentData.userId!,
+          senderName: commentData.username || 'Someone',
+          senderAvatar: commentData.userAvatar,
+          type: 'comment',
+          targetId: postId,
+          targetPreview: commentData.text ? commentData.text.substring(0, 40) : 'left a comment'
+        }).catch(console.error);
+      }
+
+      if (parentOwnerId && parentOwnerId !== commentData.userId && parentOwnerId !== postOwnerId) {
+        firestoreService.createNotification({
+          recipientId: parentOwnerId,
+          senderId: commentData.userId!,
+          senderName: commentData.username || 'Someone',
+          senderAvatar: commentData.userAvatar,
+          type: 'reply',
+          targetId: postId,
+          targetPreview: commentData.text ? commentData.text.substring(0, 40) : 'replied to you'
+        }).catch(console.error);
+      }
+
       return commentId;
     } catch (error) {
       console.error('[FirestoreService] Error adding comment:', error);
@@ -584,7 +643,10 @@ export const firestoreService = {
     const followingRef = doc(db, 'users', followingId);
 
     try {
-      return await runTransaction(db, async (transaction) => {
+      let newlyFollowed = false;
+      let followerProfile: any = null;
+
+      const result = await runTransaction(db, async (transaction) => {
         const snap = await transaction.get(followRef);
         const followerSnap = await transaction.get(followerRef);
         const followingSnap = await transaction.get(followingRef);
@@ -601,9 +663,24 @@ export const firestoreService = {
           transaction.set(followRef, { followerId, followingId, createdAt: serverTimestamp() });
           transaction.update(followerRef, { followingCount: increment(1) });
           transaction.update(followingRef, { followersCount: increment(1) });
+          newlyFollowed = true;
+          followerProfile = followerData;
           return true;
         }
       });
+
+      if (newlyFollowed && followerProfile) {
+        firestoreService.createNotification({
+          recipientId: followingId,
+          senderId: followerId,
+          senderName: followerProfile.username || 'Someone',
+          senderAvatar: followerProfile.avatarUrl,
+          type: 'follow',
+          targetId: followerId
+        }).catch(console.error);
+      }
+
+      return result;
     } catch (e) {
       console.error('[FirestoreService] toggleFollow Transaction Failed: ', e);
       // Fallback for optimistic UI reverts
@@ -635,6 +712,21 @@ export const firestoreService = {
       return snap.docs.map(d => d.data().followerId);
     } catch (error) {
       console.error('[FirestoreService] Error getting followers list:', error);
+      return [];
+    }
+  },
+
+  getMutualFriends: async (userId: string): Promise<string[]> => {
+    if (!userId) return [];
+    try {
+      const [following, followers] = await Promise.all([
+        firestoreService.getUserFollowing(userId),
+        firestoreService.getUserFollowers(userId)
+      ]);
+      const followersSet = new Set(followers);
+      return following.filter(id => followersSet.has(id));
+    } catch (error) {
+      console.error('[FirestoreService] Error getting mutual friends:', error);
       return [];
     }
   },
@@ -686,7 +778,16 @@ export const firestoreService = {
       const q = query(notifRef, where('recipientId', '==', userId), orderBy('createdAt', 'desc'), limit(50));
       const snap = await getDocs(q);
       return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityNotification));
-    } catch (error) {
+    } catch (error: any) {
+      if (String(error).includes('index') || String(error).includes('failed-precondition')) {
+        const notifRef = collection(db, 'notifications');
+        const fallbackQ = query(notifRef, where('recipientId', '==', userId), limit(50));
+        try {
+          const snap = await getDocs(fallbackQ);
+          const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as CommunityNotification));
+          return docs.sort((a, b) => (b.createdAt?.toMillis?.() || Date.now()) - (a.createdAt?.toMillis?.() || Date.now()));
+        } catch (fallbackError) { }
+      }
       console.error('[FirestoreService] Error getting notifications:', error);
       return [];
     }
@@ -1333,6 +1434,24 @@ export const firestoreService = {
       });
     } catch (error) {
       console.error(`[FirestoreService] Error adding to not interested for ${userId}:`, error);
+    }
+  },
+
+  submitFeedback: async (userId: string, username: string, message: string) => {
+    try {
+      const feedbacksRef = collection(db, 'feedbacks');
+      await addDoc(feedbacksRef, {
+        userId,
+        username,
+        message,
+        timestamp: serverTimestamp(),
+        contact: 'animorgapp@gmail.com',
+        status: 'new'
+      });
+      return true;
+    } catch (e) {
+      console.error('[Firestore] Failed to submit feedback:', e);
+      return false;
     }
   }
 };

@@ -7,12 +7,15 @@ import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { firestoreService } from '../../src/services/firebase/firestore';
 import { CommunityPostCard } from '../../src/components/features/community/CommunityPostCard';
 import { CommunityPost } from '../../src/types';
+import { useAppStore } from '../../src/store/useAppStore';
+import { getSafeTopInset } from '../../src/utils/layout';
 
 export default function SinglePostScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const theme = useThemeColors();
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const user = useAppStore(s => s.user);
 
     const [post, setPost] = useState<CommunityPost | null>(null);
     const [loading, setLoading] = useState(true);
@@ -22,7 +25,12 @@ export default function SinglePostScreen() {
             if (!id) return;
             try {
                 const data = await firestoreService.getCommunityPost(id);
-                setPost(data);
+                if (data && user) {
+                    const resolved = await firestoreService.resolveSavesForPosts(user.id, [data]);
+                    setPost(resolved[0]);
+                } else {
+                    setPost(data);
+                }
             } catch (error) {
                 console.error("Error fetching single post", error);
             } finally {
@@ -30,11 +38,11 @@ export default function SinglePostScreen() {
             }
         };
         fetchPost();
-    }, [id]);
+    }, [id, user?.id]);
 
     return (
         <View style={[styles.container, { backgroundColor: theme.background }]}>
-            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+            <View style={[styles.header, { paddingTop: getSafeTopInset(insets) + 12 }]}>
                 <TouchableOpacity
                     onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}
                     style={styles.backBtn}

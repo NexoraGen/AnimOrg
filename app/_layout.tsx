@@ -24,6 +24,17 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   /* reloading the app might cause this to error, which is ok */
 });
 
+// Suppress default web focus rings on all TextInputs for a premium app-like feel
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    textarea, input, [tabindex] {
+      outline: none !important;
+    }
+  `;
+  document.head.append(style);
+}
+
 // Native app relies on GestureHandlerRootView which is now safely initialized at the top.
 import { GestureHandlerRootView as RNGesRoot } from 'react-native-gesture-handler';
 const GestureHandlerRootView = Platform.OS === 'web' ? View : RNGesRoot;

@@ -17,7 +17,8 @@ import { spacing, borderRadius } from '../src/theme';
 import { useThemeColors } from '../src/hooks/useThemeColors';
 import { useAppStore } from '../src/store/useAppStore';
 import { AnimatedScreen } from '../src/components/layout/AnimatedScreen';
-import { GlassHeader } from '../src/components/ui/GlassHeader';
+import { GlassHeader, HEADER_HEIGHT } from '../src/components/ui';
+import { getSafeTopInset } from '../src/utils/layout';
 
 // Types
 type AnalyticsType = 'episodes' | 'hours' | 'currentStreak' | 'longestStreak';
@@ -101,21 +102,70 @@ export default function AnalyticsScreen() {
 
     const opacity = animatedValue;
 
-    // --- 1. MOCK DATA GENERATORS (used for charts and heatmaps to look professional) ---
-    const monthlyEpisodesData = [
-        { label: 'Jan', value: Math.max(3, Math.round(totalEpisodesWatched * 0.15)) },
-        { label: 'Feb', value: Math.max(10, Math.round(totalEpisodesWatched * 0.22)) },
-        { label: 'Mar', value: Math.max(6, Math.round(totalEpisodesWatched * 0.17)) },
-        { label: 'Apr', value: Math.max(12, Math.round(totalEpisodesWatched * 0.20)) },
-        { label: 'May', value: Math.max(15, Math.round(totalEpisodesWatched * 0.28)) },
-        { label: 'Jun', value: Math.max(8, Math.round(totalEpisodesWatched * 0.12)) },
-    ];
+    // --- 1. REAL DATA GENERATORS (binned by user's actual watch time) ---
 
-    const yearlyEpisodesData = [
-        { label: '2024', value: Math.max(45, Math.round(totalEpisodesWatched * 0.6)) },
-        { label: '2025', value: Math.max(78, Math.round(totalEpisodesWatched * 1.1)) },
-        { label: '2026', value: Math.max(totalEpisodesWatched, 12) },
-    ];
+    // Group animeProgress by updatedAt date
+    const monthCounts = Array(12).fill(0);
+    const yearCounts: Record<string, number> = {};
+    const activityMap: Record<string, { eps: number, titles: Set<string> }> = {};
+
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthIdx = now.getMonth();
+
+    Object.values(animeProgress).forEach((p: any) => {
+        let d = new Date();
+        if (p.updatedAt) {
+            d = p.updatedAt?.toMillis ? new Date(p.updatedAt.toMillis()) :
+                p.updatedAt?.seconds ? new Date(p.updatedAt.seconds * 1000) :
+                    new Date(p.updatedAt);
+        }
+        if (isNaN(d.getTime())) {
+            d = new Date();
+        }
+
+        const eps = p.lastWatchedEpisode || 0;
+
+        // Yearly binning
+        const year = d.getFullYear().toString();
+        yearCounts[year] = (yearCounts[year] || 0) + eps;
+
+        // Monthly binning (for current year only)
+        if (d.getFullYear() === currentYear) {
+            monthCounts[d.getMonth()] += eps;
+        }
+
+        // Daily binning for heatmap
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        if (!activityMap[dateStr]) {
+            activityMap[dateStr] = { eps: 0, titles: new Set() };
+        }
+        activityMap[dateStr].eps += eps;
+
+        const item = watchlist.find(w => w.mediaId === p.animeId);
+        if (item && item.title) {
+            activityMap[dateStr].titles.add(item.title);
+        }
+    });
+
+    const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthlyEpisodesData: { label: string, value: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+        const mIdx = (currentMonthIdx - i + 12) % 12;
+        monthlyEpisodesData.push({
+            label: monthLabels[mIdx],
+            value: monthCounts[mIdx]
+        });
+    }
+
+    const yearlyEpisodesData: { label: string, value: number }[] = [];
+    for (let i = 2; i >= 0; i--) {
+        const y = (currentYear - i).toString();
+        yearlyEpisodesData.push({
+            label: y,
+            value: yearCounts[y] || 0
+        });
+    }
 
     const watchTimeDistribution = [
         { label: 'Morning (6am - 12pm)', value: '15%', progress: 0.15, icon: 'sun' },
@@ -127,30 +177,20 @@ export default function AnalyticsScreen() {
     // Calendar Heatmap: generates dates representing past 7 weeks for scrolling display
     const generateHeatmapData = (): HeatmapDay[] => {
         const list: HeatmapDay[] = [];
-        const now = new Date();
         // 7 weeks = 49 days
         for (let i = 48; i >= 0; i--) {
             const d = new Date(now);
             d.setDate(now.getDate() - i);
-            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+            const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-            // Calculate random activity based on dates
-            let seed = (d.getDate() * 7 + d.getMonth() * 3) % 10;
-            let episodes = 0;
-            if (totalEpisodesWatched > 5) {
-                episodes = seed > 6 ? (isWeekend ? 5 : 2) : seed > 4 ? 1 : 0;
-            }
-
-            const titles = episodes > 0
-                ? [watchlist[seed % watchlist.length]?.title || 'Frieren: Beyond Journey\'s End']
-                : [];
+            const activity = activityMap[dateStr] || { eps: 0, titles: new Set() };
 
             list.push({
-                date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                date: dateStr,
                 dayOfWeek: d.getDay(),
-                episodes,
-                hours: Math.round(episodes * 23 / 60 * 10) / 10,
-                titles
+                episodes: activity.eps,
+                hours: Math.round(activity.eps * 24 / 60 * 10) / 10, // Assuming avg 24min/ep
+                titles: Array.from(activity.titles)
             });
         }
         return list;
@@ -533,7 +573,10 @@ export default function AnalyticsScreen() {
 
             <ScrollView
                 style={styles.contentView}
-                contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
+                contentContainerStyle={{
+                    paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT + spacing.md,
+                    paddingBottom: insets.bottom + spacing.xl
+                }}
                 showsVerticalScrollIndicator={false}
             >
                 {/* SEGMENTED TAB SWAPPER */}

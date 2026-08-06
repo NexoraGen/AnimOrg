@@ -42,6 +42,7 @@ export default function CollectionDetailsScreen() {
     const collections = useAppStore(state => state.collections);
     const watchlist = useAppStore(state => state.watchlist);
     const deleteCollectionAction = useAppStore(state => state.deleteCollectionAction);
+    const updateCollectionAction = useAppStore(state => state.updateCollectionAction);
     const reorderCollectionAnimeAction = useAppStore(state => state.reorderCollectionAnimeAction);
     const removeAnimeFromCollectionAction = useAppStore(state => state.removeAnimeFromCollectionAction);
 
@@ -57,24 +58,6 @@ export default function CollectionDetailsScreen() {
         return collections.find(c => c.id === id);
     }, [collections, id]);
 
-    // If collection deleted, exit
-    if (!collection) {
-        return (
-            <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
-                <GlassHeader
-                    title="Not Found"
-                    leftComponent={
-                        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
-                            <Feather name="chevron-left" size={24} color={themeColors.text} />
-                        </TouchableOpacity>
-                    }
-                />
-                <View style={styles.errorContainer}>
-                    <Text style={[styles.errorText, { color: 'white' }]}>Collection not found or has been deleted.</Text>
-                </View>
-            </AnimatedScreen>
-        );
-    }
 
     const [collectionItems, setCollectionItems] = React.useState<CollectionItem[]>([]);
     const [isLoadingItems, setIsLoadingItems] = React.useState(true);
@@ -128,11 +111,12 @@ export default function CollectionDetailsScreen() {
     }, [collectionItems, searchQuery, sortBy, collection]);
     useEffect(() => {
         if (!isLoadingItems && collection && collectionItems.length !== (collection.itemCount || 0)) {
-            CollectionService.updateCollection(collection.id, { itemCount: collectionItems.length });
+            updateCollectionAction(collection.id, { itemCount: collectionItems.length });
         }
-    }, [isLoadingItems, collectionItems.length, collection?.itemCount]);
+    }, [isLoadingItems, collectionItems.length, collection?.itemCount, updateCollectionAction, collection?.id]);
 
     const handleDeleteCollection = async () => {
+        if (!collection) return;
         router.replace('/category/continue-watching');
         try {
             router.replace('/collections');
@@ -142,12 +126,14 @@ export default function CollectionDetailsScreen() {
 
     const handleRemoveAnime = async (animeId: string, title: string) => {
         // Optimistic mutation guarantees immediate visuals
+        if (!collection) return;
         setCollectionItems(prev => prev.filter(a => String(a.animeId) !== String(animeId)));
         await removeAnimeFromCollectionAction(collection.id, animeId);
     };
 
     // Reordering helpers
     const handleMoveUp = async (index: number) => {
+        if (!collection) return;
         if (index === 0) return;
         const newOrder = [...(collection.animeIds || [])];
         const temp = newOrder[index];
@@ -157,6 +143,7 @@ export default function CollectionDetailsScreen() {
     };
 
     const handleMoveDown = async (index: number) => {
+        if (!collection) return;
         const orderLen = (collection.animeIds || []).length;
         if (index === orderLen - 1) return;
         const newOrder = [...(collection.animeIds || [])];
@@ -171,10 +158,10 @@ export default function CollectionDetailsScreen() {
             version: '1.0.0',
             exportedAt: new Date().toISOString(),
             metadata: {
-                name: collection.name,
-                description: collection.description || '',
-                emoji: collection.emoji || '📂',
-                coverImage: collection.coverImage || '',
+                name: collection?.name || '',
+                description: collection?.description || '',
+                emoji: collection?.emoji || '📂',
+                coverImage: collection?.coverImage || '',
             },
             animeList: collectionItems.map(item => ({
                 id: item.animeId,
@@ -184,6 +171,25 @@ export default function CollectionDetailsScreen() {
         };
         return JSON.stringify(blueprint, null, 2);
     }, [collection, collectionItems]);
+
+    // If collection deleted, exit (must be checked after all hooks to prevent React hook mismatch crashes)
+    if (!collection) {
+        return (
+            <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
+                <GlassHeader
+                    title="Not Found"
+                    leftComponent={
+                        <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
+                            <Feather name="chevron-left" size={24} color={themeColors.text} />
+                        </TouchableOpacity>
+                    }
+                />
+                <View style={styles.errorContainer}>
+                    <Text style={[styles.errorText, { color: 'white' }]}>Collection not found or has been deleted.</Text>
+                </View>
+            </AnimatedScreen>
+        );
+    }
 
     return (
         <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>

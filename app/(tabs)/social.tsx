@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { collection, query, where, getDocs, updateDoc, onSnapshot, orderBy, limit, collectionGroup, startAfter } from 'firebase/firestore';
 import { db } from '../../src/services/firebase/config';
 
@@ -37,6 +38,7 @@ import { firestoreService } from '../../src/services/firebase/firestore';
 import { PostComposer } from '../../src/components/features/community/PostComposer';
 import { ActivityFeedCard } from '../../src/components/community/ActivityFeedCard';
 import { useAppStore } from '../../src/store/useAppStore';
+import { getHeaderContentTopOffset } from '../../src/utils/layout';
 
 const { width } = Dimensions.get('window');
 
@@ -51,6 +53,7 @@ interface SocialTabFeedProps {
     handleAuthRequired: () => void;
     handleProfilePress: (id: string) => void;
     handleAnimePress: (id: string) => void;
+    onDiscoverUsers: () => void;
 }
 
 const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
@@ -61,7 +64,8 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
     getFavoriteGenres,
     handleAuthRequired,
     handleProfilePress,
-    handleAnimePress
+    handleAnimePress,
+    onDiscoverUsers
 }) => {
     const theme = useThemeColors();
     const insets = useSafeAreaInsets();
@@ -73,6 +77,14 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
     const [lastVisible, setLastVisible] = useState<any>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [hasLoaded, setHasLoaded] = useState(false);
+    const [isOffline, setIsOffline] = useState(false);
+
+    useEffect(() => {
+        if (!hasLoaded && tabName === currentActiveTab && !isLoading) {
+            setHasLoaded(true);
+            fetchFeed(false);
+        }
+    }, [currentActiveTab, hasLoaded, tabName]);
 
     const fetchFeed = async (isLoadMore = false) => {
         if (!isLoadMore) {
@@ -92,135 +104,197 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                 'Recommendations': 'recommendation',
             };
 
-            if (tabName === 'For You') {
-                q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
-                if (isLoadMore && lastVisible) {
-                    q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(limitCount));
-                }
-            } else if (tabName === 'Friend Activity') {
-                const followedIds = await firestoreService.getUserFollowing(user?.id || '');
-                if (followedIds.length === 0) {
-                    setPosts([]);
-                    setHasMore(false);
-                    return;
-                }
-                const chunkedIds = followedIds.slice(0, 10);
-                const activitiesRef = collectionGroup(db, 'activities');
-                q = query(activitiesRef, where('userId', 'in', chunkedIds), orderBy('timestamp', 'desc'), limit(limitCount));
-                if (isLoadMore && lastVisible) {
-                    q = query(activitiesRef, where('userId', 'in', chunkedIds), orderBy('timestamp', 'desc'), startAfter(lastVisible), limit(limitCount));
-                }
-            } else if (TAB_TO_CATEGORY[tabName]) {
-                const cat = TAB_TO_CATEGORY[tabName];
-                q = query(postsRef, where('category', '==', cat), limit(limitCount));
-                if (isLoadMore && lastVisible) {
-                    q = query(postsRef, where('category', '==', cat), startAfter(lastVisible), limit(limitCount));
-                }
-            } else {
-                q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
-            }
-
             const timeoutPromise = new Promise<any>((_, reject) => {
                 setTimeout(() => reject(new Error("Social feed fetching timed out.")), 8000);
             });
-            let snapshot = await Promise.race([getDocs(q), timeoutPromise]);
 
-            // Fallback for empty For You feed (e.g. legacy posts missing createdAt)
-            if (snapshot.empty && !isLoadMore && tabName === 'For You') {
-                console.log("[SocialFeed] For You feed empty using orderBy createdAt desc, falling back to unordered fetch for older posts");
-                q = query(postsRef, limit(limitCount));
-                snapshot = await Promise.race([getDocs(q), timeoutPromise]);
-            }
+            let finalPosts: any[] = [];
+            let newCursors: any = { ...(lastVisible || {}) };
+            let hasMoreLocal = false;
 
-            const fetchedPosts = snapshot.docs.map((doc: any) => {
-                const data = doc.data() as any;
-                // We no longer trigger aggressive backend updateDoc writes during frontend queries to prevent severe network bottlenecks on load. We grace-fallback to 'discussion' in memory.
-                if (!data.category) {
-                    data.category = 'discussion';
-                }
-                return { id: doc.id, ...data };
-            });
-
-            if (tabName === 'Friend Activity') {
-                fetchedPosts.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
-            }
-
-            let finalPosts = fetchedPosts;
             if (tabName === 'For You') {
+                const followingIds = user?.id ? await firestoreService.getUserFollowing(user.id) : [];
+
+                const qTrending = newCursors.trending
+                    ? query(postsRef, orderBy('engagementScore', 'desc'), startAfter(newCursors.trending), limit(8))
+                    : query(postsRef, orderBy('engagementScore', 'desc'), limit(8));
+
+                const qRecent = newCursors.recent
+                    ? query(postsRef, orderBy('createdAt', 'desc'), startAfter(newCursors.recent), limit(8))
+                    : query(postsRef, orderBy('createdAt', 'desc'), limit(8));
+
+                let qFollowing = null;
+                if (followingIds.length > 0) {
+                    const chunkedFollows = followingIds.slice(0, 30);
+                    qFollowing = newCursors.following
+                        ? query(postsRef, where('userId', 'in', chunkedFollows), orderBy('createdAt', 'desc'), startAfter(newCursors.following), limit(5))
+                        : query(postsRef, where('userId', 'in', chunkedFollows), orderBy('createdAt', 'desc'), limit(5));
+                }
+
+                const promises = [
+                    Promise.race([getDocs(qTrending), timeoutPromise]).catch(() => ({ docs: [] })),
+                    Promise.race([getDocs(qRecent), timeoutPromise]).catch(() => ({ docs: [] }))
+                ];
+                if (qFollowing) {
+                    const chunkedFollows = followingIds.slice(0, 30);
+                    const fallbackQ = query(postsRef, where('userId', 'in', chunkedFollows), limit(15));
+                    const followingPromise = Promise.race([getDocs(qFollowing), timeoutPromise]).catch((e) => {
+                        if (String(e).includes('index') || String(e).includes('failed-precondition')) {
+                            return Promise.race([getDocs(fallbackQ), timeoutPromise]).then(snap => {
+                                let docs = snap.docs;
+                                docs.sort((a: any, b: any) => (b.data().createdAt?.toMillis?.() || Date.now()) - (a.data().createdAt?.toMillis?.() || Date.now()));
+                                return { docs: docs.slice(0, 5) };
+                            });
+                        }
+                        return { docs: [] };
+                    }).catch(() => ({ docs: [] }));
+                    promises.push(followingPromise);
+                }
+
+                const results = await Promise.all(promises);
+
+                const trendingDocs = results[0].docs;
+                const recentDocs = results[1].docs;
+                const followingDocs = qFollowing ? results[2].docs : [];
+
+                if (trendingDocs.length > 0) newCursors.trending = trendingDocs[trendingDocs.length - 1];
+                if (recentDocs.length > 0) newCursors.recent = recentDocs[recentDocs.length - 1];
+                if (followingDocs.length > 0) newCursors.following = followingDocs[followingDocs.length - 1];
+
+                const allDocs = [...trendingDocs, ...recentDocs, ...followingDocs];
+
+                const uniqueDocs = Array.from(new Map(allDocs.map(item => [item.id, item])).values());
+                hasMoreLocal = trendingDocs.length === 8 || recentDocs.length === 8 || followingDocs.length === 5;
+
+                const fetched = uniqueDocs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+
                 const favGenres = getFavoriteGenres() || [];
                 const userWatchlist = watchlist || [];
 
-                const scored = fetchedPosts.map(post => {
+                finalPosts = fetched.map(post => {
                     let score = 0;
                     const createdAt = post.createdAt?.toDate ? post.createdAt.toDate() : new Date(post.createdAt || Date.now());
                     const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-                    const recencyBoost = Math.max(0, 10 - hoursOld * 0.2);
-                    score += recencyBoost;
+                    score += Math.max(0, 10 - hoursOld * 0.2);
 
-                    const engagement = (post.likes || 0) * 2 + (post.comments || 0) * 3 + (post.shares || 0) * 5;
-                    score += engagement;
+                    score += (post.likes || 0) * 2 + (post.comments || 0) * 3 + (post.shares || 0) * 5;
 
                     if (user) {
+                        if (post.userId && followingIds.includes(post.userId)) score += 5;
+
                         if (post.animeId) {
-                            const watchlistEntry = userWatchlist.find(item => String(item.mediaId) === String(post.animeId));
-                            if (watchlistEntry) {
+                            const wEntry = userWatchlist.find(i => String(i.mediaId) === String(post.animeId));
+                            if (wEntry) {
                                 score += 15;
-                                if (watchlistEntry.status === 'watching') score += 10;
-                                if (watchlistEntry.isFavorite) score += 15;
+                                if (wEntry.status === 'watching') score += 10;
+                                if (wEntry.isFavorite) score += 15;
                             }
                         }
-
                         if (post.hashtags && post.hashtags.length > 0) {
-                            const matchingGenres = post.hashtags.filter((tag: string) =>
-                                favGenres.some(fg => fg.toLowerCase() === tag.toLowerCase())
-                            );
-                            score += matchingGenres.length * 5;
+                            const matching = post.hashtags.filter((t: string) => favGenres.some((fg: string) => fg.toLowerCase() === t.toLowerCase()));
+                            score += matching.length * 5;
                         }
-
-                        const contentLower = (post.content || '').toLowerCase();
-                        userWatchlist.forEach(item => {
-                            if (item.title && contentLower.includes(item.title.toLowerCase())) {
-                                score += 8;
-                            }
-                        });
                     }
-
                     score += Math.random() * 5;
-                    return { ...post, recommendationScore: score };
+                    return { ...post, category: post.category || 'discussion', recommendationScore: score };
                 });
 
-                scored.sort((a, b) => (b.recommendationScore || 0) - (a.recommendationScore || 0));
-                finalPosts = scored;
+                let prevUserId: string | null = null;
+                let consecutiveCount = 0;
+                finalPosts = finalPosts.sort((a, b) => b.recommendationScore - a.recommendationScore).map(post => {
+                    if (post.userId === prevUserId) {
+                        consecutiveCount++;
+                        post.recommendationScore -= (consecutiveCount * 15);
+                    } else {
+                        consecutiveCount = 0;
+                        prevUserId = post.userId;
+                    }
+                    return post;
+                }).sort((a, b) => b.recommendationScore - a.recommendationScore); // Resort after penalties
+
+            } else if (tabName === 'Friend Activity') {
+                const mutualIds = await firestoreService.getMutualFriends(user?.id || '');
+                if (mutualIds.length === 0) {
+                    setPosts([]);
+                    setHasMore(false);
+                    setIsLoading(false);
+                    setRefreshing(false);
+                    return;
+                }
+                const chunkedIds = mutualIds.slice(0, 30);
+
+                let qFriend = newCursors.friend
+                    ? query(postsRef, where('userId', 'in', chunkedIds), orderBy('createdAt', 'desc'), startAfter(newCursors.friend), limit(limitCount))
+                    : query(postsRef, where('userId', 'in', chunkedIds), orderBy('createdAt', 'desc'), limit(limitCount));
+
+                let snapshotDocs: any[] = [];
+                try {
+                    const snap = await Promise.race([getDocs(qFriend), timeoutPromise]);
+                    snapshotDocs = snap.docs;
+                } catch (e: any) {
+                    if (String(e).includes('index') || String(e).includes('failed-precondition')) {
+                        const fallbackQ = query(postsRef, where('userId', 'in', chunkedIds), limit(limitCount * 2));
+                        const snap = await Promise.race([getDocs(fallbackQ), timeoutPromise]);
+                        snapshotDocs = snap.docs;
+                        snapshotDocs.sort((a: any, b: any) => (b.data().createdAt?.toMillis?.() || Date.now()) - (a.data().createdAt?.toMillis?.() || Date.now()));
+                        snapshotDocs = snapshotDocs.slice(0, limitCount);
+                    } else {
+                        throw e;
+                    }
+                }
+
+                if (snapshotDocs.length > 0) newCursors.friend = snapshotDocs[snapshotDocs.length - 1];
+
+                const fetched = snapshotDocs.map((doc: any) => ({ id: doc.id, ...doc.data(), category: doc.data().category || 'discussion' }));
+                finalPosts = fetched;
+                hasMoreLocal = snapshotDocs.length >= limitCount;
+
+            } else {
+                const cat = TAB_TO_CATEGORY[tabName];
+                if (cat) {
+                    q = query(postsRef, where('category', '==', cat), orderBy('createdAt', 'desc'), limit(limitCount));
+                    if (isLoadMore && newCursors?.default) {
+                        q = query(postsRef, where('category', '==', cat), orderBy('createdAt', 'desc'), startAfter(newCursors.default), limit(limitCount));
+                    }
+                } else {
+                    q = query(postsRef, orderBy('createdAt', 'desc'), limit(limitCount));
+                    if (isLoadMore && newCursors?.default) {
+                        q = query(postsRef, orderBy('createdAt', 'desc'), startAfter(newCursors.default), limit(limitCount));
+                    }
+                }
+                let snapshot = await Promise.race([getDocs(q), timeoutPromise]);
+                if (snapshot.docs.length > 0) newCursors.default = snapshot.docs[snapshot.docs.length - 1];
+                finalPosts = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data(), category: doc.data().category || 'discussion' }));
+                hasMoreLocal = snapshot.docs.length >= limitCount;
             }
 
-            // Resolve likes and saves in PARALLEL to massively drop sequential network lag!
+            if (isLoadMore) {
+                const existingIds = new Set(posts.map(p => p.id));
+                finalPosts = finalPosts.filter(p => !existingIds.has(p.id));
+            }
+
             let resolvedFinalPosts = finalPosts.map(p => ({ ...p, isLiked: false, isSaved: false }));
 
-            // 🚀 RENDER UI IMMEDIATELY 🚀 
             if (isLoadMore) {
                 setPosts(prev => [...prev, ...resolvedFinalPosts]);
             } else {
                 setPosts(resolvedFinalPosts);
+                setIsOffline(false);
+                const CACHE_KEY = `feed_cache_${tabName}_${user?.id || 'guest'}`;
+                AsyncStorage.setItem(CACHE_KEY, JSON.stringify(resolvedFinalPosts)).catch(() => { });
             }
 
-            if (snapshot.docs.length > 0) {
-                setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-            }
-            setHasMore(snapshot.docs.length >= limitCount);
-
-            // Drop spinner instantly!
+            setLastVisible(newCursors);
+            setHasMore(hasMoreLocal);
             setIsLoading(false);
             setRefreshing(false);
 
-            // 👻 RESOLVE IN BACKGROUND 👻
             if (user && finalPosts.length > 0) {
                 try {
                     const [resolvedLikes, resolvedSaves] = await Promise.all([
                         firestoreService.resolveLikesForPosts(user.id, finalPosts),
                         firestoreService.resolveSavesForPosts(user.id, finalPosts)
                     ]);
-
-                    // Merge parallel results 
                     const fullyResolved = finalPosts.map(post => {
                         const likeObj = resolvedLikes.find(p => p.id === post.id);
                         const saveObj = resolvedSaves.find(p => p.id === post.id);
@@ -230,8 +304,6 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
                             isSaved: saveObj ? saveObj.isSaved : false
                         };
                     });
-
-                    // Silently patch UI
                     setPosts(prev => prev.map(p => {
                         const r = fullyResolved.find(f => f.id === p.id);
                         return r ? { ...p, isLiked: r.isLiked, isSaved: r.isSaved } : p;
@@ -242,24 +314,15 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
             }
         } catch (error) {
             console.error('[Feed Fetch] error:', error);
-            if (!isLoadMore) setPosts([]);
+            if (!isLoadMore && posts.length > 0) {
+                setIsOffline(true);
+            } else if (!isLoadMore) {
+                setPosts([]);
+            }
             setIsLoading(false);
             setRefreshing(false);
         }
     };
-
-    useEffect(() => {
-        if (tabName === currentActiveTab && !hasLoaded) {
-            setHasLoaded(true);
-            fetchFeed(false);
-        }
-    }, [tabName, currentActiveTab, hasLoaded]);
-
-    useEffect(() => {
-        if (hasLoaded) {
-            fetchFeed(false);
-        }
-    }, [user]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -274,67 +337,90 @@ const SocialTabFeed: React.FC<SocialTabFeedProps> = React.memo(({
     };
 
     return (
-        <FlashList<CommunityPost>
-            {...{ estimatedItemSize: 200 } as any}
-            data={posts}
-            decelerationRate="fast"
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => {
-                if (tabName === 'Friend Activity' || ('timestamp' in item && 'type' in item && ['rated', 'reviewed', 'favorited', 'added', 'follow', 'watched'].includes(item.type as string))) {
-                    return <ActivityFeedCard activity={item as any} onPressProfile={handleProfilePress} onPressAnime={handleAnimePress} />;
-                }
-                return (
-                    <CommunityPostCard
-                        post={item as any}
-                        onPress={() => router.push(`/post/${item.id}`)}
-                        onAuthRequired={handleAuthRequired}
-                        onPressProfile={handleProfilePress}
-                        onPostUpdated={(updatedPost) => {
-                            setPosts((prev) =>
-                                prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
-                            );
-                        }}
-                        onPostDeleted={(postId) => {
-                            setPosts((prev) => prev.filter((p) => p.id !== postId));
-                        }}
+        <>
+            {isOffline && (
+                <View style={{ backgroundColor: theme.primary + '20', padding: 8, marginHorizontal: spacing.M, marginTop: spacing.S, borderRadius: 8, alignItems: 'center' }}>
+                    <Text style={{ color: theme.primary, fontSize: 12, fontWeight: 'bold' }}>Showing cached posts. Reconnecting...</Text>
+                </View>
+            )}
+            <FlashList<CommunityPost>
+                {...{ estimatedItemSize: 200 } as any}
+                data={posts}
+                decelerationRate="fast"
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => {
+                    if ('timestamp' in item && 'type' in item && ['rated', 'reviewed', 'favorited', 'added', 'follow', 'watched'].includes(item.type as string)) {
+                        return <ActivityFeedCard activity={item as any} onPressProfile={handleProfilePress} onPressAnime={handleAnimePress} />;
+                    }
+                    return (
+                        <CommunityPostCard
+                            post={item as any}
+                            onPress={() => router.push(`/post/${item.id}`)}
+                            onAuthRequired={handleAuthRequired}
+                            onPressProfile={handleProfilePress}
+                            onPostUpdated={(updatedPost) => {
+                                setPosts((prev) =>
+                                    prev.map((p) => (p.id === updatedPost.id ? updatedPost : p))
+                                );
+                            }}
+                            onPostDeleted={(postId) => {
+                                setPosts((prev) => prev.filter((p) => p.id !== postId));
+                            }}
+                        />
+                    );
+                }}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={[
+                    styles.listContent,
+                    { paddingTop: spacing.M }
+                ]}
+                onEndReached={onLoadMore}
+                onEndReachedThreshold={0.5}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={theme.primary}
+                        progressViewOffset={10}
                     />
-                );
-            }}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={[
-                styles.listContent,
-                { paddingTop: spacing.M }
-            ]}
-            onEndReached={onLoadMore}
-            onEndReachedThreshold={0.5}
-            refreshControl={
-                <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    tintColor={theme.primary}
-                    progressViewOffset={10}
-                />
-            }
-            ListEmptyComponent={
-                isLoading ? (
-                    <View style={styles.emptyContainer}>
-                        <ActivityIndicator color={theme.primary} size="large" />
-                    </View>
-                ) : (
-                    <View style={styles.emptyContainer}>
-                        <Feather name="coffee" size={48} color={theme.textDim} />
-                        <Text style={[styles.emptyText, { color: theme.textDim }]}>
-                            No discussions yet. Start one!
-                        </Text>
-                    </View>
-                )
-            }
-            ListFooterComponent={
-                isLoading && posts.length > 0 ? (
-                    <ActivityIndicator style={{ paddingVertical: 20 }} color={theme.primary} />
-                ) : <View style={{ height: 100 }} />
-            }
-        />
+                }
+                ListEmptyComponent={
+                    isLoading && !refreshing ? (
+                        <View style={styles.emptyContainer}>
+                            <ActivityIndicator color={theme.primary} size="large" />
+                        </View>
+                    ) : tabName === 'Friend Activity' ? (
+                        <View style={styles.emptyContainer}>
+                            <Feather name="users" size={60} color={theme.primary} style={{ opacity: 0.8, marginBottom: 16 }} />
+                            <Text style={[styles.emptyText, { color: theme.text, fontSize: 18, fontWeight: '700', opacity: 1, marginBottom: 8 }]}>
+                                No activity from friends yet
+                            </Text>
+                            <Text style={[styles.emptyText, { color: theme.textDim, marginBottom: 24, marginTop: 0 }]}>
+                                Mutual followers' posts will appear here. Find people to follow and build your community!
+                            </Text>
+                            <TouchableOpacity
+                                style={{ backgroundColor: theme.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20 }}
+                                onPress={onDiscoverUsers}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Discover Users</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <View style={styles.emptyContainer}>
+                            <Feather name="coffee" size={48} color={theme.textDim} />
+                            <Text style={[styles.emptyText, { color: theme.textDim }]}>
+                                No discussions yet. Start one!
+                            </Text>
+                        </View>
+                    )
+                }
+                ListFooterComponent={
+                    isLoading && posts.length > 0 ? (
+                        <ActivityIndicator style={{ paddingVertical: 20 }} color={theme.primary} />
+                    ) : <View style={{ height: 100 + Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0) }} />
+                }
+            />
+        </>
     );
 });
 
@@ -439,7 +525,7 @@ export default function SocialScreen() {
             />
 
             {!showSearchView && (
-                <View style={{ flex: 1, paddingTop: insets.top + HEADER_HEIGHT }}>
+                <View style={{ flex: 1, paddingTop: getHeaderContentTopOffset(insets) }}>
                     <SwipeableTabs
                         tabs={TABS}
                         activeTab={activeTab}
@@ -456,6 +542,7 @@ export default function SocialScreen() {
                                 handleAuthRequired={handleAuthRequired}
                                 handleProfilePress={handleProfilePress}
                                 handleAnimePress={handleAnimePress}
+                                onDiscoverUsers={() => setShowSearchView(true)}
                             />
                         ))}
                     </SwipeableTabs>
@@ -463,7 +550,7 @@ export default function SocialScreen() {
             )}
 
             {showSearchView && (
-                <View style={[styles.listContent, { paddingTop: insets.top + HEADER_HEIGHT + 20, flex: 1 }]}>
+                <View style={[styles.listContent, { paddingTop: getHeaderContentTopOffset(insets, 20), flex: 1 }]}>
                     <View style={[styles.searchBox, { backgroundColor: theme.surfaceVariant, borderColor: theme.border }]}>
                         <Feather name="search" size={20} color={theme.textDim} />
                         <TextInput
@@ -508,7 +595,7 @@ export default function SocialScreen() {
             )}
 
             <TouchableOpacity
-                style={[styles.fab, { backgroundColor: theme.primary, bottom: insets.bottom + 20 }]}
+                style={[styles.fab, { backgroundColor: theme.primary, bottom: Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0) + 20 }]}
                 onPress={() => {
                     if (!handleAuthGuard()) return;
                     router.push('/create-post');

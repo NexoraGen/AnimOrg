@@ -39,6 +39,12 @@ export default function NotificationsScreen() {
         try {
             const data = await firestoreService.getNotifications(user.id);
             setNotifications(data);
+
+            const unreadIds = data.filter(n => !n.read).map(n => n.id);
+            if (unreadIds.length > 0) {
+                // Clear the red dot globally without blocking interaction
+                unreadIds.forEach(id => firestoreService.markNotificationRead(id).catch(() => { }));
+            }
         } catch (error) {
             console.error('[NotificationsScreen] Failed to load notifications:', error);
         } finally {

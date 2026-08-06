@@ -30,8 +30,8 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, 
       styles.tabBar,
       {
         backgroundColor: themeColors.surface,
-        height: 64 + insets.bottom,
-        paddingBottom: insets.bottom,
+        height: 64 + Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0),
+        paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 0),
       }
     ]}>
       {state.routes.map((route, index) => {

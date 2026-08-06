@@ -189,23 +189,22 @@ export default function OnboardingScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         try {
-            // Execute the robust Firestore atomic transaction profile update
-            await firestoreService.updateUserProfile(user.id, {
+            // ONLY execute ONE atomic transaction update to prevent 3-second UI hangs!
+            const userUpdate = {
                 username: username,
                 email: user.email || '',
                 timezone: timezone.trim(),
                 hasCompletedOnboarding: true,
                 usernameClaimed: true
-            });
+            };
 
-            // IMMEDIATELY update local store so routing guard sees completed state
-            // This prevents the race condition where the guard re-fires before Firestore syncs
-            await updateProfile({
-                username: username,
-                timezone: timezone.trim(),
-                hasCompletedOnboarding: true,
-                usernameClaimed: true
-            });
+            await firestoreService.updateUserProfile(user.id, userUpdate);
+
+            // Optimistic instant state update out of the event loop to let the layout route them to /home instantly.
+            // DO NOT use updateProfile() here because it retriggers an identical, slow Firestore transaction block.
+            useAppStore.setState(state => ({
+                user: state.user ? { ...state.user, ...userUpdate } as any : null
+            }));
 
             // Async: fetch refreshed profile in background to get any server-side fields
             firestoreService.getUserProfile(user.id).then(refreshedProfile => {

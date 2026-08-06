@@ -156,6 +156,8 @@ class ProfileLoadingManager {
         // Wait for all to settle, completely isolated from main initialization flow.
         await Promise.allSettled(promises);
 
+        useAppStore.getState().setIsSecondaryDataLoaded(true);
+
         console.log(`[ProfileLoadingManager] Background fetch completed for user: ${userId}`);
         this.isFetching = false;
     }

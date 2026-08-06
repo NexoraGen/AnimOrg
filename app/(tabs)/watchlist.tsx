@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { colors, spacing, typography } from '../../src/theme';
 import { GlassHeader, PosterCard, HEADER_HEIGHT, Button } from '../../src/components/ui';
+import { getHeaderContentTopOffset } from '../../src/utils/layout';
 import { AnimatedScreen } from '../../src/components/layout/AnimatedScreen';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useRouter } from 'expo-router';
@@ -166,7 +167,7 @@ export default function WatchlistScreen() {
     <AnimatedScreen style={[styles.container, { backgroundColor: themeColors.background }]}>
       <GlassHeader title="My Watchlist" showLogo={true} />
 
-      <View style={{ flex: 1, paddingTop: insets.top + HEADER_HEIGHT }}>
+      <View style={{ flex: 1, paddingTop: getHeaderContentTopOffset(insets) }}>
         <SwipeableTabs
           tabs={TABS.map(t => t.label)}
           activeTab={TABS.find(t => t.id === activeTab)?.label || 'All'}
@@ -229,7 +230,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   cardContainer: {
     marginBottom: spacing.md,

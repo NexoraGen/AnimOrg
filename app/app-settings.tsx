@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, FlatList, Modal, TextInput, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Alert, FlatList, Modal, TextInput, AppState, Linking, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -45,12 +45,25 @@ export default function AppSettingsScreen() {
   const [timezoneModalVisible, setTimezoneModalVisible] = React.useState(false);
   const [searchText, setSearchText] = React.useState('');
 
+  const [feedbackModalVisible, setFeedbackModalVisible] = React.useState(false);
+  const [feedbackType, setFeedbackType] = React.useState<'playstore' | 'mail' | null>(null);
+  const [feedbackText, setFeedbackText] = React.useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = React.useState(false);
+
   const [permissionStatus, setPermissionStatus] = React.useState<'unknown' | 'granted' | 'denied' | 'blocked'>('unknown');
 
   const checkPermission = React.useCallback(async () => {
     const status = await notificationPermission.getPermissionStatus();
     setPermissionStatus(status);
   }, []);
+
+  const [localQuietStart, setLocalQuietStart] = React.useState(notificationSettings?.quietHoursStart || '22:00');
+  const [localQuietEnd, setLocalQuietEnd] = React.useState(notificationSettings?.quietHoursEnd || '08:00');
+
+  React.useEffect(() => {
+    setLocalQuietStart(notificationSettings?.quietHoursStart || '22:00');
+    setLocalQuietEnd(notificationSettings?.quietHoursEnd || '08:00');
+  }, [notificationSettings?.quietHoursStart, notificationSettings?.quietHoursEnd]);
 
   React.useEffect(() => {
     checkPermission();
@@ -117,6 +130,21 @@ export default function AppSettingsScreen() {
           { text: "Clear", style: "destructive", onPress: clearRecentlyViewed }
         ]
       );
+    }
+  };
+
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackText.trim()) return;
+    setIsSubmittingFeedback(true);
+    await firestoreService.submitFeedback(user?.id || 'guest', user?.username || 'Guest', feedbackText);
+    setIsSubmittingFeedback(false);
+    setFeedbackModalVisible(false);
+    setFeedbackText('');
+    setFeedbackType(null);
+    if (Platform.OS === 'web') {
+      alert("Thank you for your feedback! It has been automatically sent to animorgapp@gmail.com.");
+    } else {
+      Alert.alert("Feedback Sent", "Thank you for your feedback! It has been automatically sent to animorgapp@gmail.com.");
     }
   };
 
@@ -328,8 +356,9 @@ export default function AppSettingsScreen() {
                       textAlign: 'center',
                       fontSize: 14
                     }}
-                    value={notificationSettings?.quietHoursStart || '22:00'}
-                    onChangeText={(val) => updateNotificationSettings({ quietHoursStart: val })}
+                    value={localQuietStart}
+                    onChangeText={setLocalQuietStart}
+                    onEndEditing={() => updateNotificationSettings({ quietHoursStart: localQuietStart })}
                     placeholder="22:00"
                     placeholderTextColor={themeColors.textDim}
                   />
@@ -347,8 +376,9 @@ export default function AppSettingsScreen() {
                       textAlign: 'center',
                       fontSize: 14
                     }}
-                    value={notificationSettings?.quietHoursEnd || '08:00'}
-                    onChangeText={(val) => updateNotificationSettings({ quietHoursEnd: val })}
+                    value={localQuietEnd}
+                    onChangeText={setLocalQuietEnd}
+                    onEndEditing={() => updateNotificationSettings({ quietHoursEnd: localQuietEnd })}
                     placeholder="08:00"
                     placeholderTextColor={themeColors.textDim}
                   />
@@ -406,7 +436,6 @@ export default function AppSettingsScreen() {
             triggerHaptic();
             if (user?.id) {
               updateProfile({ timeFormat: nextVal ? '24h' : '12h' });
-              firestoreService.updateUserProfile(user.id, { timeFormat: nextVal ? '24h' : '12h' });
             }
           })}
         </View>
@@ -476,7 +505,11 @@ export default function AppSettingsScreen() {
             </View>
             <Text style={[styles.rowValue, { color: themeColors.textDim }]}>{APP_VERSION}</Text>
           </View>
-          {renderAction('Send Feedback', 'message-square', () => { triggerHaptic(); })}
+          {renderAction('Send Feedback', 'message-square', () => {
+            triggerHaptic();
+            setFeedbackType(null);
+            setFeedbackModalVisible(true);
+          })}
         </View>
 
       </ScrollView>
@@ -578,13 +611,6 @@ export default function AppSettingsScreen() {
                         timezoneLabel: item.label,
                         country: item.country
                       });
-                      if (user?.id) {
-                        firestoreService.updateUserProfile(user.id, {
-                          timezone: item.id,
-                          timezoneLabel: item.label,
-                          country: item.country
-                        });
-                      }
                       setTimezoneModalVisible(false);
                       setSearchText('');
                     }}
@@ -611,6 +637,103 @@ export default function AppSettingsScreen() {
                 );
               }}
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- FEEDBACK MODAL --- */}
+      <Modal
+        visible={feedbackModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setFeedbackModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalDismissOverlay}
+            activeOpacity={1}
+            onPress={() => setFeedbackModalVisible(false)}
+          />
+          <View style={[styles.modalContent, { backgroundColor: '#131317' }]}>
+            <View style={styles.modalDragHandle} />
+
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Send Feedback</Text>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setFeedbackModalVisible(false)}>
+                <Feather name="x" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            {!feedbackType ? (
+              <View style={{ gap: spacing.md, paddingVertical: spacing.md }}>
+                <TouchableOpacity
+                  style={[styles.feedbackOptionCard, { backgroundColor: themeColors.surfaceVariant }]}
+                  onPress={() => {
+                    triggerHaptic();
+                    Linking.openURL("market://details?id=com.nexora.animorg").catch(() => {
+                      Linking.openURL("https://play.google.com/store/apps/details?id=com.nexora.animorg");
+                    });
+                    setFeedbackModalVisible(false);
+                  }}
+                >
+                  <Feather name="play" size={24} color={themeColors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.feedbackOptionTitle, { color: themeColors.text }]}>Rate on Play Store</Text>
+                    <Text style={[styles.feedbackOptionSub, { color: themeColors.textDim }]}>Love the app? Leave us a review.</Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color={themeColors.textDim} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.feedbackOptionCard, { backgroundColor: themeColors.surfaceVariant }]}
+                  onPress={() => {
+                    triggerHaptic();
+                    setFeedbackType('mail');
+                  }}
+                >
+                  <Feather name="mail" size={24} color={themeColors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.feedbackOptionTitle, { color: themeColors.text }]}>Send an Email</Text>
+                    <Text style={[styles.feedbackOptionSub, { color: themeColors.textDim }]}>Report bugs or suggest features directly.</Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color={themeColors.textDim} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={{ paddingVertical: spacing.md }}>
+                <Text style={{ color: themeColors.textDim, fontSize: 13, textTransform: 'uppercase', fontWeight: 'bold', marginBottom: 8, marginLeft: 4 }}>
+                  Message
+                </Text>
+                <TextInput
+                  style={[styles.feedbackInput, { backgroundColor: themeColors.surfaceVariant, color: themeColors.text, borderColor: themeColors.border }]}
+                  placeholder="Tell us what's on your mind... (We read everything!)"
+                  placeholderTextColor={themeColors.textDim}
+                  multiline
+                  textAlignVertical="top"
+                  value={feedbackText}
+                  onChangeText={setFeedbackText}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={[styles.feedbackSubmitBtn, { backgroundColor: themeColors.primary, opacity: (!feedbackText.trim() || isSubmittingFeedback) ? 0.5 : 1 }]}
+                  disabled={!feedbackText.trim() || isSubmittingFeedback}
+                  onPress={handleFeedbackSubmit}
+                >
+                  {isSubmittingFeedback ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Text style={styles.feedbackSubmitText}>Send Automatically</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ marginTop: 16, alignItems: 'center' }}
+                  onPress={() => setFeedbackType(null)}
+                >
+                  <Text style={{ color: themeColors.textDim, fontWeight: '600' }}>Back to options</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
           </View>
         </View>
       </Modal>
@@ -798,34 +921,64 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 8,
     borderRadius: 12,
-    marginBottom: 6,
-    height: 52,
   },
   tzFlagCol: {
     marginRight: spacing.sm,
   },
   flagBadge: {
     width: 32,
-    height: 24,
-    borderRadius: 6,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   flagText: {
-    color: 'white',
     fontSize: 10,
     fontWeight: 'bold',
-    opacity: 0.95,
+    color: 'white',
   },
   tzMetaCol: {
     flex: 1,
   },
   tzCountryCityText: {
-    fontSize: 14,
+    fontSize: 15,
     marginBottom: 2,
   },
   tzLabelText: {
-    fontSize: 11,
+    fontSize: 12,
+  },
+  feedbackOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: 16,
+    gap: spacing.md,
+  },
+  feedbackOptionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  feedbackOptionSub: {
+    fontSize: 13,
+  },
+  feedbackInput: {
+    height: 120,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: spacing.md,
+    fontSize: 15,
+  },
+  feedbackSubmitBtn: {
+    padding: spacing.md,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  feedbackSubmitText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   warningBanner: {
     flexDirection: 'row',

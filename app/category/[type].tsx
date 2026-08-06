@@ -174,10 +174,10 @@ export default function CategoryScreen() {
       />
 
       <View style={{ flex: 1, paddingTop: getSafeTopInset(insets) + HEADER_HEIGHT }}>
-        {resolvedType === 'upcoming' ? (
+        {resolvedType === 'upcoming' || resolvedType === 'ratings' ? (
           <CategoryTabFeed
             type={resolvedType}
-            sortBy="popularity"
+            sortBy="newest"
             viewMode={viewMode}
             cardWidth={cardWidth}
             numColumns={numColumns}
