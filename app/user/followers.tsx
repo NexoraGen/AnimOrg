@@ -94,11 +94,10 @@ export default function FollowersScreen() {
                     <ActivityIndicator size="large" color={theme.primary} />
                 </View>
             ) : (
-                // @ts-ignore
                 <FlashList
-                    data={users}
-                    renderItem={({ item }) => <UserSearchCard user={item} />}
-                    estimatedItemSize={70}
+                    data={users as any}
+                    renderItem={({ item }: any) => <UserSearchCard user={item} />}
+                    {...({ estimatedItemSize: 70 } as any)}
                     onEndReached={() => fetchFollowers(true)}
                     onEndReachedThreshold={0.5}
                     ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} color={theme.primary} /> : null}

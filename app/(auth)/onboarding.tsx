@@ -36,6 +36,7 @@ export default function OnboardingScreen() {
     const theme = useThemeColors();
     const { user, updateProfile, setUser } = useAppStore();
 
+    const [displayName, setDisplayName] = useState('');
     const [username, setUsername] = useState('');
     const [status, setStatus] = useState<'idle' | 'validating' | 'available' | 'taken' | 'invalid'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
@@ -191,6 +192,7 @@ export default function OnboardingScreen() {
         try {
             // ONLY execute ONE atomic transaction update to prevent 3-second UI hangs!
             const userUpdate = {
+                displayName: displayName.trim() ? displayName.trim() : username.trim(),
                 username: username,
                 email: user.email || '',
                 timezone: timezone.trim(),
@@ -283,6 +285,27 @@ export default function OnboardingScreen() {
                     </View>
 
                     <Animated.View style={[styles.form, { transform: [{ scale: pulseAnim }] }]}>
+                        <View style={styles.inputContainer}>
+                            <View style={styles.labelRow}>
+                                <Text style={styles.label}>Display Name</Text>
+                            </View>
+                            <View style={[styles.glowBorderWrapper, { borderColor: 'rgba(255,255,255,0.1)' }]}>
+                                <TextInput
+                                    style={[styles.input, { paddingLeft: 8 }]}
+                                    placeholder="What should we call you?"
+                                    placeholderTextColor="rgba(255, 255, 255, 0.3)"
+                                    value={displayName}
+                                    onChangeText={setDisplayName}
+                                    autoCorrect={false}
+                                    maxLength={30}
+                                    editable={!isLoading}
+                                />
+                            </View>
+                            <Text style={styles.helpText}>
+                                The name displayed on your profile. You can change this later.
+                            </Text>
+                        </View>
+
                         <View style={styles.inputContainer}>
                             <View style={styles.labelRow}>
                                 <Text style={styles.label}>Handle ID</Text>

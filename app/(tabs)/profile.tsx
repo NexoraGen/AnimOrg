@@ -415,7 +415,7 @@ export default function ProfileScreen() {
           </Animated.View>
 
           <View style={styles.headerContentWrapper}>
-            <View style={[styles.userInfoRow, isGuest && { marginBottom: spacing.sm }]}>
+            <View style={[styles.userInfoRow, isGuest && { marginBottom: spacing.sm }, { alignItems: 'center' }]}>
               <TouchableOpacity
                 onPress={() => router.push('/edit-profile')}
                 activeOpacity={0.9}
@@ -430,61 +430,84 @@ export default function ProfileScreen() {
                     transition={300}
                     cachePolicy="memory-disk"
                   />
-
                 </View>
               </TouchableOpacity>
 
-              <View style={styles.headerTextContainer}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Text style={[styles.username, { color: 'white' }]}>{user?.username ? user.username : 'Guest User'}</Text>
-                  {user?.favoriteBadgeId && (
-                    <View style={[styles.favoriteBadgeShowcase, { backgroundColor: `${themeColors.primary}20`, borderColor: themeColors.primary }]}>
-                      <Feather name={(ACHIEVEMENTS.find(a => a.id === user.favoriteBadgeId)?.icon || "award") as any} size={10} color={themeColors.primary} />
-                      <Text style={[styles.favoriteBadgeShowcaseText, { color: themeColors.primary }]} numberOfLines={1}>
-                        {ACHIEVEMENTS.find(a => a.id === user.favoriteBadgeId)?.title}
-                      </Text>
-                    </View>
-                  )}
+              {!isGuest && (
+                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginLeft: spacing.sm }}>
+                  <TouchableOpacity onPress={() => router.push('/social/me?tab=posts')} activeOpacity={0.7} style={{ alignItems: 'center' }}>
+                    <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>{userPosts?.length || 0}</Text>
+                    <Text style={{ color: themeColors.textDim, fontSize: 12 }}>Posts</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => router.push('/social/me?tab=followers')} activeOpacity={0.7} style={{ alignItems: 'center' }}>
+                    <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>{followers?.length || 0}</Text>
+                    <Text style={{ color: themeColors.textDim, fontSize: 12 }}>Followers</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => router.push('/social/me?tab=following')} activeOpacity={0.7} style={{ alignItems: 'center' }}>
+                    <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>{following?.length || 0}</Text>
+                    <Text style={{ color: themeColors.textDim, fontSize: 12 }}>Following</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setRankModalVisible(true)}
-                  activeOpacity={0.7}
-                  style={styles.badgeRow}
-                >
-                  <View style={[styles.levelBadge, { backgroundColor: `${themeColors.primary}20`, borderColor: themeColors.primary }]}>
-                    <Text style={[styles.levelText, { color: themeColors.primary }]}>LVL {levelInfo.level}</Text>
+              )}
+            </View>
+
+            <View style={{ marginTop: spacing.md, paddingHorizontal: spacing.xs }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Text style={[styles.username, { color: 'white', fontSize: 20 }]} numberOfLines={1}>
+                  {user?.displayName || user?.username || 'Guest User'}
+                </Text>
+                {user?.favoriteBadgeId && (
+                  <View style={[styles.favoriteBadgeShowcase, { backgroundColor: `${themeColors.primary}20`, borderColor: themeColors.primary }]}>
+                    <Feather name={(ACHIEVEMENTS.find(a => a.id === user.favoriteBadgeId)?.icon || "award") as any} size={10} color={themeColors.primary} />
+                    <Text style={[styles.favoriteBadgeShowcaseText, { color: themeColors.primary }]} numberOfLines={1}>
+                      {ACHIEVEMENTS.find(a => a.id === user.favoriteBadgeId)?.title}
+                    </Text>
                   </View>
-                  <Text style={[styles.levelTitle, { color: 'white' }]}>{levelInfo.rankTitle}</Text>
-                  <Feather name="chevron-right" size={13} color="rgba(255,255,255,0.4)" style={{ marginLeft: 2 }} />
-                </TouchableOpacity>
+                )}
+              </View>
 
-                <TouchableOpacity
-                  onPress={() => router.push('/ranks')}
-                  activeOpacity={0.7}
-                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 }}
-                >
-                  <Feather name="award" size={12} color={themeColors.primary} />
-                  <Text style={{ color: themeColors.primary, fontSize: 12, fontWeight: '700' }}>View All Ranks</Text>
-                  <Feather name="chevron-right" size={12} color={themeColors.primary} />
-                </TouchableOpacity>
-
-                {!isGuest && levelInfo.nextRankTitle && (
-                  <Text style={[styles.nextRankPromo, { color: themeColors.textDim, marginTop: 4 }]}>
-                    Next Rank: {levelInfo.nextRankTitle} (Level {levelInfo.nextRankMinLevel})
+              <View style={styles.bioContainer}>
+                {user?.bio && (
+                  <Text style={[styles.bio, { color: 'rgba(255,255,255,0.7)', marginTop: 2 }]} numberOfLines={2}>
+                    {user.bio}
                   </Text>
                 )}
               </View>
+
+              {!isGuest && (
+                <View style={{ marginTop: spacing.sm }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <TouchableOpacity onPress={() => setRankModalVisible(true)} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={[styles.levelBadge, { backgroundColor: `${themeColors.primary}20`, borderColor: themeColors.primary }]}>
+                        <Text style={[styles.levelText, { color: themeColors.primary }]}>LVL {levelInfo.level}</Text>
+                      </View>
+                      <Text style={[styles.levelTitle, { color: 'white', marginLeft: 6 }]}>{levelInfo.rankTitle}</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => router.push('/ranks')} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Feather name="award" size={12} color={themeColors.primary} />
+                      <Text style={{ color: themeColors.primary, fontSize: 12, fontWeight: '700' }}>View Ranks</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {levelInfo.nextRankTitle && (
+                    <Text style={[styles.nextRankPromo, { color: themeColors.textDim, marginTop: 4, fontSize: 12, width: '100%' }]}>
+                      Next Rank: {levelInfo.nextRankTitle} (Level {levelInfo.nextRankMinLevel})
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
 
             {/* XP PROGRESS BAR */}
             {!isGuest && (
-              <View style={styles.xpProgressContainer}>
+              <View style={[styles.xpProgressContainer, { marginTop: spacing.md }]}>
                 <View style={styles.xpTextRow}>
                   <Text style={[styles.xpText, { color: 'rgba(255,255,255,0.7)' }]}>
                     {levelInfo.currentXp - levelInfo.xpForCurrentLevel} / {levelInfo.xpForNextLevel - levelInfo.xpForCurrentLevel} XP ({Math.round(levelInfo.progressPercentage)}%)
                   </Text>
                   <Text style={[styles.xpUntilText, { color: themeColors.primary }]}>
-                    {levelInfo.xpForNextLevel - levelInfo.currentXp} XP until Level {levelInfo.level + 1}
+                    {levelInfo.xpForNextLevel - levelInfo.currentXp} XP left
                   </Text>
                 </View>
                 <View style={[styles.progressTrack, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
@@ -503,7 +526,7 @@ export default function ProfileScreen() {
 
             {isGuest ? (
               <TouchableOpacity
-                style={[styles.pillActionButton, { backgroundColor: themeColors.primary }]}
+                style={[styles.pillActionButton, { backgroundColor: themeColors.primary, marginTop: spacing.md }]}
                 onPress={() => {
                   clearSession();
                   setTimeout(() => {
@@ -517,7 +540,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={styles.pillActionButton}
+                style={[styles.pillActionButton, { marginTop: spacing.md }]}
                 onPress={() => router.push('/edit-profile')}
                 activeOpacity={0.8}
               >
@@ -525,26 +548,8 @@ export default function ProfileScreen() {
                 <Text style={styles.pillActionButtonText}>Edit Profile</Text>
               </TouchableOpacity>
             )}
-
-            <View style={styles.bioContainer}>
-              {user?.bio && (
-                <Text style={[styles.bio, { color: 'rgba(255,255,255,0.7)' }]} numberOfLines={2}>
-                  {user.bio}
-                </Text>
-              )}
-            </View>
           </View>
         </View>
-
-        {/* --- SOCIAL STATS STRIP --- */}
-        <ProfileStatsStrip
-          followingCount={following?.length || 0}
-          followersCount={followers?.length || 0}
-          postsCount={userPosts?.length || 0}
-          onFollowingPress={() => router.push('/social/me?tab=following')}
-          onFollowersPress={() => router.push('/social/me?tab=followers')}
-          onPostsPress={() => { }}
-        />
 
         {/* --- PROFILE STATISTICS GRID --- */}
         <ProfileStatsGrid
@@ -863,7 +868,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     zIndex: 10,
     width: '100%',
-    marginTop: 20,
+    marginTop: 30,
     paddingBottom: 0,
   },
   userInfoRow: {
@@ -898,10 +903,16 @@ const styles = StyleSheet.create({
     paddingRight: 120, // Prevents long usernames from overflowing under the absolute-positioned action bar
   },
   username: {
-    fontSize: 28,
-    fontWeight: '900' as any,
-    letterSpacing: -0.8,
+    fontSize: 24,
+    fontWeight: '800' as any,
+    letterSpacing: -0.5,
     color: 'white',
+  },
+  handle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 3,
+    marginBottom: 6,
   },
   badgeRow: {
     flexDirection: 'row',

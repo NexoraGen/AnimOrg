@@ -32,6 +32,7 @@ export default function EditProfileScreen() {
   const themeColors = useThemeColors();
   const { user, updateProfile } = useAppStore();
 
+  const [displayName, setDisplayName] = useState(user?.displayName || user?.username || '');
   const [username, setUsername] = useState(user?.username || '');
   const [bio, setBio] = useState(user?.bio || '');
 
@@ -138,6 +139,7 @@ export default function EditProfileScreen() {
       let finalAvatarUrl = selectedAvatar;
 
       await updateProfile({
+        displayName: displayName.trim() || cleanedUsername,
         username: cleanedUsername,
         bio: bio.trim(),
         avatarUrl: finalAvatarUrl,
@@ -247,6 +249,23 @@ export default function EditProfileScreen() {
               <Text style={[styles.permissionToastText, { color: themeColors.error }]}>{saveError}</Text>
             </View>
           ) : null}
+
+          {/* Display Name Input */}
+          <View style={styles.inputSection}>
+            <Text style={[styles.inputLabel, { color: themeColors.text }]}>Display Name</Text>
+            <View style={[styles.inputContainer, { backgroundColor: themeColors.surface, borderColor: themeColors.border }]}>
+              <Feather name="star" size={20} color={themeColors.textDim} />
+              <TextInput
+                style={[styles.input, { color: themeColors.text }]}
+                value={displayName}
+                onChangeText={setDisplayName}
+                placeholder="What should we call you?"
+                placeholderTextColor={themeColors.textDim}
+                autoCorrect={false}
+                maxLength={30}
+              />
+            </View>
+          </View>
 
           {/* Username Input Settings */}
           <View style={styles.inputSection}>

@@ -3,7 +3,7 @@ import { WatchlistItem, AnimeProgress } from '../types';
 
 export interface CollectionLike {
     id: string;
-    animeIds: string[];
+    animeIds?: string[];
 }
 
 export interface RatingLike {
